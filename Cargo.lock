@@ -691,6 +691,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness-tools"
+version = "0.1.0"
+dependencies = [
+ "harness-bash",
+ "harness-core",
+ "harness-glob",
+ "harness-grep",
+ "harness-lsp",
+ "harness-read",
+ "harness-skill",
+ "harness-webfetch",
+ "harness-write",
+]
+
+[[package]]
 name = "harness-webfetch"
 version = "0.1.0"
 dependencies = [

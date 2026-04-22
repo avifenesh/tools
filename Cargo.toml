@@ -10,6 +10,7 @@ members = [
     "crates/write",
     "crates/lsp",
     "crates/skill",
+    "crates/harness-tools",
 ]
 
 [workspace.package]
