@@ -1,0 +1,66 @@
+{
+  "name": "@agent-sh/harness-bash",
+  "version": "0.1.0",
+  "description": "Bash tool for AI agent harnesses — autonomous shell execution with pluggable executor, permission hook, cwd-carry, inactivity timeout, and background job support",
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "tool-use",
+    "bash",
+    "shell",
+    "exec",
+    "sandbox",
+    "bedrock",
+    "openai"
+  ],
+  "license": "MIT",
+  "author": "Avi Fenesh",
+  "homepage": "https://github.com/avifenesh/tools/tree/main/packages/bash#readme",
+  "bugs": {
+    "url": "https://github.com/avifenesh/tools/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avifenesh/tools.git",
+    "directory": "packages/bash"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@agent-sh/harness-core": "workspace:*",
+    "valibot": "^0.42.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

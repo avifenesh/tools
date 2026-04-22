@@ -1,0 +1,257 @@
+{
+  "topic": "Tool use methods — function calling, schemas, and execution patterns",
+  "slug": "agent-tool-use-methods",
+  "generated": "2026-04-19T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 20,
+  "sourceBreakdown": {
+    "officialDocs": 10,
+    "engineeringBlogs": 3,
+    "researchPapers": 4,
+    "analysis": 1,
+    "github": 1,
+    "leaderboards": 1
+  },
+  "sources": [
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/overview",
+      "title": "Anthropic: Tool use with Claude (overview)",
+      "qualityScore": 98,
+      "scores": {"authority": 10, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 9},
+      "keyInsights": [
+        "Canonical tool_use/tool_result block model with stop_reason='tool_use'",
+        "Client tools run in your application; server tools run on Anthropic infrastructure",
+        "Tool system prompt adds fixed 313-346 tokens overhead on Claude 4.x models",
+        "If required parameter missing, Opus asks; Sonnet/Haiku may guess"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/define-tools",
+      "title": "Anthropic: Define tools",
+      "qualityScore": 96,
+      "scores": {"authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 8},
+      "keyInsights": [
+        "Tool description is by far the most important factor in performance; aim for 3-4 sentences",
+        "input_examples (schema-validated) help complex tools; adds 20-200 tokens",
+        "tool_choice: auto|any|tool|none — any/tool prefills assistant turn, no preface text",
+        "Extended thinking incompatible with tool_choice any or tool (400 error)"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/strict-tool-use",
+      "title": "Anthropic: Strict tool use",
+      "qualityScore": 95,
+      "scores": {"authority": 10, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 7},
+      "keyInsights": [
+        "strict: true uses grammar-constrained sampling to guarantee schema conformance",
+        "Requires additionalProperties: false; schemas cached up to 24 hours",
+        "Tool name also guaranteed valid under strict mode",
+        "HIPAA warning: never put PHI in schema property names, enum values, patterns"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/parallel-tool-use",
+      "title": "Anthropic: Parallel tool use",
+      "qualityScore": 94,
+      "scores": {"authority": 10, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 8},
+      "keyInsights": [
+        "Parallel tool calls are default on Claude 4.x; disable with disable_parallel_tool_use",
+        "CRITICAL: return all tool_results in a single user message or model stops parallelizing",
+        "System prompt phrasing affects parallelism: 'invoke all relevant tools simultaneously'",
+        "Track avg_tools_per_message > 1.0 to verify parallel calls work"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/fine-grained-tool-streaming",
+      "title": "Anthropic: Fine-grained tool streaming",
+      "qualityScore": 92,
+      "scores": {"authority": 10, "recency": 10, "depth": 8, "examples": 10, "uniqueness": 9},
+      "keyInsights": [
+        "Set eager_input_streaming: true per-tool to disable buffering/validation",
+        "Reduces latency ~15s → ~3s for large parameter payloads",
+        "May yield invalid/partial JSON if max_tokens hits mid-parameter",
+        "Wrap invalid JSON as {'INVALID_JSON': '...'} when feeding back to model"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/tool-search-tool",
+      "title": "Anthropic: Tool search tool",
+      "qualityScore": 97,
+      "scores": {"authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 10},
+      "keyInsights": [
+        "Multi-server MCP setup can consume 55k tokens in tool definitions before work starts",
+        "Selection accuracy degrades above 30-50 available tools",
+        "defer_loading: true keeps tools out of system prompt; loaded via regex or BM25 search",
+        "Preserves prompt caching; supports up to 10,000 tools; 3-5 results per search"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/writing-tools-for-agents",
+      "title": "Anthropic Engineering: Writing tools for agents",
+      "qualityScore": 93,
+      "scores": {"authority": 10, "recency": 9, "depth": 9, "examples": 7, "uniqueness": 10},
+      "keyInsights": [
+        "Consolidate: one schedule_event tool beats list_users + list_events + create_event",
+        "Avoid low-signal tools that force agents to process irrelevant data",
+        "Namespace tool names by service: github_list_prs, slack_send_message",
+        "Return semantic IDs (names, slugs) not UUIDs; agents reason better on language"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents",
+      "title": "Anthropic Engineering: Effective context engineering",
+      "qualityScore": 90,
+      "scores": {"authority": 10, "recency": 9, "depth": 8, "examples": 5, "uniqueness": 9},
+      "keyInsights": [
+        "Just-in-time retrieval: load info on demand, don't pre-load everything",
+        "Context has an 'attention budget' — performance degrades with too many tokens",
+        "Tools should be self-contained, robust to error, extremely clear in intent",
+        "Compaction + structured note-taking + multi-agent for long-horizon tasks"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/cookbook/examples/how_to_call_functions_with_chat_models",
+      "title": "OpenAI Cookbook: Function calling with chat models",
+      "qualityScore": 90,
+      "scores": {"authority": 10, "recency": 9, "depth": 8, "examples": 9, "uniqueness": 6},
+      "keyInsights": [
+        "tools array format: {type: 'function', function: {name, description, parameters}}",
+        "tool_choice: omit (auto) | 'none' | {type: 'function', function: {name}} | 'required'",
+        "Parallel tool calls supported on GPT-4o+; finish_reason = 'tool_calls'",
+        "function.arguments is a JSON string — always JSON.parse before use"
+      ]
+    },
+    {
+      "url": "https://openai.com/index/introducing-structured-outputs-in-the-api/",
+      "title": "OpenAI: Introducing Structured Outputs in the API",
+      "qualityScore": 88,
+      "scores": {"authority": 10, "recency": 8, "depth": 7, "examples": 7, "uniqueness": 8},
+      "keyInsights": [
+        "strict: true uses grammar-based token filtering for 100% schema conformance",
+        "First requests preprocess schema into context-free grammar (latency cost)",
+        "Only JSON Schema subset supported; all objects need additionalProperties: false",
+        "Edge case: confused model may loop generating valid output until max_tokens"
+      ]
+    },
+    {
+      "url": "https://simonwillison.net/2024/Aug/6/openai-structured-outputs/",
+      "title": "Simon Willison: OpenAI Structured Outputs analysis",
+      "qualityScore": 82,
+      "scores": {"authority": 8, "recency": 8, "depth": 7, "examples": 6, "uniqueness": 9},
+      "keyInsights": [
+        "Technique borrowed from jsonformer and llama.cpp",
+        "OpenAI engineer recommendation: 'in 99% of cases, you'll want strict: true'",
+        "OpenAI strict mode eliminates optional properties — use unions with null instead",
+        "gpt-4o-2024-08-06 also delivered 50% input cost cut + doubled output tokens"
+      ]
+    },
+    {
+      "url": "https://modelcontextprotocol.io/introduction",
+      "title": "Model Context Protocol: Introduction",
+      "qualityScore": 94,
+      "scores": {"authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 10},
+      "keyInsights": [
+        "MCP = 'USB-C for AI applications' — standardized context + tool exchange",
+        "Supported by Claude, ChatGPT, VS Code, Cursor, MCPJam, and others",
+        "Open protocol — build once, integrate everywhere",
+        "Distinguishes connecting data sources, tools, and workflows"
+      ]
+    },
+    {
+      "url": "https://modelcontextprotocol.io/docs/learn/architecture",
+      "title": "MCP: Architecture overview",
+      "qualityScore": 95,
+      "scores": {"authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 9},
+      "keyInsights": [
+        "Host → Client → Server model over JSON-RPC 2.0",
+        "Three server primitives: tools, resources, prompts",
+        "Three client primitives: sampling, elicitation, logging",
+        "Transports: stdio (local) or Streamable HTTP (remote, with optional SSE)"
+      ]
+    },
+    {
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18",
+      "title": "MCP Specification 2025-06-18",
+      "qualityScore": 93,
+      "scores": {"authority": 10, "recency": 10, "depth": 9, "examples": 7, "uniqueness": 9},
+      "keyInsights": [
+        "MCP inspired by Language Server Protocol — standardize across ecosystem",
+        "Tools MUST be treated as arbitrary code execution; descriptions untrusted",
+        "Hosts MUST obtain user consent before invoking tools or exposing data",
+        "Sampling requests MUST be explicitly approved by user"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "title": "MCP Reference Server Implementations",
+      "qualityScore": 84,
+      "scores": {"authority": 10, "recency": 9, "depth": 7, "examples": 8, "uniqueness": 6},
+      "keyInsights": [
+        "Reference servers: filesystem, git, fetch, memory, sequential-thinking, time, everything",
+        "SDKs for TypeScript, Python, C#, Go, Java, Kotlin, PHP, Ruby, Rust, Swift",
+        "Memory server implements knowledge-graph-based persistence",
+        "Launched via npx or uvx for local stdio transport"
+      ]
+    },
+    {
+      "url": "https://huggingface.co/docs/transformers/en/chat_extras",
+      "title": "Hugging Face: Tool use in Transformers",
+      "qualityScore": 85,
+      "scores": {"authority": 9, "recency": 9, "depth": 8, "examples": 10, "uniqueness": 8},
+      "keyInsights": [
+        "apply_chat_template accepts Python functions or JSON schemas directly",
+        "Google-style docstrings required for auto JSON-schema generation via get_json_schema",
+        "Tool calls go in tool_calls key of assistant message (dict, not JSON string)",
+        "Hermes-2-Pro, Command-R, Mixtral-8x22B support tool use; formats are model-specific"
+      ]
+    },
+    {
+      "url": "https://gorilla.cs.berkeley.edu/leaderboard.html",
+      "title": "Berkeley Function Calling Leaderboard (BFCL)",
+      "qualityScore": 92,
+      "scores": {"authority": 10, "recency": 10, "depth": 8, "examples": 5, "uniqueness": 10},
+      "keyInsights": [
+        "v1: AST evaluation; v2: enterprise APIs; v3: multi-turn; v4: agentic with web search",
+        "Two pathways: FC (native function calling) and Prompt (text workarounds)",
+        "Metrics: accuracy, latency (seconds), estimated USD cost",
+        "Scoring is unweighted average across sub-categories"
+      ]
+    },
+    {
+      "url": "https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html",
+      "title": "BFCL v3: Multi-turn function calling",
+      "qualityScore": 90,
+      "scores": {"authority": 10, "recency": 9, "depth": 9, "examples": 6, "uniqueness": 10},
+      "keyInsights": [
+        "1,000 entries: Base Multi-Turn + Missing Params/Functions + Long-Context + Composite",
+        "State-based evaluation compares final backend state to ground truth",
+        "Response-based evaluation uses subset-matching of function calls",
+        "Three failure modes: Implicit Action Gaps, State Unawareness, Over-Planning"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2307.16789",
+      "title": "ToolLLM / ToolBench (arXiv 2307.16789)",
+      "qualityScore": 87,
+      "scores": {"authority": 9, "recency": 7, "depth": 9, "examples": 6, "uniqueness": 10},
+      "keyInsights": [
+        "16,464 real-world RESTful APIs across 49 categories from RapidAPI Hub",
+        "DFS-based decision tree improves reasoning by exploring multiple paths",
+        "ToolLLaMA achieves comparable performance to ChatGPT on API calling",
+        "Strong zero-shot generalization to unseen APIs (APIBench OOD)"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2305.15334",
+      "title": "Gorilla: LLM Connected with Massive APIs (arXiv 2305.15334)",
+      "qualityScore": 86,
+      "scores": {"authority": 9, "recency": 7, "depth": 8, "examples": 6, "uniqueness": 10},
+      "keyInsights": [
+        "Even GPT-4 struggles with accurate API input arguments and hallucinates usage",
+        "Retrieval-aware training substantially mitigates hallucination",
+        "Adapts to test-time document changes — no retraining for API updates",
+        "APIBench: HuggingFace + TorchHub + TensorHub evaluation dataset"
+      ]
+    }
+  ]
+}

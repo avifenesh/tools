@@ -1,0 +1,338 @@
+{
+  "topic": "Glob tool implementation and prompts in major AI coding agent tools and libraries",
+  "slug": "glob-impl-and-prompts-in-major-tools",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code Tools Reference (Official)",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 8 },
+      "keyInsights": [
+        "Glob tool is listed as a first-class built-in: \"Finds files based on pattern matching\", permission required: No",
+        "Grep and Glob are listed as separate tools, reinforcing the two-primitive design",
+        "Tool names are the exact strings used in permission rules / hook matchers / subagent tool lists",
+        "Docs do not publish the full Glob tool description string; it must be extracted from runtime"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://code.claude.com/docs/en/agent-sdk",
+      "title": "Claude Agent SDK Overview (Official)",
+      "qualityScore": 84,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Glob listed in built-in tool table with phrasing: \"Find files by pattern (`**/*.ts`, `src/**/*.py`)\"",
+        "Example code shows `allowed_tools=[\"Read\", \"Glob\", \"Grep\"]` as the canonical read-only agent configuration",
+        "SDK documents Glob + Grep as the paired discovery primitives for subagent exploration"
+      ],
+      "codeExamples": [
+        { "language": "python", "description": "ClaudeAgentOptions allowed_tools list including Glob" },
+        { "language": "typescript", "description": "query with allowedTools: ['Read','Glob','Grep']" }
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/glob.ts",
+      "title": "OpenCode glob.ts source (GitHub)",
+      "qualityScore": 92,
+      "scores": { "authority": 9, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 9 },
+      "keyInsights": [
+        "Exact parameter schemas including the verbatim 'DO NOT enter \"undefined\" or \"null\"' instruction for the optional path param",
+        "100-result cap, results sorted by mtime newest first, truncation notice emitted to model",
+        "Uses a `Ripgrep.files()` service under the hood with glob pattern passed directly",
+        "Empty-result message: \"No files found\" — short, single-line, no sibling suggestions",
+        "Throws when resolved path is a file not a directory"
+      ],
+      "codeExamples": [
+        { "language": "typescript", "description": "Tool.define('glob', { parameters: z.object({...}) })" }
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/glob.txt",
+      "title": "OpenCode glob.txt description file (GitHub)",
+      "qualityScore": 85,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Exact description imported as DESCRIPTION constant: near-verbatim Claude Code wording",
+        "Mentions 'Use the Task tool for open-ended searches requiring multiple rounds' (OpenCode's analog of Claude Code's Agent-tool redirect)",
+        "Mentions 'multiple tools can be called simultaneously for batch searches' — permission model is concurrent-safe"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/glob.ts",
+      "title": "Gemini CLI glob.ts source (GitHub)",
+      "qualityScore": 91,
+      "scores": { "authority": 9, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Most parameter-rich Glob schema: pattern, dir_path, case_sensitive, respect_git_ignore, respect_gemini_ignore",
+        "Structured error types: PATH_NOT_IN_WORKSPACE, GLOB_EXECUTION_ERROR — usable by the harness for auto-redirect",
+        "Sort logic: files modified within last 24h first (newest), then alphabetical for older — a twist on pure mtime-sort",
+        "Description references absolute-path bias but implementation accepts both",
+        "Error messages quote the pattern back: 'No files found matching pattern \"{pattern}\"'"
+      ],
+      "codeExamples": [
+        { "language": "typescript", "description": "GlobToolParams interface with 5 optional params" }
+      ]
+    },
+    {
+      "url": "https://www.geminicli.com/docs/tools/file-system",
+      "title": "Gemini CLI file-system tools documentation",
+      "qualityScore": 72,
+      "scores": { "authority": 7, "recency": 9, "depth": 7, "examples": 7, "uniqueness": 5 },
+      "keyInsights": [
+        "Display name is 'FindFiles' — interesting UX naming divergence from canonical 'glob'",
+        "Automatically excludes node_modules, .git without exposing the exclusion list",
+        "Output format template: 'Found {N} file(s) matching \"{pattern}\" within {path}, sorted by modification time (newest first):'",
+        "No manual approval required — auto-approved read-only operation"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/definitions/model-family-sets/default-legacy.ts",
+      "title": "Gemini CLI default-legacy.ts (tool definitions)",
+      "qualityScore": 88,
+      "scores": { "authority": 9, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Verbatim glob description: 'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.'",
+        "Parameter description for pattern: 'The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').'",
+        "Parameter description for dir_path: 'The absolute path to the directory to search within. If omitted, searches the root directory.'",
+        "Uses 'omitted' instead of 'optional' in parameter description — reduces undefined/null confusion"
+      ],
+      "codeExamples": [
+        { "language": "typescript", "description": "GLOB_DEFINITION constant with description + parametersJsonSchema" }
+      ]
+    },
+    {
+      "url": "https://github.com/cline/cline/tree/main/src/core/prompts/system-prompt/tools",
+      "title": "Cline system-prompt tools directory (GitHub)",
+      "qualityScore": 86,
+      "scores": { "authority": 8, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 9 },
+      "keyInsights": [
+        "Cline does NOT have a dedicated Glob tool — ships list_files + search_files (regex with optional file_pattern glob filter)",
+        "list_files exact description: 'Request to list files and directories within the specified directory. If recursive is true...'",
+        "search_files has `file_pattern` param: 'Glob pattern to filter files (e.g., *.ts for TypeScript files). If not provided, it will search all files (*).'",
+        "Has three model-family variants per tool: GENERIC, NATIVE_GPT_5, NATIVE_NEXT_GEN — minor wording differences per variant",
+        "'Do not use this tool to confirm the existence of files you may have created' — explicit negative guidance"
+      ],
+      "codeExamples": [
+        { "language": "typescript", "description": "ClineToolSpec with parameters array (name/required/instruction/usage)" }
+      ]
+    },
+    {
+      "url": "https://github.com/continuedev/continue/blob/main/core/tools/definitions/globSearch.ts",
+      "title": "Continue.dev globSearch.ts (GitHub)",
+      "qualityScore": 88,
+      "scores": { "authority": 8, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Tool name: FileGlobSearch, display title 'Glob File Search'",
+        "Exact description: 'Search for files recursively in the project using glob patterns. Supports ** for recursive directory search. Will not show many build, cache, secrets dirs/files (can use ls tool instead). Output may be truncated; use targeted patterns'",
+        "Only harness in sample that pre-warns about truncation INSIDE the description",
+        "Only harness that explicitly says 'Will not show build/cache/secrets' — surfaces the exclusion behavior to the model",
+        "defaultToolPolicy: allowedWithoutPermission — read-only, instant, no confirmation",
+        "Single parameter: pattern (string, required). No path parameter at all — searches project-wide."
+      ],
+      "codeExamples": [
+        { "language": "typescript", "description": "globSearchTool with readonly: true, isInstant: true" }
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+      "title": "MCP filesystem server (modelcontextprotocol/servers)",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Tool name: search_files (NOT glob); description 'Recursively search for files and directories matching a pattern. The patterns should be glob-style patterns that match paths relative to the working directory.'",
+        "Parameters: path (required), pattern (required), excludePatterns (array, default [])",
+        "Backs pattern matching with minimatch — bash-compat semantics including `a/**/b` but NOT `a/**b`",
+        "Access control: restricted to allowed directories configured at server start",
+        "Also ships list_directory, directory_tree, list_directory_with_sizes — four separate file-discovery primitives",
+        "Directory tree returns JSON {name, type, children[]} — unique among harnesses for structured directory output"
+      ],
+      "codeExamples": [
+        { "language": "typescript", "description": "search_files with minimatch backend" }
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex/tree/main/codex-rs/core/src/tools/handlers",
+      "title": "OpenAI Codex CLI tool handlers (GitHub)",
+      "qualityScore": 83,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Codex CLI does NOT have a dedicated Glob tool — only list_dir (ListDirHandler), view_image, shell, shell_command, unified_exec",
+        "ListDirArgs: dir_path (required absolute), offset (1-indexed, default 1), limit (default 25), depth (default 2)",
+        "BFS traversal via VecDeque; appends / for dirs, @ for symlinks, ? for other types",
+        "File discovery happens through shell tool with rg --files -g; relies on model's RL training to use rg correctly",
+        "Sandboxing policy filters read operations before ListDir runs"
+      ],
+      "codeExamples": [
+        { "language": "rust", "description": "ListDirHandler with paginated BFS directory traversal" }
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex/blob/main/codex-rs/core/gpt_5_codex_prompt.md",
+      "title": "OpenAI Codex gpt_5_codex system prompt",
+      "qualityScore": 81,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 10 },
+      "keyInsights": [
+        "Explicit guidance: 'When searching for text or files, prefer using `rg` or `rg --files` respectively because `rg` is much faster than alternatives like `grep`.'",
+        "No separate Glob tool documented — shell tool + rg is the full file discovery story",
+        "Fallback to grep or other alternatives when rg unavailable, but no specific instructions for find command",
+        "Same guidance appears in gpt-5.2-codex_prompt.md, confirming this is Codex's stable file-search story"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/SWE-agent/SWE-agent/blob/main/tools/search/config.yaml",
+      "title": "SWE-agent search tool config (YAML)",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 8, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "find_file signature: `find_file <file_name> [<dir>]`",
+        "Description: 'finds all files with the given name or pattern in dir. If dir is not provided, searches in the current directory'",
+        "file_name param doc: 'the name of the file or pattern to search for. supports shell-style wildcards (e.g. *.py)'",
+        "Does NOT support `**` globstar — limited to shell-level fnmatch",
+        "Also ships search_dir (search term in all files in dir) and search_file (search term in single file) — three separate primitives",
+        "Implemented via bin scripts (find(1) wrapper), not a native tool — so respects whatever find's behavior is on the host"
+      ],
+      "codeExamples": [
+        { "language": "yaml", "description": "find_file/search_dir/search_file config with signatures and arg descriptions" }
+      ]
+    },
+    {
+      "url": "https://github.com/All-Hands-AI/OpenHands/blob/main/openhands/runtime/plugins/agent_skills/file_ops/file_ops.py",
+      "title": "OpenHands find_file/search_dir/search_file (Python)",
+      "qualityScore": 76,
+      "scores": { "authority": 8, "recency": 8, "depth": 7, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "find_file(file_name, dir_path='./') — docstring 'Finds all files with the given name in the specified directory.'",
+        "Signature identical to SWE-agent — both projects draw from the same Python-agent-skills lineage",
+        "No support for `**`; relies on Python fnmatch behavior which is single-level wildcard",
+        "search_dir and search_file are paired primitives for content-search at dir and file granularity",
+        "Note: the agentskills.py file marks this as a legacy V0 implementation deprecated for removal April 1 2026"
+      ],
+      "codeExamples": [
+        { "language": "python", "description": "find_file/search_dir/search_file function signatures" }
+      ]
+    },
+    {
+      "url": "https://github.com/isaacs/node-glob",
+      "title": "node-glob library (isaacs/node-glob)",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 7, "uniqueness": 5 },
+      "keyInsights": [
+        "`**` matches zero or more directories when ALONE in a path portion (so `a/**/b`, not `a/**b`)",
+        "`**` does NOT crawl symlinked directories unless {follow:true} is passed — silent source of non-determinism",
+        "Extglob: !(pattern), ?(pattern), +(pattern), *(pattern), @(pattern) — optional",
+        "Brace expansion: {a,b,c} and {1..3} — disabled via nobrace",
+        "Dotfiles: excluded unless pattern itself starts with . OR dot:true is set",
+        "Negation via `ignore` option, not `!` prefixes — differs from gitignore semantics",
+        "This is the engine behind Gemini CLI's Glob tool"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/mrmlnc/fast-glob",
+      "title": "fast-glob library (mrmlnc/fast-glob)",
+      "qualityScore": 79,
+      "scores": { "authority": 9, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 5 },
+      "keyInsights": [
+        "Distinguishes static patterns (direct stat) from dynamic patterns (traversal) for performance",
+        "Follows symlinks in `**` by default; disable via followSymbolicLinks: false",
+        "Negative patterns: ['*.js', '!node_modules/**'] works inline, unlike node-glob",
+        "Extended globs: ?(pattern), !(pattern), *(pattern), +(pattern) available",
+        "POSIX character classes: [[:digit:]] etc.",
+        "Not used directly by any major harness but reflects the best-of-breed JS glob-engine design"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/isaacs/minimatch",
+      "title": "minimatch library (isaacs/minimatch)",
+      "qualityScore": 78,
+      "scores": { "authority": 10, "recency": 8, "depth": 9, "examples": 6, "uniqueness": 5 },
+      "keyInsights": [
+        "Converts glob to RegExp; hence ReDoS susceptibility on adversarial patterns",
+        "`**` only special if it's the sole path component — `a/**b` does NOT match `a/xxxb`",
+        "Path separator `/` handled specially — 'foo*' does NOT match 'foo/bar' (diverges from fnmatch(3))",
+        "Brace expansion happens BEFORE other interpretation, so braces work even when invalid in bash",
+        "Engine used by MCP filesystem server's search_files",
+        "Docs explicitly warn: 'never use user-supplied input directly as glob patterns in production systems' due to ReDoS"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md",
+      "title": "ripgrep user guide (BurntSushi/ripgrep)",
+      "qualityScore": 87,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 9, "uniqueness": 6 },
+      "keyInsights": [
+        "`-g/--glob` flag filters files to those matching the glob; negation via `!` prefix",
+        "`--files` flag prints files rg would search WITHOUT searching; this is the file-discovery primitive",
+        "Glob patterns follow `.gitignore` conventions — later globs override earlier ones",
+        "Respects .gitignore, .ignore (takes precedence over .gitignore), .rgignore (highest precedence)",
+        "Also respects $GIT_DIR/info/exclude and core.excludesFile",
+        "This is the engine behind Claude Code Glob, OpenCode glob, Cline search_files file_pattern"
+      ],
+      "codeExamples": [
+        { "language": "bash", "description": "rg clap -g '*.toml' and rg --files pattern usage" }
+      ]
+    },
+    {
+      "url": "https://github.com/anthropics/claude-agent-sdk-python",
+      "title": "Claude Agent SDK for Python",
+      "qualityScore": 70,
+      "scores": { "authority": 10, "recency": 10, "depth": 5, "examples": 6, "uniqueness": 5 },
+      "keyInsights": [
+        "Claude Agent SDK gives Python/TypeScript apps access to the same built-in tools as Claude Code",
+        "Default toolset: 'Read, Write, Edit, Bash, and others' (per SDK docs)",
+        "Glob is usable via allowed_tools/allowedTools allowlist",
+        "SDK does not publish the exact Glob tool inputSchema — it's embedded in the CLI binary shipped as an optional dep",
+        "To inspect the Glob tool's actual schema from the SDK, one must intercept the CLI process or read from the running session"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/langchain-ai/langchain/tree/master/libs/community/langchain_community/tools/file_management",
+      "title": "LangChain community file management tools",
+      "qualityScore": 72,
+      "scores": { "authority": 8, "recency": 8, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "FileSearchTool: name='file_search', description='Recursively search for files in a subdirectory that match the regex pattern'",
+        "Despite description saying 'regex pattern', the underlying implementation uses fnmatch (glob-style) — known misleading doc",
+        "FileManagementToolkit bundles: ReadFileTool, WriteFileTool, ListDirectoryTool, CopyFileTool, DeleteFileTool, FileSearchTool, MoveFileTool",
+        "BaseFileToolMixin enforces a root_dir (sandbox) — requests outside error with InvalidPathError",
+        "No mtime sort; no result cap; no gitignore awareness — shallow compared to Claude Code / Gemini CLI"
+      ],
+      "codeExamples": [
+        { "language": "python", "description": "FileManagementToolkit() with root_dir argument" }
+      ]
+    },
+    {
+      "url": "https://cursor.com/docs",
+      "title": "Cursor documentation",
+      "qualityScore": 60,
+      "scores": { "authority": 8, "recency": 9, "depth": 3, "examples": 3, "uniqueness": 5 },
+      "keyInsights": [
+        "Cursor's agent tooling is largely private; docs do not publish the exact Glob/file-search tool schema",
+        "User-facing features reference codebase search, file search, and pattern matching but not the underlying tool names",
+        "Cursor is known (from community reverse engineering) to expose a file_search tool to the model but public documentation is sparse"
+      ],
+      "codeExamples": []
+    },
+    {
+      "url": "https://github.com/RooCodeInc/Roo-Code",
+      "title": "Roo Code (Cline fork)",
+      "qualityScore": 68,
+      "scores": { "authority": 7, "recency": 10, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Fork of Cline; inherits list_files + search_files pair (no dedicated Glob)",
+        "Directory src/core/prompts/tools has native-tools/ subfolder + filter-tools-for-mode.ts — suggests a mode-filtering layer on top of Cline's tool registry",
+        "Active development as of 2026 — one of the most-starred Cline-lineage forks"
+      ],
+      "codeExamples": []
+    }
+  ]
+}

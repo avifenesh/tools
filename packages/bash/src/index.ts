@@ -1,0 +1,55 @@
+export { bash, bashOutput, bashKill, applyCwdCarry, detectTopLevelCd } from "./bash.js";
+export {
+  bashToolDefinition,
+  bashOutputToolDefinition,
+  bashKillToolDefinition,
+  BASH_TOOL_NAME,
+  BASH_TOOL_DESCRIPTION,
+  BASH_OUTPUT_TOOL_NAME,
+  BASH_OUTPUT_TOOL_DESCRIPTION,
+  BASH_KILL_TOOL_NAME,
+  BASH_KILL_TOOL_DESCRIPTION,
+  BashParamsSchema,
+  BashOutputParamsSchema,
+  BashKillParamsSchema,
+  safeParseBashParams,
+  safeParseBashOutputParams,
+  safeParseBashKillParams,
+} from "./schema.js";
+export { createLocalBashExecutor } from "./executor.js";
+export {
+  HeadTailBuffer,
+  formatResultText,
+  formatTimeoutText,
+  formatBackgroundStartedText,
+  formatBashOutputText,
+  formatBashKillText,
+} from "./format.js";
+export {
+  DEFAULT_INACTIVITY_TIMEOUT_MS,
+  DEFAULT_WALLCLOCK_BACKSTOP_MS,
+  MAX_COMMAND_LENGTH,
+  MAX_OUTPUT_BYTES_INLINE,
+  MAX_OUTPUT_BYTES_FILE,
+  BACKGROUND_MAX_JOBS,
+  SENSITIVE_ENV_PREFIXES,
+} from "./constants.js";
+export type {
+  BashParams,
+  BashOutputParams,
+  BashKillParams,
+  BashSessionConfig,
+  BashExecutor,
+  BashRunInput,
+  BashRunResult,
+  BackgroundReadResult,
+  BashResult,
+  BashOutputResult,
+  BashKillResult,
+  BashOk,
+  BashNonzeroExit,
+  BashTimeout,
+  BashBackgroundStarted,
+  BashError,
+  BashPermissionPolicy,
+} from "./types.js";

@@ -1,0 +1,528 @@
+{
+  "topic": "Skill tool pattern across AI agent harnesses — what it IS, how it varies, and whether @agent-sh/harness-* should ship one",
+  "slug": "skill-tool-design-across-harnesses",
+  "generated": "2026-04-22",
+  "depth": "deep",
+  "totalSources": 40,
+  "sources": [
+    {
+      "url": "https://agentskills.io/specification",
+      "title": "Agent Skills Specification",
+      "qualityScore": 98,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 10 },
+      "keyInsights": [
+        "Open spec (originally Anthropic, now community): SKILL.md + optional scripts/, references/, assets/",
+        "Required frontmatter: name (1-64 chars, [a-z0-9-], no leading/trailing hyphen, no double hyphens, must match parent directory name), description (1-1024 chars)",
+        "Optional frontmatter: license, compatibility (1-500 chars), metadata (key/value map), allowed-tools (experimental)",
+        "Progressive disclosure: tier 1 metadata (~100 tokens always-in-context), tier 2 SKILL.md body (<5000 tokens on activation), tier 3 resources (unbounded, on reference)",
+        "Recommend keeping SKILL.md under 500 lines; split detailed reference material to separate files",
+        "skills-ref reference library at github.com/agentskills/agentskills/tree/main/skills-ref validates SKILL.md"
+      ]
+    },
+    {
+      "url": "https://agentskills.io/what-are-skills",
+      "title": "Agent Skills — What are skills?",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Progressive disclosure is three phases: Discovery (startup, name+desc only), Activation (body loaded when task matches), Execution (bundled files loaded as needed)",
+        "Self-documenting, extensible, portable — the three design principles",
+        "Skills are just files — easy to edit, version, and share"
+      ]
+    },
+    {
+      "url": "https://agentskills.io/client-implementation/adding-skills-support",
+      "title": "Adding skills support to your agent",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Five-phase lifecycle: discover → parse → disclose → activate → manage over time",
+        "Four activation patterns: (A) dedicated tool, (B) file-read via Read tool, (C) system prompt injection, (D) slash command — harness picks one or more",
+        "Universal convention: .agents/skills/ for cross-client interop, .<your-client>/skills/ for client-specific, pragmatic fallback .claude/skills/",
+        "Name collision rule: project-level > user-level, log warning on collision",
+        "Trust consideration: gate project-level skill loading on 'user trusts this directory' (same as workspace trust)",
+        "Lenient validation: warn on name/directory mismatch but load, skip if YAML unparseable or description missing",
+        "Catalog placement: either system prompt section OR tool description (both valid)",
+        "If dedicated tool: constrain name parameter to enum of valid skill names to prevent hallucination",
+        "Protect skill content from compaction (wrap in identifying tags, flag as durable)"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/skills",
+      "title": "Claude Code — Extend Claude with skills",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Custom commands (.claude/commands/*.md) merged into skills; both create /name and work the same",
+        "Claude Code extends the open Agent Skills standard with: invocation control (disable-model-invocation, user-invocable), subagent execution (context: fork, agent:), dynamic context injection (!`<cmd>`), allowed-tools pre-approval, paths glob gating, $ARGUMENTS/$N substitutions, ${CLAUDE_SESSION_ID}/${CLAUDE_SKILL_DIR}",
+        "Skill location precedence: enterprise > personal (~/.claude/skills/) > project (.claude/skills/); plugin skills namespaced as plugin-name:skill-name",
+        "Live change detection via filesystem watch; nested .claude/skills/ in monorepo packages auto-discovered",
+        "Skill content lifecycle: rendered SKILL.md enters conversation as one message and stays until session end; NOT re-read on later turns",
+        "Auto-compaction: re-attaches most-recent invocation of each invoked skill, keeping first 5k tokens per skill, 25k total budget",
+        "Description cap: 1,536 chars combined description+when_to_use in skill listing; default budget ~8k chars scaling to 1% of context window; override via SLASH_COMMAND_TOOL_CHAR_BUDGET env var",
+        "Subagent preload: 'skills' field on subagent injects full skill content at startup (inverse of context: fork)"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code Tools reference (Skill tool listed)",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Skill is listed as a built-in tool with Permission: Yes",
+        "Description: 'Executes a skill within the main conversation'",
+        "Skills run through the existing Skill tool — not a new tool entry per skill",
+        "Permission patterns: Skill (deny all), Skill(name) exact match, Skill(name *) prefix match"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview",
+      "title": "Anthropic Platform — Agent Skills overview",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Three surfaces: Claude API (with code execution + skills beta headers), Claude Code (filesystem-based, custom only), Claude.ai (zip upload via Settings)",
+        "API requires three beta headers: code-execution-2025-08-25, skills-2025-10-02, files-api-2025-04-14",
+        "name validation: max 64 chars, lowercase/numbers/hyphens only, NO XML tags, NO reserved words (anthropic, claude)",
+        "description validation: non-empty, max 1024 chars, NO XML tags",
+        "Skills are NOT eligible for ZDR (Zero Data Retention)",
+        "Custom skills do NOT sync across surfaces — must upload separately to each",
+        "Claude.ai: individual user only, no centralized admin; API: workspace-wide; Claude Code: personal or project or plugin-bundled",
+        "API runtime: NO network, NO runtime package install (pre-configured deps only); Claude Code: full network, discourage global package install; Claude.ai: variable network per admin settings",
+        "Strong security warning: malicious skills can direct Claude to invoke tools or execute code, treat like installing software"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices",
+      "title": "Anthropic Platform — Skill authoring best practices",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Context window is a public good; even SKILL.md body tokens compete with conversation",
+        "'Default assumption: Claude is already very smart. Only add context Claude doesn't already have.'",
+        "Set appropriate degrees of freedom: high (text), medium (pseudocode), low (specific scripts)",
+        "Test with every model you plan to use — Haiku needs more guidance than Opus",
+        "Naming convention: prefer gerund form (processing-pdfs, analyzing-spreadsheets); avoid helper/utils/tools",
+        "Write descriptions in THIRD PERSON ('Processes Excel files' not 'I can help you')",
+        "Each skill has exactly ONE description field — make it the discovery signal",
+        "Progressive disclosure patterns: (1) high-level guide with references, (2) domain-specific organization (BigQuery by domain), (3) conditional details",
+        "Keep references ONE level deep from SKILL.md — Claude partially reads deeply-nested files",
+        "Reference files >100 lines: include a table of contents at top",
+        "Workflows for complex tasks (copy-this-checklist pattern), feedback loops (run validator → fix → repeat)",
+        "Avoid time-sensitive info, use consistent terminology, avoid too many options (provide a default + escape hatch)",
+        "Scripts should 'solve, don't punt' — handle errors explicitly, document magic numbers",
+        "Utility scripts save tokens (code never in context, only output)",
+        "Plan-validate-execute pattern for batch operations (intermediate JSON, script-verified before execute)",
+        "Evaluation-driven development: measure unskilled baseline, write just enough to pass evals, iterate"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills",
+      "title": "Anthropic engineering: Equipping agents for the real world with Agent Skills",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Published Oct 16 2025; core argument: composable specialization vs fragmented custom agents",
+        "Agents need 'procedural knowledge and organizational context' for real-world work",
+        "Three-tier information architecture prevents context bloat",
+        "'Amount of context that can be bundled into a skill is effectively unbounded' via progressive disclosure",
+        "MCP is complementary: skills operate at higher abstraction, teaching workflows that may use MCP tools",
+        "Skills replace monolithic instruction sets with modular, discoverable knowledge structures"
+      ]
+    },
+    {
+      "url": "https://claude.com/blog/skills",
+      "title": "Anthropic: Introducing Skills (news announcement)",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Announcement date: October 16, 2025. Update Dec 18, 2025: organization-wide management, directory, open standard published",
+        "Four key characteristics: composable (multiple skills work together), portable (same format across Claude apps/Code/API), efficient (minimal info loaded when relevant), powerful (can include executable code)",
+        "'Skills are folders that include instructions, scripts, and resources that Claude can load when needed'",
+        "skill-creator skill guides users through folder structure and SKILL.md creation"
+      ]
+    },
+    {
+      "url": "https://simonwillison.net/2025/Oct/16/claude-skills/",
+      "title": "Simon Willison: Claude Skills are awesome, maybe a bigger deal than MCP",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Third-party independent analysis; key headline: 'maybe a bigger deal than MCP'",
+        "MCP token cost argument: GitHub's MCP consumes 'tens of thousands of tokens of context', skills cost 'few dozen extra tokens' per skill",
+        "Framing: Claude Code is 'a tool for general computer automation', not just coding",
+        "Universality: 'You can grab a skills folder right now, point Codex CLI or Gemini CLI at it and say read pdf/SKILL.md.'",
+        "Skills leverage the coding environment itself — LLMs already know --help, file navigation, shell",
+        "Concern raised: sandboxing to prevent prompt injection attacks"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/tools/",
+      "title": "OpenCode tools overview (skill tool in 13-tool surface)",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "13 tools: read, write, edit, apply_patch, grep, glob, lsp (experimental), bash, webfetch, websearch, skill, todowrite, question",
+        "skill tool: 'Load a skill (a SKILL.md file) and return its content in the conversation'",
+        "permission.skill config: allow/deny/ask",
+        "skill is positioned between pure code tools and user interaction capabilities"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/skills/",
+      "title": "OpenCode skills documentation",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Discovery order: project first (.opencode/skills/, .claude/skills/, .agents/skills/), then global (~/.config/opencode/skills/, ~/.claude/skills/, ~/.agents/skills/)",
+        "Walks up directory tree to git worktree root",
+        "Strict name validation: regex ^[a-z0-9]+(-[a-z0-9]+)*$, must match directory name",
+        "Frontmatter: name (1-64 chars), description (1-1024 chars), optional license/compatibility/metadata",
+        "Permission rules (allow/deny/ask) configured in opencode.json with pattern matching",
+        "Can disable entirely via tools.skill: false",
+        "Agent frontmatter can override permissions per-agent"
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/skill.ts",
+      "title": "OpenCode skill.ts source",
+      "qualityScore": 87,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Input schema: { name: string }",
+        "Description loaded from external skill.txt file",
+        "Lookup via Skill.Service dependency; errors list all available skills on not-found",
+        "Permission check via 'skill' permission type with skill name as pattern BEFORE loading",
+        "Uses Ripgrep to sample up to 10 files in the skill directory (excluding SKILL.md)",
+        "Returns: formatted skill content block + base directory URL + sampled files + metadata",
+        "Emphasizes sandboxed access control and limited file discovery"
+      ]
+    },
+    {
+      "url": "https://github.com/continuedev/continue/blob/main/core/tools/definitions/readSkill.ts",
+      "title": "Continue.dev readSkill source",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Input schema: { skillName: string } (required)",
+        "displayTitle: 'Read Skill'; readonly: true; isInstant: true",
+        "Loads markdown skills via loadMarkdownSkills(params.ide)",
+        "Description dynamically lists available skills with name + description",
+        "Returns markdown content with {{{ skillName }}} templating for user-facing messages"
+      ]
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/activate-skill.ts",
+      "title": "Gemini CLI activate-skill source",
+      "qualityScore": 87,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Input type: ActivateSkillToolParams { name: string }",
+        "Schema dynamically generated via getActivateSkillDefinition(skillNames) — enum of valid skill names",
+        "Display title: 'Activate Skill'",
+        "Returns ToolResult with llmContent: <activated_skill> XML containing body + folder resources",
+        "Error messages include list of available skills",
+        "Key pattern: enum-constrained schema prevents hallucinated skill names"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/skills/",
+      "title": "Codex CLI skills documentation",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "NO dedicated Skill tool — skills are a packaging format, not a discrete invocation mechanism",
+        "Two activation approaches: (1) explicit via `$skill-name` mention or `/skills` listing, (2) implicit via description-match auto-selection",
+        "Directory structure: SKILL.md required + optional scripts/, references/, assets/, agents/openai.yaml",
+        "Auto-detection of skill changes (live reload); new installs may require restart",
+        "Progressive disclosure: Codex starts with metadata only, loads full SKILL.md only when activated",
+        "$ prefix mentions skills directly in prompts; `$skill-creator` and `$skill-installer` are bundled"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex/tree/main/codex-rs/core-skills",
+      "title": "Codex core-skills Rust crate",
+      "qualityScore": 84,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Public types: SkillMetadata, SkillPolicy, SkillError, SkillLoadOutcome, SkillsLoadInput, AvailableSkills, SkillMetadataBudget, SkillDependencyInfo",
+        "Functions: detect_implicit_skill_invocation_for_command(), build_skill_name_counts(), build_available_skills()",
+        "Modules: loader, manager, model, render, injection, config_rules, remote",
+        "Confirms Codex's architecture: system-prompt injection of catalog + pattern-based command detection + NO tool call",
+        "Has 'remote' module suggesting API-fetched skills (not just local filesystem)"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "title": "Claude Code subagents docs (skills integration)",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Subagents: specialized AI assistants with own context window, custom system prompt, specific tool access, independent permissions",
+        "Built-in subagents: Explore (Haiku, read-only), Plan (read-only, for plan mode), general-purpose (all tools)",
+        "Subagent frontmatter includes: name, description, tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, effort, isolation, color, initialPrompt",
+        "`skills` field preloads skill bodies INTO the subagent's context at startup — full content, not just catalog",
+        "Cannot preload skills with disable-model-invocation: true",
+        "Subagents do NOT inherit skills from parent; must list explicitly",
+        "Subagent with `skills: []` field vs skill with `context: fork` — inverse directions of same composition",
+        "Permission modes: default, acceptEdits, auto, dontAsk, bypassPermissions, plan",
+        "Bypass-permissions still protects .git/.claude/.vscode/.idea/.husky (except .claude/commands, .claude/agents, .claude/skills)"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/mcp",
+      "title": "Claude Code MCP documentation",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 5 },
+      "keyInsights": [
+        "MCP is for custom tool connection; skills are for reusable prompt-based workflows",
+        "ToolSearch + defer_loading scale MCP tool counts by NOT putting all tool schemas in context at startup",
+        "MCP servers remain the right answer for typed function-call surfaces",
+        "Explicit guidance: 'Write a skill, which runs through the existing Skill tool rather than adding a new tool entry'"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/agent-sdk/overview",
+      "title": "Claude Agent SDK overview",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Agent SDK renamed from Claude Code SDK; wraps the same built-in tools",
+        "Default built-in tools: Read, Write, Edit, Bash, Monitor, Glob, Grep, WebSearch, WebFetch, AskUserQuestion",
+        "Skills loaded from .claude/skills/*/SKILL.md by default (configurable via setting_sources)",
+        "Skills, slash commands, memory (CLAUDE.md), plugins are all filesystem-based SDK features",
+        "allowedTools option lets you opt in/out at runtime",
+        "Same three-tier disclosure as Claude Code"
+      ]
+    },
+    {
+      "url": "https://ampcode.com/manual",
+      "title": "Amp manual (Agent Skills section)",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 9, "depth": 7, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "NO dedicated Skill tool — skills integrate transparently via catalog visibility to model",
+        "Name + description always visible to model; body loaded only on invocation (Pattern B)",
+        "Discovery precedence: ~/.config/agents/skills/, ~/.config/amp/skills/, .agents/skills/, .claude/skills/, ~/.claude/skills/, plugins, toolbox, built-in",
+        "Frontmatter: required name + description; optional tools, severity-default",
+        "mcp.json inside skill directory keeps MCP tools hidden until skill is loaded",
+        "Installation via command palette or CLI; from GitHub, git URLs, or local paths"
+      ]
+    },
+    {
+      "url": "https://cursor.com/docs/context/skills",
+      "title": "Cursor skills documentation",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Adopts agentskills.io standard with disable-model-invocation extension",
+        "Discovery: .agents/skills/, .cursor/skills/, ~/.agents/skills/, ~/.cursor/skills/, fallback to legacy Claude/Codex dirs",
+        "Two activation pathways: automatic detection via description-matching, manual via / in Agent chat",
+        "Built-in migration tool: /migrate-to-skills converts dynamic rules and slash commands to skills format, preserving explicit invocation",
+        "disable-model-invocation: true makes a skill behave like a traditional slash command"
+      ]
+    },
+    {
+      "url": "https://junie.jetbrains.com/docs/agent-skills.html",
+      "title": "Junie (JetBrains) agent skills",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "NO dedicated Skill tool — skills are auto-invoked based on task description matching",
+        "Discovery: .junie/skills/ project-level, ~/.junie/skills/ user-level (or %USERPROFILE%\\.junie\\skills\\ on Windows)",
+        "Frontmatter: name + description required",
+        "Skills activate only when needed (unlike always-applied guidelines)",
+        "Project-level overrides user-level",
+        "Skills portable: both Junie CLI and JetBrains IDE plugin read them"
+      ]
+    },
+    {
+      "url": "https://docs.openhands.dev/overview/skills",
+      "title": "OpenHands skills documentation",
+      "qualityScore": 79,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 5, "uniqueness": 8 },
+      "keyInsights": [
+        "Skills are 'specialized prompts' with domain knowledge; not a tool call",
+        "Three activation modes: always-on (AGENTS.md at start), keyword-triggered (frontmatter match), agent-invoked",
+        "Discovery: .agents/skills/ (preferred), deprecated .openhands/skills/ and .openhands/microagents/, ~/.agents/skills/",
+        "Frontmatter only required for keyword-triggered skills",
+        "Community registry on GitHub for sharing skills — organizational/global",
+        "Decentralized, file-based system with multiple activation modes vs Claude Code's explicit tool invocation"
+      ]
+    },
+    {
+      "url": "https://docs.roocode.com/features/skills",
+      "title": "Roo Code skills documentation",
+      "qualityScore": 76,
+      "scores": { "authority": 8, "recency": 9, "depth": 7, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "NO dedicated Skill tool — skills are instruction packages, not executable tools",
+        "Directory locations: ~/.roo/skills/, .roo/skills/, mode-specific skills-{mode}/ (e.g., skills-code/)",
+        "Project overrides global; .roo/ overrides .agents/ at same level",
+        "Required frontmatter: name (1-64 chars), description (1-1024 chars)",
+        "Three-tier progressive disclosure: frontmatter discovery → full content via read_file → bundled resources on demand",
+        "'Skills remain dormant until activated — they don't bloat your base prompt'",
+        "Mode-specific skills: Roo-specific extension (architect, code, debug modes)"
+      ]
+    },
+    {
+      "url": "https://github.com/anthropics/skills",
+      "title": "anthropics/skills reference repository",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 10, "uniqueness": 6 },
+      "keyInsights": [
+        "Top-level: ./skills/ (organized by category), ./spec/, ./template/, .claude-plugin/",
+        "Skill categories: Creative & Design, Development & Technical, Enterprise & Communication, Document (PDF/DOCX/PPTX/XLSX)",
+        "License split: most skills Apache 2.0; document creation/editing skills source-available (not open source)",
+        "122k stars by Q2 2026 — the ecosystem's central reference",
+        "Disclaimer: demonstration/educational only; test thoroughly before relying on for critical tasks",
+        "Basic structure matches spec: YAML frontmatter + markdown body"
+      ]
+    },
+    {
+      "url": "https://agentskills.io/",
+      "title": "agentskills.io — adopter carousel (ecosystem breadth)",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 6, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "~35+ adopters by Q2 2026: Junie, Gemini CLI, Autohand, OpenCode, OpenHands, Mux, Cursor, Amp, Letta, Firebender, Goose, GitHub Copilot, VS Code, Claude Code, Claude, OpenAI Codex, Piebald, Factory, pi, Databricks Genie, Agentman, TRAE, Spring AI, Roo Code, Mistral AI Vibe, Command Code, Ona, VT Code, Qodo, Laravel Boost, Emdash, Snowflake Cortex Code, Kiro, Workshop, Google AI Edge Gallery, nanobot, fast-agent",
+        "Spec originally developed by Anthropic, released as open standard, community-maintained via github.com/agentskills/agentskills",
+        "Discussion on GitHub Discussions + Discord"
+      ]
+    },
+    {
+      "url": "https://block.github.io/goose/docs/guides/context-engineering/using-skills/",
+      "title": "Goose (Block) skills guide",
+      "qualityScore": 74,
+      "scores": { "authority": 8, "recency": 8, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Block's open-source extensible agent adopts the spec",
+        "Positioned under 'context engineering' — framing as a context-management tool",
+        "Pattern B-ish: catalog-based, not a tool call"
+      ]
+    },
+    {
+      "url": "https://docs.letta.com/letta-code/skills/",
+      "title": "Letta skills documentation",
+      "qualityScore": 72,
+      "scores": { "authority": 8, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 7 },
+      "keyInsights": [
+        "Letta Code implements the open Agent Skills standard",
+        "Multi-scope: project (.agents/skills/), agent-scoped (~/.letta/agents/{id}/skills/), global (~/.letta/skills/)",
+        "Stateful-agent platform — different context model from coding agents but same skill primitive"
+      ]
+    },
+    {
+      "url": "https://kiro.dev/docs/skills/",
+      "title": "Kiro skills documentation",
+      "qualityScore": 70,
+      "scores": { "authority": 7, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "Spec-driven development platform adopts skills",
+        "Framing: skills bring structure to AI coding"
+      ]
+    },
+    {
+      "url": "https://docs.firebender.com/multi-agent/skills",
+      "title": "Firebender skills (Android-native coding agent)",
+      "qualityScore": 68,
+      "scores": { "authority": 7, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "Android-native coding agent; skills for multi-agent orchestration",
+        "Proves spec's vertical applicability (mobile development)"
+      ]
+    },
+    {
+      "url": "https://docs.factory.ai/cli/configuration/skills",
+      "title": "Factory CLI skills",
+      "qualityScore": 68,
+      "scores": { "authority": 7, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "AI-native software dev platform with Droids — delegates refactors, incidents, migrations",
+        "CI/CD-integrated skills"
+      ]
+    },
+    {
+      "url": "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills",
+      "title": "GitHub Copilot agent skills",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "GitHub's adoption proves broad cross-vendor acceptance",
+        "Same SKILL.md format; Copilot uses the standard unmodified"
+      ]
+    },
+    {
+      "url": "https://code.visualstudio.com/docs/copilot/customization/agent-skills",
+      "title": "VS Code Copilot Agent Skills",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Microsoft/VS Code adoption of the spec",
+        "Same progressive disclosure model",
+        "IDE-integrated skills"
+      ]
+    },
+    {
+      "url": "https://spring.io/blog/2026/01/13/spring-ai-generic-agent-skills/",
+      "title": "Spring AI generic agent skills",
+      "qualityScore": 74,
+      "scores": { "authority": 8, "recency": 10, "depth": 6, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Spring AI (Java ecosystem) adopts the spec in Jan 2026",
+        "Proves the spec's language-neutrality — not tied to TS/Python"
+      ]
+    },
+    {
+      "url": "https://laravel.com/docs/12.x/boost#agent-skills",
+      "title": "Laravel Boost agent skills",
+      "qualityScore": 74,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Framework-bundled skills model: Laravel ships skills with the framework for AI-assisted dev",
+        "Proves the 'library bundles skills' distribution pattern"
+      ]
+    },
+    {
+      "url": "https://docs.databricks.com/aws/en/assistant/skills",
+      "title": "Databricks Genie Code skills",
+      "qualityScore": 72,
+      "scores": { "authority": 8, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "Data-platform vertical adoption (Databricks)",
+        "Genie Code uses skills for extensibility"
+      ]
+    },
+    {
+      "url": "https://docs.emdash.sh/skills",
+      "title": "Emdash skills documentation",
+      "qualityScore": 68,
+      "scores": { "authority": 7, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "Desktop app for parallel coding agents with git worktree isolation",
+        "Skills composable across parallel agents"
+      ]
+    },
+    {
+      "url": "https://fast-agent.ai/agents/skills/",
+      "title": "fast-agent skills documentation",
+      "qualityScore": 70,
+      "scores": { "authority": 7, "recency": 8, "depth": 5, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "ACP-integrated framework for LLMs; skills development explicitly supported",
+        "Good for 'Coding, Evals, ACPX and Skills development'"
+      ]
+    },
+    {
+      "url": "https://www.qodo.ai/blog/how-i-use-qodos-agent-skills-to-auto-fix-issues-in-pull-requests/",
+      "title": "Qodo agent skills case study",
+      "qualityScore": 70,
+      "scores": { "authority": 7, "recency": 9, "depth": 6, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "PR-automation use case for skills",
+        "Auto-fix-in-PR workflow via skills",
+        "Concrete end-user scenario showing skill composition"
+      ]
+    }
+  ]
+}

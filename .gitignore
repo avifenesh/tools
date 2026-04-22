@@ -1,0 +1,25 @@
+# dependencies + build artefacts
+node_modules
+dist
+.turbo
+*.tsbuildinfo
+coverage
+target
+/home/*/rust-target-harness
+
+# OS
+.DS_Store
+
+# secrets + local env
+.env
+.env.local
+
+# per-user memory / personal notes — not part of the shared repo
+.remember/
+.claude/
+.agents/
+
+# e2e baselines + traces: regeneratable via `pnpm aggregate:*:update`.
+# They can capture env dumps / tokens from local shells — keep local.
+packages/harness-e2e/baselines/
+packages/harness-e2e/traces/

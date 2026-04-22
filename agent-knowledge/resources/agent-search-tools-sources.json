@@ -1,0 +1,304 @@
+{
+  "topic": "Glob Grep and file discovery tools in AI agent harnesses",
+  "slug": "agent-search-tools",
+  "generated": "2026-04-19T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "scope": "How harnesses expose filesystem search to LLMs: Claude Code Glob/Grep, subagents, Codex/OpenAI shell + file_search, Aider repo-map, Cline list/search, OpenCode grep/glob, anti-patterns, ripgrep gotchas, pagination.",
+  "ecosystems": ["Anthropic Claude Code", "OpenAI Codex", "Aider", "Cline", "OpenCode", "Continue"],
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/overview",
+      "title": "Claude Code overview",
+      "type": "official-docs",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Claude Code is an agentic coding environment with first-class file read, edit, and shell tools",
+        "Each surface (CLI, VS Code, JetBrains, Web) connects to the same underlying engine and tool set"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "title": "Best Practices for Claude Code",
+      "type": "official-docs",
+      "qualityScore": 96,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Context window performance degrades as it fills; file reads dominate consumption",
+        "Subagents run in separate context windows and return summaries, preserving main context",
+        "Kitchen-sink sessions, over-correction, over-specified CLAUDE.md are classic anti-patterns",
+        "Subagent example explicitly grants Read, Grep, Glob, Bash tools for security review"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "title": "Create custom subagents",
+      "type": "official-docs",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Subagents preserve main-context tokens by isolating search/exploration work",
+        "Claude uses subagent descriptions to decide when to delegate",
+        "Each subagent can have its own restricted tool list and model (e.g. Haiku)"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/context-window",
+      "title": "Explore the context window",
+      "type": "official-docs",
+      "qualityScore": 84,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "File reads dominate context usage (~2400 tokens for a typical auth file)",
+        "A grep of 'refreshToken' across the codebase costs ~600 tokens",
+        "Startup loads: system prompt (~4200), CLAUDE.md files, auto memory, MCP tool names",
+        "MCP tool schemas are deferred by default; agents load specific ones via tool search"
+      ]
+    },
+    {
+      "url": "https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md",
+      "title": "Ripgrep user guide",
+      "type": "official-docs",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 8, "depth": 10, "examples": 10, "uniqueness": 6 },
+      "keyInsights": [
+        "--type/-t filters by file type (js, py, rust...); -T excludes a type",
+        "-g glob filter: '*.toml' include, '!*.toml' exclude; later globs override earlier",
+        "Output modes: -c count, -o only-matching, -C context lines, --sort path",
+        "Multiline: -U enables cross-line patterns; PCRE2 multiline requires full-file memory load",
+        "Respects .gitignore/.ignore/.rgignore by default; -u/-uu/-uuu progressively disables",
+        "Use -F for literal string matching without regex interpretation"
+      ]
+    },
+    {
+      "url": "https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md",
+      "title": "Ripgrep FAQ",
+      "type": "official-docs",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 8, "depth": 9, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Multi-line mode (-U) disables parallelism and can be slow on large files",
+        "Default engine cannot do lookaround/backreferences; use -P for PCRE2",
+        "For ASCII-only PCRE2 patterns use --no-pcre2-unicode for best performance",
+        "Windows Cygwin mangles paths starting with /; escape or set MSYS_NO_PATHCONV=1",
+        "Oh My Zsh Rails plugin creates conflicting 'rg' alias"
+      ]
+    },
+    {
+      "url": "https://burntsushi.net/ripgrep/",
+      "title": "Ripgrep homepage",
+      "type": "project-homepage",
+      "qualityScore": 76,
+      "scores": { "authority": 10, "recency": 6, "depth": 6, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "Three design principles: smart defaults, performance through optimization, Unicode-first",
+        "Recursive search respecting .gitignore is the default mode",
+        "SIMD-accelerated literal extraction + finite-automaton matching",
+        "Type filtering and .gitignore compliance are critical for automation tools"
+      ]
+    },
+    {
+      "url": "https://docs.rs/regex/latest/regex/",
+      "title": "Rust regex crate syntax",
+      "type": "language-docs",
+      "qualityScore": 72,
+      "scores": { "authority": 9, "recency": 8, "depth": 7, "examples": 6, "uniqueness": 5 },
+      "keyInsights": [
+        "Meta-characters needing escape: { } [ ] ( ) . * + ? ^ $ | \\",
+        "Unicode is on by default; . matches scalar values, not just ASCII",
+        "Character-class set ops: intersection &&, difference --, symmetric diff ~~",
+        "m flag changes ^/$ to match line boundaries"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/repomap.html",
+      "title": "Aider repository map",
+      "type": "official-docs",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 8, "depth": 8, "examples": 5, "uniqueness": 9 },
+      "keyInsights": [
+        "Repo-map sends important classes/functions + signatures with each user turn",
+        "Graph ranking algorithm selects most relevant portions within --map-tokens budget (default 1000)",
+        "Map expands automatically when no files are added to chat"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/usage/commands.html",
+      "title": "Aider slash commands",
+      "type": "official-docs",
+      "qualityScore": 76,
+      "scores": { "authority": 9, "recency": 8, "depth": 6, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "/add and /drop manage file inclusion manually",
+        "/ls lists all known files and indicates which are in chat",
+        "/map prints the current repo map",
+        "/read-only adds reference files that aider won't edit"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/usage/tips.html",
+      "title": "Aider usage tips",
+      "type": "official-docs",
+      "qualityScore": 74,
+      "scores": { "authority": 9, "recency": 8, "depth": 6, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Be selective with /add; too much irrelevant code distracts the LLM",
+        "For new files, run /add first so Aider doesn't overwrite existing files",
+        "Chunked workflow: break large goals into smaller sequential tasks"
+      ]
+    },
+    {
+      "url": "https://github.com/Aider-AI/aider/blob/main/aider/repomap.py",
+      "title": "Aider repomap.py implementation",
+      "type": "source-code",
+      "qualityScore": 84,
+      "scores": { "authority": 9, "recency": 8, "depth": 9, "examples": 7, "uniqueness": 10 },
+      "keyInsights": [
+        "Uses tree-sitter parsers (per-language .scm query files) for semantic tag extraction",
+        "networkx.pagerank() ranks definitions by graph centrality",
+        "Files mentioned in chat get 50x rank multiplier; 8+ char identifiers get 10x boost",
+        "Caches parsed state in diskcache.Cache keyed on mtime"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/exploring-clines-tools/cline-tools-guide",
+      "title": "Cline tools guide",
+      "type": "official-docs",
+      "qualityScore": 76,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Four read-side tools: read_file, list_files, search_files, list_code_definition_names",
+        "search_files uses path + regex + file_pattern (XML invocation shape)",
+        "list_code_definition_names is distinct: extracts function/class definitions"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/tools-reference/all-cline-tools",
+      "title": "Cline complete tool reference",
+      "type": "official-docs",
+      "qualityScore": 74,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Full tool surface: read_file, list_files, search_files, list_code_definition_names, write_to_file, replace_in_file",
+        "execute_command for shell; browser_action via Puppeteer",
+        "use_mcp_tool / access_mcp_resource for MCP extensions"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/tools/",
+      "title": "OpenCode built-in tools",
+      "type": "official-docs",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Tools: grep, glob, read, edit, write, bash, lsp, apply_patch, skill, todowrite, webfetch, websearch, question",
+        "glob returns paths sorted by modification time (newest first)",
+        "read supports line-range specifications for large files",
+        "No dedicated list tool; glob + read cover the space"
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/grep.ts",
+      "title": "OpenCode grep tool source",
+      "type": "source-code",
+      "qualityScore": 82,
+      "scores": { "authority": 8, "recency": 10, "depth": 9, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Parameters: pattern (regex), path (optional, default cwd), include (optional glob)",
+        "Backed by ripgrep via internal file/ripgrep module",
+        "Results grouped by file, sorted by mtime desc, capped at 100 matches",
+        "Line text >2000 chars truncated with '...'; header shows truncation state"
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/glob.ts",
+      "title": "OpenCode glob tool source",
+      "type": "source-code",
+      "qualityScore": 80,
+      "scores": { "authority": 8, "recency": 10, "depth": 8, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Parameters: pattern (required), path (optional)",
+        "Results sorted b.mtime - a.mtime (newest first)",
+        "Caps at 100 files with truncation notice",
+        "Permission checks validate path is a directory"
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode",
+      "title": "OpenCode repository",
+      "type": "source-code",
+      "qualityScore": 70,
+      "scores": { "authority": 8, "recency": 10, "depth": 5, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Two built-in agents: 'build' (full-access) and 'plan' (read-only)",
+        "'general' subagent handles complex searches",
+        "Open-source harness modeled on Claude Code architecture"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex",
+      "title": "OpenAI Codex CLI",
+      "type": "project-homepage",
+      "qualityScore": 72,
+      "scores": { "authority": 10, "recency": 10, "depth": 5, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Lightweight coding agent running in the terminal",
+        "Rust-based implementation",
+        "Can read, change, and run code in a selected directory"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/sandbox",
+      "title": "Codex sandbox approvals",
+      "type": "official-docs",
+      "qualityScore": 86,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "Pre-approved read-only commands: rg, ls, find, grep",
+        "--ask-for-approval untrusted runs only known-safe read operations automatically",
+        "State-mutating commands always require approval",
+        "Sandbox approach: enforce security at shell layer, not by narrowing tool surface"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex/blob/main/docs/config.md",
+      "title": "Codex CLI config",
+      "type": "official-docs",
+      "qualityScore": 72,
+      "scores": { "authority": 10, "recency": 10, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "MCP servers configured in ~/.codex/config.toml",
+        "supports_parallel_tool_calls enables parallel execution per server",
+        "mcp_servers section stores approval defaults and per-tool overrides"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/building-effective-agents",
+      "title": "Anthropic: Building Effective Agents",
+      "type": "engineering-blog",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Three principles: simplicity, transparency, careful ACI design",
+        "Treat tool definitions like docstrings for junior developers",
+        "Poka-yoke tool design: make errors hard to commit",
+        "Workflows (predefined paths) vs Agents (LLM-directed); pick the simplest that works",
+        "Absolute filepaths prevented navigation errors in SWE-bench"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/multi-agent-research-system",
+      "title": "Anthropic: Multi-agent Research System",
+      "type": "engineering-blog",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Vague subagent instructions cause duplicated work; use structured decomposition",
+        "LeadResearcher persists plan to Memory since context >200k tokens gets truncated",
+        "Subagents store outputs externally, pass lightweight references back",
+        "Fresh-context handoffs for conversations spanning hundreds of turns"
+      ]
+    }
+  ]
+}

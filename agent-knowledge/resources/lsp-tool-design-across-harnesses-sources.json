@@ -1,0 +1,299 @@
+{
+  "topic": "LSP / Code-Intelligence Tool Design Across AI Agent Harnesses and Libraries",
+  "slug": "lsp-tool-design-across-harnesses",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "purpose": "Design-space deep dive for building an LSP primitive for the @agent-sh/harness-* TypeScript library, targeting autonomous agents. Cross-harness comparison across 12 dimensions; adapter-interface recommendation; per-dimension trade-off analysis.",
+  "totalSources": 22,
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code Tools Reference — LSP tool behavior",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "The `LSP` tool is first-class in Claude Code with no explicit operation parameter in the schema; operations are inferred from the full-docs description (jump to def, find refs, hover type, list symbols, find implementations, trace call hierarchies).",
+        "Automatic diagnostics after every file edit is the load-bearing behavior — not an operation the model calls.",
+        "The tool is 'inactive until you install a code intelligence plugin for your language' — plugin-delivered server configuration.",
+        "Permission: `No` — the LSP tool doesn't require explicit allow/ask/deny, unlike Bash/Edit/Write/WebFetch."
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/plugins-reference",
+      "title": "Claude Code Plugins Reference — LSP servers section",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "The `.lsp.json` manifest schema: required fields `command` + `extensionToLanguage`; optional fields `args`, `transport`, `env`, `initializationOptions`, `settings`, `workspaceFolder`, `startupTimeout`, `shutdownTimeout`, `restartOnCrash`, `maxRestarts`.",
+        "Transport defaults to `stdio`; alternative is `socket`.",
+        "Available plugins (2026): `pyright-lsp`, `typescript-lsp`, `rust-lsp` — others in the official marketplace via the plugin discovery page.",
+        "Users must install the language-server binary separately; manifest only configures the connection.",
+        "This schema is a reusable spec — adopt wholesale for library-level plugin compatibility."
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/discover-plugins",
+      "title": "Claude Code Discover and Install Plugins — Code intelligence section",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "11 LSP plugins in the official Anthropic marketplace: clangd-lsp (C/C++), csharp-lsp, gopls-lsp, jdtls-lsp (Java), kotlin-lsp, lua-lsp, php-lsp (intelephense), pyright-lsp (Python), rust-analyzer-lsp, swift-lsp (sourcekit-lsp), typescript-lsp.",
+        "Each plugin bundles the manifest but requires the binary on PATH; `Executable not found in $PATH` is the standard failure mode.",
+        "Two capabilities Claude gains: (1) automatic diagnostics after edits; (2) code navigation (definitions, references, hover, symbols, implementations, call hierarchies).",
+        "Known trouble: language servers like rust-analyzer and pyright can consume significant memory on large projects — disable the plugin if memory-constrained.",
+        "Monorepo workspaces: language servers may report false-positive unresolved imports for internal packages — doesn't affect edit ability."
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/lsp.ts",
+      "title": "OpenCode `lsp.ts` — tool source (experimental)",
+      "qualityScore": 92,
+      "scores": { "authority": 9, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 9 },
+      "keyInsights": [
+        "Nine operations enumerated: goToDefinition, findReferences, hover, documentSymbol, workspaceSymbol, goToImplementation, prepareCallHierarchy, incomingCalls, outgoingCalls.",
+        "Schema uses 1-indexed line and character (`min(1)`) — converts to LSP's 0-indexed internally.",
+        "Two-layer guards: `assertExternalDirectoryEffect` (workspace fence) + `ctx.ask({permission: 'lsp'})` (permission subsystem).",
+        "Fail-fast `hasClients(file)` check with human-language error: 'No LSP server available for this file type.'",
+        "Empty result message: `No results found for ${args.operation}` — not an empty array.",
+        "Output: `JSON.stringify(result, null, 2)` — raw LSP JSON, which is a design miss; models struggle with nested Location[] ranges.",
+        "Gated by `OPENCODE_EXPERIMENTAL_LSP_TOOL=true`; still experimental as of 2026."
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/lsp/server.ts",
+      "title": "OpenCode `lsp/server.ts` — language server registry",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "40+ languages via per-language `Info` objects: `{id, extensions, root(fn to find project root), spawn()}`.",
+        "TypeScript ecosystem: typescript-language-server (TS/JS), @vue/language-server (Vue), svelte-language-server, @astrojs/language-server, vscode-eslint (auto-downloaded from GitHub).",
+        "Python: Pyright with venv detection at `.venv`, `venv`, or `$VIRTUAL_ENV`; Ty (experimental) with interpreter discovery.",
+        "Aggressive auto-install: go install, gem install, dotnet tool install, GitHub release download + extract to Global.Path.bin — library should NOT copy this.",
+        "Java JDTLS requires Java 21+, downloads Eclipse distribution; Kotlin binaries from JetBrains CDN; Clojure via `clojure-lsp listen`.",
+        "Auto-install is convenience for end-users; wrong boundary for a distributable library."
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/lsp/client.ts",
+      "title": "OpenCode `lsp/client.ts` — LSP client implementation",
+      "qualityScore": 88,
+      "scores": { "authority": 9, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Sends: initialize (with rootUri/processId/workspaceFolders/capabilities), initialized, workspace/didChangeConfiguration, workspace/didChangeWatchedFiles, textDocument/didOpen, textDocument/didChange.",
+        "Tracks open files in `Map<path, version>`; increments version on each change.",
+        "Receives `textDocument/publishDiagnostics`; debounces 150ms to coalesce syntax-pass + semantic-pass diagnostics.",
+        "45-second initialization timeout, hard.",
+        "`shutdown()` ends connection, disposes resources, kills server process.",
+        "Does NOT discuss UTF-16 vs UTF-8 position encoding — implicit assumption.",
+        "Full TypeScript LSP client is ~300 LOC — feasible for a library."
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/lsp/language.ts",
+      "title": "OpenCode `lsp/language.ts` — extension-to-language map",
+      "qualityScore": 70,
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 8, "uniqueness": 5 },
+      "keyInsights": [
+        "60+ extensions mapped to language identifiers, dot-prefixed (e.g., `.py → python`).",
+        "Compound extensions supported (`.html.erb`, `.js.erb`).",
+        "One exception without dot prefix: `makefile → makefile`.",
+        "Detection is pure file-extension-based; no shebang, no content sniffing."
+      ]
+    },
+    {
+      "url": "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/",
+      "title": "Language Server Protocol 3.17 specification",
+      "qualityScore": 98,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Position is {line, character} — both 0-based; character offset encoding is UTF-16 by default (spec-mandated), negotiable via `general.positionEncodings` and `capabilities.positionEncoding` to UTF-8 or UTF-32.",
+        "Initialization sequence: client → initialize → server → InitializeResult → client → initialized notification. Requests before init are rejected with `-32002`.",
+        "Hover returns `Hover | null` where contents is `MarkupContent | string` (v3.17 narrowed from legacy MarkedString[] union).",
+        "Definition returns `Location | Location[] | LocationLink[] | null` — three legal shapes.",
+        "References takes `context: {includeDeclaration: boolean}` — model may want/not-want the definition itself.",
+        "Rename returns `WorkspaceEdit` which can touch arbitrary files and include CreateFile/RenameFile/DeleteFile ops.",
+        "Diagnostics: `textDocument/publishDiagnostics` is server-initiated notification, NOT a request; v3.17 adds optional pull model via `textDocument/pullDiagnostics`."
+      ]
+    },
+    {
+      "url": "https://github.com/oraios/serena",
+      "title": "Serena — MCP semantic-symbol toolkit on LSP",
+      "qualityScore": 90,
+      "scores": { "authority": 8, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Tool surface is semantic, not positional: find_symbol (by name), symbol_overview, find_referencing_symbols, rename, replace_symbol_body, insert_after_symbol/before_symbol, safe_delete.",
+        "Dual backend: default LSP-based (40+ languages); alternative JetBrains IDE bridge (all JetBrains-supported languages except Rider/CLion).",
+        "Argument: 'Symbolic editing tools are less error-prone and much more token-efficient than typical alternatives. A single rename-symbol call replaces what would otherwise demand 8-12 careful, error-prone steps.'",
+        "Server lifecycle: managed launch or HTTP/MCP mode.",
+        "Multi-layered config: global defaults → MCP launch params → per-project overrides → context-specific → dynamic mode fragments.",
+        "Memory system for long-lived workflow persistence.",
+        "Symbol-first design hides position-encoding entirely from the model."
+      ]
+    },
+    {
+      "url": "https://github.com/isaacphi/mcp-language-server",
+      "title": "mcp-language-server — minimalist MCP wrapper for LSPs",
+      "qualityScore": 85,
+      "scores": { "authority": 8, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Six tools: definition (returns full source, not just location), references, diagnostics, hover, rename_symbol, edit_file (multi-edit by line numbers).",
+        "User-wired binary: `--workspace [path] --lsp [server-executable] -- [lsp args]`. POSIX `--` convention for LSP args pass-through.",
+        "Transport: stdio only ('The language server must communicate over stdio').",
+        "Supported LSPs: gopls, rust-analyzer, pyright, typescript-language-server, clangd; generic compatibility with any stdio LSP.",
+        "`definition` inlines source code — trades tokens for round-trips (single call instead of Location + follow-up Read).",
+        "Marked as beta; no explicit limits documented."
+      ]
+    },
+    {
+      "url": "https://github.com/jonrad/lsp-mcp",
+      "title": "lsp-mcp — dynamic schema-generated MCP tools",
+      "qualityScore": 72,
+      "scores": { "authority": 7, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "Dynamically generates supported MCP tools from LSP JSON Schema capabilities advertised at initialize.",
+        "Zod validation; multiple LSPs can run simultaneously via a single config.",
+        "Lazy initialization: LSP servers start on-demand per query, not at MCP server startup.",
+        "Node.js implementation; Docker containerization for deployment.",
+        "Dynamic tool generation is elegant but wrong for LLMs: models prefer a small, stable, human-curated tool surface over a reflected N-tool surface where schemas drift."
+      ]
+    },
+    {
+      "url": "https://github.com/microsoft/multilspy",
+      "title": "Multilspy — the Microsoft Research library for LSP-for-LLMs",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 10, "uniqueness": 9 },
+      "keyInsights": [
+        "Per-operation Python methods (NOT a unified tool): request_definition, request_references, request_completions, request_hover, request_document_symbols.",
+        "11 supported languages: Java (Eclipse JDTLS), Python (jedi-language-server), Rust (rust-analyzer), C# (OmniSharp/RazorSharp), TypeScript, JavaScript (typescript-language-server), Go (gopls), Dart, Ruby (Solargraph), Kotlin, PHP (Intelephense).",
+        "Auto-downloads platform-specific server binaries; sync + async APIs via context manager.",
+        "Powers NeurIPS 2023 Monitor-Guided Decoding paper.",
+        "Library shape (per-operation methods) is correct for programmatic callers; wrong shape for a tool surface — convert to discriminated-union at the tool layer."
+      ]
+    },
+    {
+      "url": "https://github.com/microsoft/monitors4codegen",
+      "title": "Microsoft monitors4codegen — Monitor-Guided Decoding research",
+      "qualityScore": 94,
+      "scores": { "authority": 10, "recency": 8, "depth": 10, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "NeurIPS 2023 paper: 'Monitor-Guided Decoding of Code LMs with Static Analysis of Repository Context'.",
+        "Key finding: 'MGD can improve the compilation rate of code generated by LMs at all scales (350M-175B) by 19-25%, without any training/fine-tuning required.'",
+        "Monitors implemented via LSP: dereference validation, function argument count verification, typestate method sequencing, enum constant generation, class instantiation constraints.",
+        "LSP provides ground-truth repository context that constrains decoding — the strongest quantitative argument for LSP-for-LLM.",
+        "Limitations: requires running language servers; addresses code-level correctness, not algorithmic correctness."
+      ]
+    },
+    {
+      "url": "https://github.com/microsoft/vscode-languageserver-node",
+      "title": "vscode-languageserver-node — Microsoft's LSP TypeScript libs",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Four packages: vscode-languageclient (editor-coupled, do NOT use in a generic library), vscode-languageserver (for writing servers), vscode-languageserver-protocol (types, reusable), vscode-jsonrpc (transport, reusable).",
+        "For a standalone tool library, use vscode-jsonrpc + vscode-languageserver-protocol directly. Skip vscode-languageclient (it hooks into VSCode's extension APIs).",
+        "Lifecycle pattern: `await client.start(); ... await client.stop();`. All handlers return Disposable for cleanup."
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/repomap.html",
+      "title": "Aider repo-map documentation",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Aider uses tree-sitter + graph ranking (PageRank-style) instead of LSP. Not a tool — the repo-map is included in LLM context.",
+        "`--map-tokens` defaults to 1K tokens; Aider dynamically adjusts size based on chat state.",
+        "Graph is file-level: each source file is a node; edges are dependencies. Ranking picks 'most often referenced' files.",
+        "Output format: file path + `⋮...` elisions + `│` prefix on kept lines, showing class/function signatures only.",
+        "No types, no references, no rename — but instant, zero runtime deps beyond grammar bundles."
+      ]
+    },
+    {
+      "url": "https://aider.chat/2023/10/22/repomap.html",
+      "title": "Aider blog — 'Improving GPT-4's codebase understanding with ctags'",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 5, "depth": 9, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "17+ languages via `py-tree-sitter-languages` Python module — pip-installable binary wheels.",
+        "Evolution: moved from ctags to tree-sitter for richer AST-based extraction and automatic language support.",
+        "Sample output: `filename:` header + `⋮...` + indented signatures prefixed with `│`.",
+        "Tree-sitter advantage over ctags: structured AST, no external tool dependencies, permissive licensing on grammars.",
+        "No direct comparison to LSP, but the architectural argument is identical: static parsing is strictly weaker than server-based semantic analysis, but much faster and simpler."
+      ]
+    },
+    {
+      "url": "https://github.com/cline/cline/blob/main/src/services/tree-sitter/index.ts",
+      "title": "Cline tree-sitter service — `list_code_definition_names` implementation",
+      "qualityScore": 82,
+      "scores": { "authority": 8, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 7 },
+      "keyInsights": [
+        "Uses tree-sitter, not LSP. 17 supported extensions: js jsx ts tsx py rs go c h cpp hpp cs rb java php swift kt.",
+        "Max 50 files per directory.",
+        "Three phases: parse → query (language-specific `tags.scm` captures definitions, filtering by `name.includes('name')`) → format.",
+        "Output: `|----` separators + `│` prefix on each kept line, sorted by line position, separators between gaps >1 line.",
+        "Captures definition names only, not implementations — the AST tells you about structure, not semantics.",
+        "Complement to LSP, not a replacement."
+      ]
+    },
+    {
+      "url": "https://cursor.com/docs/agent/tools",
+      "title": "Cursor agent tools reference",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Cursor exposes NO LSP tool to the agent. The IDE owns LSP internally.",
+        "Agent gets Semantic Search ('Finds code by meaning, not just exact matches') over an indexed codebase, plus Search Files/Folders, Read Files, Edit Files.",
+        "IDE-embedded harness design: the model sees distilled results, not raw LSP ops. Contrasts with autonomous tools where the agent has to own code nav.",
+        "Validates: if harness is IDE-embedded, LSP-as-tool is redundant. If harness is autonomous, LSP-as-tool is load-bearing."
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK — Tools documentation",
+      "qualityScore": 78,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Five tool categories: hosted OpenAI (WebSearchTool, FileSearchTool, CodeInterpreterTool, HostedMCPTool, ImageGenerationTool, ToolSearchTool), local runtime (ComputerTool, ShellTool, LocalShellTool, ApplyPatchTool), function, agents-as-tools, experimental Codex tool.",
+        "No dedicated LSP or code-intelligence tool ships.",
+        "FileSearchTool is retrieval-based over OpenAI Vector Stores — semantic document lookup, NOT code analysis.",
+        "HostedMCPTool is the escape hatch: 'exposes a remote MCP server's tools to the model' — users plug in Serena or mcp-language-server externally.",
+        "Validates: the ecosystem distributes LSP-for-LLM via MCP, not as first-class framework tools."
+      ]
+    },
+    {
+      "url": "https://modelcontextprotocol.io/examples",
+      "title": "MCP reference servers catalog",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 6, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Seven official reference servers: Everything, Fetch, Filesystem, Git, Memory, Sequential Thinking, Time.",
+        "None of them is LSP or code-intelligence related — a clear ecosystem gap.",
+        "Users compose their own: community-authored mcp-language-server, lsp-mcp, Serena are all third-party.",
+        "Distribution opportunity: ship `@agent-sh/harness-lsp` as both a native TS library and an MCP server for wider reach."
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/tools/",
+      "title": "OpenCode tools documentation",
+      "qualityScore": 75,
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "`lsp` tool is experimental; gated by `OPENCODE_EXPERIMENTAL_LSP_TOOL=true`.",
+        "Full tool list (non-experimental): bash, read, write, edit, grep, glob, apply_patch, skill, todowrite, webfetch, websearch, question.",
+        "Operations published match the nine enumerated in the source: goToDefinition, findReferences, hover, documentSymbol, workspaceSymbol, goToImplementation, prepareCallHierarchy, incomingCalls, outgoingCalls.",
+        "Configuration of LSP servers is documented on a separate `/docs/lsp` page; per-project scope."
+      ]
+    },
+    {
+      "url": "https://lucumr.pocoo.org/2025/6/12/agentic-coding/",
+      "title": "Armin Ronacher — 'Agentic Coding' blog post",
+      "qualityScore": 75,
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 4, "uniqueness": 7 },
+      "keyInsights": [
+        "Tools must be 'fast', 'user friendly', and 'protected against an LLM chaos monkey using them completely wrong' — applies doubly to LSP where position off-by-one and cold-start are real attack surfaces.",
+        "'Anything can be a tool. A shell script can be a tool, an MCP server can be a tool, a log file can be a tool.' — supports the MCP-as-distribution argument.",
+        "Go advantage: 'tests run straightforwardly and incrementally, significantly enhancing the agentic workflow' — relates to verification-tool argument.",
+        "Does not discuss LSP specifically, but the practitioner stance on 'give the model verification tools it can run' (tests, linters, LSP diagnostics) is the foundation for the diagnostics-via-hook pattern."
+      ]
+    }
+  ]
+}

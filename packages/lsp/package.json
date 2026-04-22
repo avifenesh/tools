@@ -1,0 +1,67 @@
+{
+  "name": "@agent-sh/harness-lsp",
+  "version": "0.1.0",
+  "description": "LSP tool for AI agent harnesses — language-server-protocol operations (hover, definition, references, symbols) with .lsp.json manifest, lazy-spawn policy, and pluggable LspClient adapter",
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "tool-use",
+    "lsp",
+    "language-server",
+    "code-navigation",
+    "bedrock",
+    "openai"
+  ],
+  "license": "MIT",
+  "author": "Avi Fenesh",
+  "homepage": "https://github.com/avifenesh/tools/tree/main/packages/lsp#readme",
+  "bugs": {
+    "url": "https://github.com/avifenesh/tools/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avifenesh/tools.git",
+    "directory": "packages/lsp"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@agent-sh/harness-core": "workspace:*",
+    "valibot": "^0.42.1",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver-protocol": "^3.17.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

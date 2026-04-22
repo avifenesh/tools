@@ -1,0 +1,24 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "fixed": [],
+  "linked": [
+    [
+      "@agent-sh/harness-core",
+      "@agent-sh/harness-read",
+      "@agent-sh/harness-write",
+      "@agent-sh/harness-grep",
+      "@agent-sh/harness-glob",
+      "@agent-sh/harness-bash",
+      "@agent-sh/harness-webfetch",
+      "@agent-sh/harness-lsp",
+      "@agent-sh/harness-skill",
+      "@agent-sh/harness-tools"
+    ]
+  ],
+  "ignore": ["@agent-sh/harness-e2e"]
+}

@@ -1,0 +1,327 @@
+{
+  "topic": "Harness Tool-Surface Audit — the 'what ships with what' matrix",
+  "slug": "harness-tool-surface-audit",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "sourceBreakdown": {
+    "officialDocs": 14,
+    "sourceCode": 4,
+    "blogPosts": 2,
+    "paperOrSpec": 0,
+    "archivedReference": 2
+  },
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code — Tools reference (2026)",
+      "qualityScore": 98,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Claude Code ships 30+ built-in tools in 2026: Agent, AskUserQuestion, Bash, CronCreate/List/Delete, Edit, EnterPlanMode/ExitPlanMode, EnterWorktree/ExitWorktree, Glob, Grep, ListMcpResourcesTool, LSP, Monitor, NotebookEdit, PowerShell, Read, ReadMcpResourceTool, SendMessage, Skill, TaskCreate/Get/List/Update/Stop, TeamCreate/Delete, TodoWrite (deprecated), ToolSearch, WebFetch, WebSearch, Write",
+        "Monitor tool (v2.1.98+) watches a background command and feeds each output line to the model — unique to Claude Code",
+        "EnterWorktree / ExitWorktree are first-class worktree tools — nobody else has this",
+        "LSP tool requires a plugin per language; gives jump-to-def, find-refs, type info, symbol listing, call-hierarchy",
+        "PowerShell tool is a preview non-Bash shell; opt-in on non-Windows, rolling out on Windows",
+        "TodoWrite is marked deprecated in favor of TaskCreate/Get/List/Update — the task-list surface has expanded"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/agent-sdk/overview",
+      "title": "Claude Agent SDK — Overview",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Agent SDK ships the same tool surface as Claude Code but exposes a narrower default — allowed_tools in practice picks a subset (Read, Edit, Bash, Glob, Grep, WebSearch, WebFetch, AskUserQuestion, Monitor are the highlighted ones)",
+        "Monitor is explicitly named as part of the SDK's built-in tools",
+        "AskUserQuestion is the structured multi-choice clarification tool; shipped in both TS and Python",
+        "Subagents invoked via Agent tool; Agent must be in allowedTools",
+        "The TS SDK bundles the Claude Code binary as an optional dependency"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/cli/features",
+      "title": "OpenAI Codex CLI — features",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Codex CLI ships 6 model-facing tools: shell/container.exec, apply_patch, update_plan, view_image, write_stdout, web_search",
+        "web_search defaults to cached; live requires --search flag or config",
+        "All tools respect approval modes (Auto/Read-only/Full Access) and sandbox settings",
+        "No dedicated Read, Write, Edit, Glob, or Grep — everything routes through shell + apply_patch",
+        "MCP integration is separate from the built-in tool set",
+        "The deliberate minimalism contrasts directly with Claude Code's 30+ tools"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK — Tools",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Hosted tools: WebSearchTool, FileSearchTool (vector stores), CodeInterpreterTool, HostedMCPTool, ImageGenerationTool, ToolSearchTool",
+        "Local tools: ComputerTool (GUI/browser), ShellTool, LocalShellTool (legacy), ApplyPatchTool",
+        "Function tools: @function_tool decorator, FunctionTool class, tool_namespace() for grouping",
+        "Agent.as_tool() exposes any Agent as a callable tool — the SDK's handoff primitive",
+        "codex_tool (experimental) runs workspace-scoped Codex tasks from inside an agent",
+        "FileSearchTool is NOT filesystem grep — it's vector-store retrieval; a common conflation",
+        "defer_loading flag on function_tool / HostedMCPTool / ToolSearchTool enables ToolSearch-based lazy loading"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/tools/",
+      "title": "OpenCode — Tools",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "OpenCode ships 13 built-in tools: bash, edit, write, read, grep, glob, lsp (experimental), apply_patch, skill, todowrite, webfetch, websearch, question",
+        "lsp tool is experimental; OpenCode is the only harness besides Claude Code with first-class LSP",
+        "websearch uses Exa AI for the search backend",
+        "question is OpenCode's name for the structured ask-user primitive; simpler schema than Claude Code's AskUserQuestion",
+        "skill tool loads a skill file and returns its content — similar to Claude Code's Skill",
+        "Tool names are lowercase, breaking from Claude Code's PascalCase convention"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/exploring-clines-tools/cline-tools-guide",
+      "title": "Cline — Tools guide",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Cline ships: write_to_file, read_file, replace_in_file, search_files, list_files, list_code_definition_names, execute_command, browser_action, use_mcp_tool, access_mcp_resource, ask_followup_question, attempt_completion, new_task",
+        "All tools use XML tag parameter conventions (<path>...</path>), not JSON schema",
+        "replace_in_file is the targeted-edit tool; write_to_file is the full-file-overwrite fallback",
+        "browser_action wraps Puppeteer; Cline is one of the few to ship browser as a first-class tool",
+        "attempt_completion is the finish-task primitive (vs Claude Code's stop_reason:end_turn)",
+        "new_task spawns a fresh task with a clean context window"
+      ]
+    },
+    {
+      "url": "https://docs.roocode.com/basic-usage/how-tools-work",
+      "title": "Roo Code — how tools work",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Roo Code (Cline fork) has 5 edit tools: apply_diff, edit_file, search_replace, edit, apply_patch — each with slightly different semantics",
+        "Adds codebase_search (semantic), apply_patch (multi-file unified diffs), generate_image, switch_mode, update_todo_list",
+        "read_command_output retrieves truncated output from previous commands",
+        "new_task creates a subtask with a specific starting mode",
+        "skill tool loads predefined skill instructions",
+        "The 5-edit-tool fragmentation is a cautionary example: more tools != better coverage"
+      ]
+    },
+    {
+      "url": "https://cursor.com/docs/agent/tools",
+      "title": "Cursor — Agent tools",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Cursor agent has 8 tools: Semantic Search, Search Files and Folders, Read Files, Edit Files, Run Shell Commands, Web, Browser, Image Generation",
+        "Semantic Search is first-class; Cursor is the only IDE-side harness with semantic search as a primary tool (vs Claude Code which relies on Grep)",
+        "Read Files supports vision — images are first-class",
+        "Browser tool controls a real browser for screenshots, navigation, visual verification",
+        "Image Generation saves to project assets/ folder",
+        "Also has Fetch Rules (retrieve project rules) and Ask Questions — listed as agent capabilities but not explicitly in the 8"
+      ]
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/tree/main/packages/core/src/tools",
+      "title": "Gemini CLI — tools directory",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Gemini CLI ships ~20 tools: read-file, read-many-files, list-directory, ls, glob, grep, ripGrep, search_file_content, edit, write-file, shell, shellBackgroundTools, web-fetch, web-search, save-memory, ask-user, activate-skill, complete-task, enter-plan-mode, exit-plan-mode, write-todos, topicTool, trackerTools",
+        "THREE separate grep-style tools (grep, ripGrep, search_file_content) — redundant and a design smell",
+        "save_memory is unique: persistent memory as a first-class tool",
+        "enter-plan-mode / exit-plan-mode mirror Claude Code's pair",
+        "activate-skill / list-mcp-resources / read-mcp-resource / mcp-tool / mcp-client are a rich MCP-adjacent surface"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+      "title": "MCP filesystem reference server",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "MCP filesystem ships 13 tools: read_text_file (with head/tail), read_media_file, read_multiple_files, write_file, edit_file (with dryRun), create_directory, list_directory, list_directory_with_sizes, directory_tree, move_file, search_files, get_file_info, list_allowed_directories",
+        "edit_file is the only MCP-FS edit tool; accepts an array of {oldText, newText} edits and supports dryRun",
+        "search_files is misleadingly named — it's a FIND-BY-PATTERN tool (glob-style name matching), NOT a content grep",
+        "list_directory_with_sizes supports sortBy: name|size",
+        "read_text_file supports head OR tail but not both simultaneously",
+        "No content-grep equivalent; users are expected to run grep via a separate MCP server or shell"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/git",
+      "title": "MCP git reference server",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "MCP git server ships 12 tools: git_status, git_diff_unstaged, git_diff_staged, git_diff, git_commit, git_add, git_reset, git_log, git_create_branch, git_checkout, git_show, git_branch",
+        "Alternative to shell-git; gives the model structured git operations without shell injection risk",
+        "No harness ships git operations as first-class tools; all delegate to either shell+git OR this MCP server"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github",
+      "title": "MCP GitHub server (archived)",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 6, "depth": 9, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Exposed 26 tools for GitHub API: create_or_update_file, push_files, search_repositories, create_repository, get_file_contents, fork_repository, create_branch, list_commits, create_issue, list_issues, update_issue, get_issue, add_issue_comment, create_pull_request, list_pull_requests, get_pull_request, get_pull_request_files, get_pull_request_status, merge_pull_request, update_pull_request_branch, get_pull_request_comments, get_pull_request_reviews, create_pull_request_review, search_code, search_issues, search_users",
+        "Shows the richness MCP can add beyond a harness's native surface",
+        "Archived but widely forked — still the reference shape"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "title": "MCP reference servers (overview)",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Active reference servers: Everything (test), Fetch (web), Filesystem, Git, Memory (knowledge graph), Sequential Thinking, Time",
+        "Archived: GitHub, GitLab, PostgreSQL, SQLite, Puppeteer, Brave Search — still widely used but no longer actively maintained in this repo",
+        "Memory server uses a knowledge-graph entities/relations/observations model, different from Gemini CLI's save_memory (key-value)",
+        "Sequential Thinking is essentially a 'show your work' tool — the model calls it to reason"
+      ]
+    },
+    {
+      "url": "https://python.langchain.com/docs/integrations/tools/filesystem/",
+      "title": "LangChain FileManagementToolkit",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 7, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "LangChain's FileManagementToolkit ships 7 tools: CopyFileTool, DeleteFileTool, FileSearchTool, MoveFileTool, ReadFileTool, WriteFileTool, ListDirectoryTool",
+        "All tools scoped to a root_dir parameter (critical: non-sandboxed otherwise)",
+        "selected_tools list lets you enable only a subset",
+        "No edit-in-place tool; only full-file write",
+        "FileSearchTool is a name-search (like MCP-FS's search_files), not a content grep",
+        "Documentation explicitly warns: 'not recommended for use outside a sandboxed environment'"
+      ]
+    },
+    {
+      "url": "https://docs.crewai.com/tools/overview",
+      "title": "CrewAI tools overview",
+      "qualityScore": 76,
+      "scores": { "authority": 9, "recency": 8, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "CrewAI has 40+ tools organized by category: File/Document, Search/Research, AI/ML, Cloud/Storage, Web, Automation, Database, Integrations",
+        "Core file tools: FileReadTool, FileWriterTool, DirectoryReadTool",
+        "Search: SerperDevTool (Google), CodeDocsSearchTool, WebsiteSearchTool",
+        "AI/ML: RAG Tool, Code Interpreter Tool, DALL-E Integration",
+        "Integration-heavy (S3 Reader, Scrape Website, etc.) — the catalog is broad but shallow on the file/code-editing side"
+      ]
+    },
+    {
+      "url": "https://github.com/continuedev/continue/tree/main/core/tools/definitions",
+      "title": "Continue — tool definitions",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Continue ships 21 tool definitions: codebaseTool, createNewFile, createRuleBlock, editFile, fetchUrlContent, globSearch, grepSearch, ls, multiEdit, readCurrentlyOpenFile, readFile, readFileRange, readSkill, requestRule, runTerminalCommand, searchWeb, singleFindAndReplace, viewDiff, viewRepoMap, viewSubdirectory",
+        "Three separate read tools: readFile, readFileRange, readCurrentlyOpenFile — schema-differentiated by use case",
+        "Edit surface has 3 tools: editFile (natural-language), multiEdit, singleFindAndReplace — similar Roo-style fragmentation",
+        "Unique: viewDiff, viewRepoMap, viewSubdirectory as first-class tools (read-only IDE-panel adapters)",
+        "createRuleBlock / requestRule are IDE-integration tools for Continue's rules system",
+        "codebaseTool is semantic retrieval over indexed codebase"
+      ]
+    },
+    {
+      "url": "https://pydantic.dev/docs/ai/tools-toolsets/common-tools/",
+      "title": "Pydantic AI common tools",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Pydantic-AI ships: duckduckgo_search_tool, web_fetch_tool (with SSRF protection built-in), tavily_search_tool (paid), Exa search toolkit (search/find_similar/content/answer)",
+        "web_fetch_tool converts HTML to markdown automatically",
+        "SSRF protection is a rarity — most harness WebFetch implementations don't have it",
+        "Tools are added to agents via tools or toolsets parameters",
+        "No filesystem tools — Pydantic-AI is a framework, not a harness"
+      ]
+    },
+    {
+      "url": "https://aws.amazon.com/blogs/aws/introducing-amazon-bedrock-agentcore-securely-deploy-and-operate-ai-agents-at-any-scale/",
+      "title": "Amazon Bedrock AgentCore — introduction",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Bedrock AgentCore is a platform, not a tool library — modular services: Runtime, Memory, Code Interpreter, Browser, Gateway, Identity, Observability",
+        "Gateway turns existing APIs and Lambda functions into agent tools via MCP — the AWS equivalent of 'MCP everything'",
+        "Code Interpreter provides a sandboxed Python execution environment",
+        "Browser provides managed web browser instances at scale",
+        "Memory maintains short-term and long-term context across sessions",
+        "Services work modularly or independently",
+        "Distinct from Bedrock Agents (the older Action Groups + Knowledge Bases product)"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/usage/commands.html",
+      "title": "Aider — commands",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Aider exposes ~50 slash commands but ZERO model-facing tools in the function-calling sense",
+        "Commands include: /add, /drop, /read-only, /run, /test, /lint, /git, /diff, /commit, /code, /ask, /architect, /clear, /reset, /tokens, /undo, /help, /web, /edit, /ls",
+        "/architect switches to dual-model planner+editor mode",
+        "/web scrapes a URL and adds it to context as markdown",
+        "The entire model interface is text-based: search/replace blocks, unified diffs, whole-file, diff-fenced — parsed by the harness after the turn",
+        "Deliberate architectural stance: function calling is the wrong interface for code editing"
+      ]
+    },
+    {
+      "url": "https://swe-agent.com/latest/",
+      "title": "SWE-agent docs (index)",
+      "qualityScore": 75,
+      "scores": { "authority": 10, "recency": 8, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "SWE-agent ACI tools (default config): open, goto, edit, scroll_up, scroll_down, search_dir, search_file, find_file, create, submit",
+        "Stateful tool design: open + goto + scroll maintain a 'current file + current line' state machine",
+        "edit uses N:M<<<EOF...EOF syntax (line range + heredoc body) with optional lint gate on save",
+        "submit is the finish-task primitive (vs stop_reason or attempt_completion)",
+        "filemap tool prints a Python file skipping function bodies — compression for large files",
+        "Benchmark-tuned narrow surface — proves that 10 tools is enough for SWE-bench tasks"
+      ]
+    },
+    {
+      "url": "https://lucumr.pocoo.org/2025/6/12/agentic-coding/",
+      "title": "Armin Ronacher — Agentic Coding Tools",
+      "qualityScore": 85,
+      "scores": { "authority": 8, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Tools should be designed assuming an 'LLM chaos monkey' — every tool called with unexpected args",
+        "Crashes are acceptable, hangs are problematic — every tool needs a timeout",
+        "Verification tools (tests, linters, LSP, compilation) are the highest-leverage thing an agent can have",
+        "Go / plain SQL / descriptive function names beat magical Python for agent work",
+        "Harness design forces you to build provider-neutral abstractions; cache control and tool prompting diverge across providers",
+        "Reinforcement: inject contextual reminders into tool outputs to re-anchor the model on its goal during long loops"
+      ]
+    },
+    {
+      "url": "https://github.com/Significant-Gravitas/AutoGPT/tree/master/classic",
+      "title": "AutoGPT classic abilities (historical reference)",
+      "qualityScore": 62,
+      "scores": { "authority": 7, "recency": 4, "depth": 6, "examples": 4, "uniqueness": 5 },
+      "keyInsights": [
+        "Classic AutoGPT shipped: read_file, write_file, append_to_file, list_files, delete_file, web_search, browse_website, execute_python_code, execute_shell, image_gen, improve_code, write_tests",
+        "The 'classic' project is UNSUPPORTED and contains known vulnerabilities — educational only",
+        "The current AutoGPT Platform is a block-based integration catalog (Firecrawl, Jina, Exa, GitHub, Google Docs, Notion, Discord, Airtable, HubSpot, Twitter) rather than a local agent harness",
+        "As a reference for 'what tools did the early autonomous agents ship,' this is the canonical list",
+        "Not comparable to 2026 harnesses — included for historical completeness only"
+      ]
+    }
+  ],
+  "selfEvaluation": {
+    "coverage": 9,
+    "diversity": 9,
+    "examples": 7,
+    "accuracy": 9,
+    "gaps": [
+      "OpenHands CodeActAgent exact tool schemas not verified from source — relied on paper/doc summaries and cross-harness references. The action space (IPythonRunCellAction, CmdRunAction, FileReadAction, FileEditAction, FileWriteAction, BrowseURLAction, BrowseInteractiveAction, MessageAction, AgentFinishAction, AgentDelegateAction, AgentThinkAction) is inferred from prior-art knowledge and not re-verified in this pass.",
+      "Cline's load_mcp_documentation and focus_chain not confirmed in the tools-guide fetch; may be newer features or removed",
+      "SWE-agent's exact default-config tool list not re-confirmed in this pass; relied on widely-known ACI design from the paper",
+      "Microsoft AutoGen / Magentic-One tool schemas only at a high level (FileSurfer, WebSurfer, Coder, ComputerTerminal); not schema-level",
+      "Bedrock Agents (the older Action Groups product) listed only conceptually; not matrixed separately from AgentCore",
+      "LangChain has moved a lot of tools to langchain-community and langchain-experimental; the full inventory there is not re-verified"
+    ]
+  }
+}

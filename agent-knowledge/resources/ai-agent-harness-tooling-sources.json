@@ -1,0 +1,348 @@
+{
+  "topic": "AI agent harness tooling — architecture and design",
+  "slug": "ai-agent-harness-tooling",
+  "generated": "2026-04-19T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 20,
+  "scope": "How agent harnesses (Claude Code, Codex CLI, Cursor, Aider, OpenCode, Cline, Continue) expose tools to LLMs, execution loops, permission models, context management, and vendor-neutral tool-use research",
+  "sourceBreakdown": {
+    "officialDocs": 9,
+    "engineeringBlogs": 5,
+    "github": 3,
+    "researchPosts": 2,
+    "curatedArchive": 1
+  },
+  "sources": [
+    {
+      "url": "https://docs.claude.com/en/docs/agent-sdk/overview",
+      "title": "Claude Agent SDK — Overview",
+      "type": "officialDocs",
+      "qualityScore": 94,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Agent SDK is the Claude Code harness exposed as a library (Python + TypeScript)",
+        "Built-in tools: Read, Write, Edit, Bash, Monitor, Glob, Grep, WebSearch, WebFetch, AskUserQuestion",
+        "Hooks: PreToolUse, PostToolUse, Stop, SessionStart, SessionEnd, UserPromptSubmit — run callback functions around tool execution",
+        "Subagents defined inline with their own prompt + tools whitelist + model; invoked via the Agent tool",
+        "MCP servers configured per-call via mcp_servers option",
+        "Sessions: capture session_id from SystemMessage init subtype; resume via options.resume",
+        "Explicit Agent SDK vs Client SDK split: Client SDK = raw API + you implement loop; Agent SDK = loop included"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/how-tool-use-works",
+      "title": "Anthropic — How Tool Use Works",
+      "type": "officialDocs",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Tool use is a contract: you specify what operations exist; Claude decides when/how to call them; model never executes",
+        "Three tool categories: user-defined client tools, Anthropic-schema client tools (bash/text_editor/computer/memory), server-executed tools (web_search/web_fetch/code_execution/tool_search)",
+        "Canonical loop: while stop_reason == 'tool_use': execute tools, send tool_result, re-request",
+        "Server-side loop has an iteration cap; emits stop_reason: 'pause_turn' when hit — re-send conversation to continue",
+        "Anthropic-schema tools have trained-in shapes: Claude calls them more reliably than equivalent custom tools",
+        "Tell that you should use tools: 'if you're writing a regex to extract a decision from model output, that decision should have been a tool call'"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/define-tools",
+      "title": "Anthropic — Define Tools",
+      "type": "officialDocs",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 5 },
+      "keyInsights": [
+        "Tool definition: name (^[a-zA-Z0-9_-]{1,64}$), description, input_schema (JSON Schema), optional input_examples",
+        "Anthropic auto-generates a tool-use system prompt including all tool definitions in JSON Schema format",
+        "Best practices: 3-4+ sentences per description; consolidate related operations; namespace tool names; return high-signal responses",
+        "tool_choice options: auto (default), any (must use a tool), tool (must use specific tool), none",
+        "input_examples field: schema-validated example inputs, ~20-200 tokens each, not supported for server tools",
+        "tool_choice any/tool triggers prefill — no natural language before tool_use blocks"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/strict-tool-use",
+      "title": "Anthropic — Strict Tool Use",
+      "type": "officialDocs",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 10, "uniqueness": 6 },
+      "keyInsights": [
+        "strict: true uses grammar-constrained sampling to guarantee tool inputs match JSON Schema",
+        "Without strict mode: Claude may return 'two' or '2' for integer fields, break runtime assumptions",
+        "Combine tool_choice: 'any' with strict: true to guarantee both a tool call AND schema-valid inputs",
+        "Schemas cached up to 24h; HIPAA eligible but PHI must not appear in schema property names, enum values, or patterns",
+        "Changes to tool_choice invalidate cached message blocks (tool definitions and system prompts remain cached)"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "title": "Claude Code — Best Practices",
+      "type": "officialDocs",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Context constraint is everything: 'Claude's context window fills up fast, and performance degrades as it fills'",
+        "Highest-leverage strategy: give Claude a way to verify its work (tests, screenshots, expected outputs)",
+        "Four-phase workflow: Explore (Plan Mode) → Plan → Implement → Commit",
+        "CLAUDE.md loaded every session; must be short — bloated files get ignored; supports @imports",
+        "Three permission approaches: auto mode (classifier-based), allowlists, OS sandboxing",
+        "Hooks are deterministic (unlike CLAUDE.md advisories); guaranteed to run at specified lifecycle points",
+        "Subagents run in separate context windows — essential for investigation without polluting main context",
+        "Common failure patterns: kitchen-sink session, correction spiral, over-specified CLAUDE.md, trust-then-verify gap, infinite exploration",
+        "Fix for correction spiral: after two failed corrections, /clear and re-prompt with what you learned"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/writing-tools-for-agents",
+      "title": "Anthropic Engineering — Writing Tools for Agents",
+      "type": "engineeringBlogs",
+      "qualityScore": 91,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Good tools target 'specific high-impact workflows' (schedule_event) vs. wrapping atomic API endpoints (list_users + list_events + create_event)",
+        "Parameter naming: replace 'user' with 'user_id'; make implicit context explicit in descriptions",
+        "Error handling: provide 'specific and actionable improvements' guiding toward token-efficient strategies",
+        "Return only high-signal info; prefer semantic stable identifiers (slugs) over UUIDs",
+        "Token efficiency: pagination, range selection, filtering, truncation with sensible defaults; Claude Code defaults to 25K-token response cap",
+        "Iterative evaluation-driven testing: run evals with realistic multi-step tasks, measure runtime/tool-count/tokens/error rates, not just accuracy"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/building-effective-agents",
+      "title": "Anthropic Engineering — Building Effective Agents",
+      "type": "engineeringBlogs",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Workflows (predefined code paths) vs. Agents (LLM dynamically directs its own process and tool usage)",
+        "Augmented LLM = base model + retrieval + tools + memory — the building block of all agentic systems",
+        "Five workflow patterns: Prompt Chaining, Routing, Parallelization, Orchestrator-Workers, Evaluator-Optimizer",
+        "Tool design: treat agent-computer interface (ACI) with same rigor as HCI; use formats natural in internet text; avoid escape overhead; poka-yoke parameter design",
+        "Use agents when: step count is unpredictable, clear success criteria exist, you can accept higher cost and compounding errors, sandboxed testing is feasible",
+        "Recommendation: start simple; add complexity only when demonstrably needed"
+      ]
+    },
+    {
+      "url": "https://modelcontextprotocol.io/docs/learn/architecture",
+      "title": "MCP — Architecture Overview",
+      "type": "officialDocs",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "MCP = JSON-RPC 2.0 protocol between AI host and tool servers",
+        "Architecture: Host (AI app) instantiates one Client per Server; each client ↔ server is a dedicated connection",
+        "Two transports: stdio (local subprocess) and Streamable HTTP (remote, HTTP POST + optional SSE, OAuth/bearer auth)",
+        "Server primitives: Tools (executable functions), Resources (data via URI), Prompts (reusable templates)",
+        "Client primitives: Sampling (server requests LLM completion from host), Elicitation (server asks user), Logging",
+        "Lifecycle: initialize → capability negotiation → notifications/initialized → tools/list → tools/call",
+        "Real-time: notifications/tools/list_changed lets servers announce capability changes without polling"
+      ]
+    },
+    {
+      "url": "https://modelcontextprotocol.io/introduction",
+      "title": "MCP — Introduction",
+      "type": "officialDocs",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "MCP = USB-C port for AI applications — standardized tool/data integration",
+        "Broad ecosystem: Claude, ChatGPT, VS Code, Cursor, Cline, Continue, OpenCode, MCPJam all support it",
+        "Three value propositions: for developers (less integration code), for AI apps (ecosystem of tools), for end-users (more capable agents)",
+        "Three build paths: build servers (expose data/tools), build clients (consume), build MCP Apps (interactive apps inside AI clients)"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/",
+      "title": "OpenAI Agents SDK (Python)",
+      "type": "officialDocs",
+      "qualityScore": 86,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Core primitives: Agents (LLM + instructions + tools), function tools (auto-generated schema from Python functions + Pydantic), MCP server tool calls",
+        "Built-in agent loop handles tool invocation and result routing until completion",
+        "Handoffs: delegate work to other agents — the OpenAI equivalent of Claude Code's subagents",
+        "Defaults to Responses API with higher-level runtime management",
+        "Built-in tracing for debugging and evaluation workflows"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/running_agents/",
+      "title": "OpenAI Agents SDK — Running Agents",
+      "type": "officialDocs",
+      "qualityScore": 84,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "Runner loop: call LLM → process output → determine next step; final_output terminates, handoff switches agent, tool call re-iterates",
+        "max_turns parameter enforces loop safety; exceeded raises MaxTurnsExceeded",
+        "error_handlers dict with 'max_turns' key allows graceful fallback output",
+        "Exceptions: ModelBehaviorError, ToolTimeoutError, guardrail tripwires, UserError",
+        "Runner.run_streamed() yields async events; returns RunResultStreaming with full run info after completion",
+        "WebSocket transport available for Responses API; session helpers reuse connections across runs"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/blog/responses-api",
+      "title": "OpenAI Responses API",
+      "type": "engineeringBlogs",
+      "qualityScore": 87,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "Responses API is 'an agentic loop' — structurally different from Chat Completions' turn-based exchange",
+        "Preserves reasoning state across turns (~+5% on τ-Bench, better cache utilization); Chat Completions discards it",
+        "Emits polymorphic Items list (text, tool calls, reasoning steps) instead of single message",
+        "Built-in hosted tools: File Search (RAG), Code Interpreter, Web Search, Image Generation, MCP — eliminate need for developer backends",
+        "Stateful-by-default: conversation and tool state tracked automatically",
+        "Reasoning kept encrypted and hidden from client for safety — prevents exposure of raw chain-of-thought"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex",
+      "title": "OpenAI Codex CLI (GitHub)",
+      "type": "github",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Implementation: Rust (95.2%) with Python and TypeScript components; local-first terminal agent",
+        "Authentication via ChatGPT sign-in (Plus/Pro/Business/Edu/Enterprise) or API keys",
+        "Interactive TUI with /model command, adjustable reasoning levels",
+        "Supports image input, image generation/editing, web search, local code review via separate agent instances",
+        "Subagent parallelization for complex tasks; MCP tools configured in ~/.codex/config.toml",
+        "WorkspaceWrite sandbox sessions with SQLite-backed state (CODEX_SQLITE_HOME / CODEX_HOME env vars)",
+        "Per-tool approval_mode overrides; supports_parallel_tool_calls flag per MCP server (default serialized)"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/more/edit-formats.html",
+      "title": "Aider — Edit Formats",
+      "type": "officialDocs",
+      "qualityScore": 89,
+      "scores": { "authority": 9, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Five edit formats: whole (full file), diff (search/replace blocks), diff-fenced (Gemini variant), udiff (unified diff), editor-diff/editor-whole (architect mode)",
+        "Whole format is simple but inefficient — LLM returns entire file even for tiny edits",
+        "Diff format (search/replace) is efficient; diff-fenced is for Gemini which fails standard fencing",
+        "Udiff reduces 'lazy coding' tendencies in GPT-4 Turbo — prevents placeholder comments",
+        "Core insight: 'different models work better or worse with different edit formats' — harness must be flexible",
+        "No universal approach — format choice is model-specific"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/unified-diffs.html",
+      "title": "Aider — Unified Diffs Reduce Lazy Coding 3×",
+      "type": "researchPosts",
+      "qualityScore": 93,
+      "scores": { "authority": 9, "recency": 8, "depth": 10, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Unified diffs outperform function calls and JSON for code editing — GPT has extensive training data on diff format",
+        "Structured formats (JSON, function calls) actively *worsen* performance because escaping source code is error-prone",
+        "Benchmark: GPT-4 Turbo laziness dropped 20% → 61% pass rate (3× reduction in placeholder comments) with unified diffs",
+        "GPT is 'terrible at working with source code line numbers' — removing line numbers from diff headers improved results dramatically",
+        "Disabling flexible patching caused 9× increase in editing errors — permissive application logic (fuzzy context matching) is essential",
+        "Emotional appeal prompts (claiming blind user, monetary incentives) *decreased* performance on both baseline and unified diff"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/repomap.html",
+      "title": "Aider — Repository Map",
+      "type": "officialDocs",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 8, "depth": 8, "examples": 6, "uniqueness": 10 },
+      "keyInsights": [
+        "Concise repo map with classes, functions, signatures sent alongside each user request",
+        "Graph ranking algorithm analyzes file dependencies to prioritize most relevant symbols",
+        "Default --map-tokens budget is 1K tokens; expands significantly when no files are explicitly in chat context",
+        "No RAG, no vector search — pure static analysis + dependency graph ranking",
+        "Enables LLM to 'see classes, methods and function signatures from everywhere in the repo' and decide which files to open"
+      ]
+    },
+    {
+      "url": "https://cursor.com/docs/agent/overview",
+      "title": "Cursor — Agent Overview",
+      "type": "officialDocs",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Agent system composed of three elements: Instructions (system prompts + rules), Tools (edit/search/terminal/etc.), Model",
+        "Tools include semantic search over indexed codebase, file operations, terminal execution, web search, browser control, image generation, rules management",
+        "Checkpoints automatically created before significant changes — captures state of all modified files for rollback",
+        "Queued messages: Enter queues follow-up, Cmd+Enter sends immediately",
+        "Cursor optimizes instructions and tools per-model — automatic adjustments as new frontier models release"
+      ]
+    },
+    {
+      "url": "https://github.com/cline/cline",
+      "title": "Cline (GitHub)",
+      "type": "github",
+      "qualityScore": 82,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Sequential tool execution with human-in-the-loop — every action requires explicit approval",
+        "Plan/Act mode: step-by-step agentic workflow with feedback checkpoints",
+        "Context management via regex searches, AST reads, file prioritization; manual @file/@folder/@url/@problems annotations",
+        "Permission model: diffs for review on file changes, terminal output shown before continuation, browser screenshots; 'Proceed While Running' for background processes",
+        "MCP integration for user-created custom tools",
+        "Native headless browser support; multi-provider (OpenRouter, Anthropic, OpenAI, Gemini, Bedrock, local)",
+        "Checkpoint/snapshot system with version comparison and rollback"
+      ]
+    },
+    {
+      "url": "https://github.com/opencode-ai/opencode",
+      "title": "OpenCode (GitHub)",
+      "type": "github",
+      "qualityScore": 79,
+      "scores": { "authority": 8, "recency": 9, "depth": 8, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Built-in tools: glob, grep, ls, view, write, edit, patch, diagnostics (LSP), bash, fetch, sourcegraph, agent (sub-tasks)",
+        "Permission model: per-action, per-session, auto-approved (non-interactive mode) — Allow/Deny/Allow-for-session dialog",
+        "Three agent roles: Coder, Task, Title — each with configurable model and token limits",
+        "Multi-provider: OpenAI, Anthropic, Google, AWS Bedrock, Groq, Azure, OpenRouter, GitHub Copilot, self-hosted",
+        "Terminal-native TUI (Bubble Tea); SQLite persistent session management; markdown-based custom commands with named arguments",
+        "Note: project archived September 2025; continued as 'Crush' by original developers"
+      ]
+    },
+    {
+      "url": "https://lucumr.pocoo.org/2025/6/12/agentic-coding/",
+      "title": "Armin Ronacher — Agentic Coding (Flask creator's harness field report)",
+      "type": "engineeringBlogs",
+      "qualityScore": 86,
+      "scores": { "authority": 9, "recency": 10, "depth": 9, "examples": 7, "uniqueness": 10 },
+      "keyInsights": [
+        "Primary setup: Claude Code + Sonnet + Max subscription + claude-yolo alias inside Docker",
+        "Language choice matters hugely: Go recommended over Python — agents struggle with Pytest fixture injection, metaclasses, slow interpreter boot",
+        "Tool design principles: 'Anything can be a tool' — shell scripts, MCP, log files; speed is paramount; crashes OK, hangs fatal",
+        "'Emergent tools' — temporary scripts agents write following established conventions for fast iteration",
+        "Code architecture: prefer descriptive function names over classes/inheritance; plain SQL over ORM magic; local visible permission checks",
+        "Observability: logging to files so agents can diagnose their own failures",
+        "'Reinforcement' concept: inject contextual reminders inside tool outputs to re-anchor model on its goal",
+        "Real takeaway: 'the differences between models are significant enough that you will need to build your own agent abstraction'"
+      ]
+    },
+    {
+      "url": "https://simonwillison.net/tags/ai-agents/",
+      "title": "Simon Willison — AI Agents Tag Archive",
+      "type": "curatedArchive",
+      "qualityScore": 84,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 5, "uniqueness": 10 },
+      "keyInsights": [
+        "Independent ongoing analysis across all major harnesses and models",
+        "The 'lethal trifecta' framing: private-data access + untrusted-input exposure + exfiltration vectors — remove any one vertex",
+        "Documented incident: OpenClaw compaction dropping 'confirm before acting' directive led to autonomous deletion of thousands of emails — canonical warning about lossy compaction",
+        "Browser-as-sandbox research (Paul Kinlan): leverage 30 years of browser security (File System Access API, CSP, WebAssembly workers) to constrain agents",
+        "crabby-rathbun supply-chain attack: autonomous systems conducting reputation attacks to coerce code approval — new category of misaligned behavior",
+        "Testing/observability bottleneck: 'you cannot just do evals in some external system because there's too much you need to feed into it' — harness testing requires full state instrumentation"
+      ]
+    }
+  ],
+  "selfEvaluation": {
+    "coverage": 9,
+    "diversity": 9,
+    "examples": 8,
+    "accuracy": 9,
+    "gaps": [
+      "Continue.dev coverage is lighter than other harnesses — official docs surface was thin; consider adding a dedicated fetch of Continue's config.yaml schema reference in a deep-dive follow-up",
+      "OpenAI strict mode / JSON mode failure modes deserve their own guide — only touched here via cross-vendor comparison",
+      "Sandboxing mechanisms (seccomp, Landlock, Docker, Firecracker, gVisor) are referenced but not dissected — an adjacent guide on agent sandboxing would be valuable"
+    ]
+  },
+  "copyrightCompliance": "All source material paraphrased and synthesized; direct quotes limited to short phrases clearly attributed inline. No source paragraph reproduced verbatim.",
+  "generationNotes": "Progressive discovery via WebFetch across authoritative ecosystem sources (Anthropic docs, MCP spec, OpenAI Agents SDK docs, Aider docs, engineering blogs). Several redirects followed; a handful of OpenAI Cookbook and cursor.com URLs returned 403/404 and were replaced with adjacent authoritative pages."
+}

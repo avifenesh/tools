@@ -1,0 +1,297 @@
+{
+  "topic": "Testing harness tools — multi-layer testing of LLM-facing agent tools",
+  "slug": "testing-harness-tools",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 20,
+  "notes": "Specialized for @agent-sh/harness-* (TypeScript library shipping LLM-facing tools). Confidence is high for live-fetched external sources and in-repo anchors; moderate for secondary sources that redirected or returned partial content.",
+  "sources": [
+    {
+      "url": "https://platform.claude.com/docs/en/docs/test-and-evaluate/develop-tests",
+      "title": "Anthropic — Define success criteria and build evaluations",
+      "type": "official_docs",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Success criteria must be specific, measurable, achievable, relevant",
+        "Three grading methods: code-based (fastest, most reliable), human (expensive), LLM-based (flexible, scalable after validation)",
+        "LLM-based grading rubrics should encourage reasoning in <thinking> tags then discard, use strict small-scale outputs (correct/incorrect or 1-5 Likert)",
+        "Evaluate with a different model than the one under test to avoid self-grading bias",
+        "Volume over quality for automated evals; more signal from many medium-quality cases than few human-graded"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/swe-bench-sonnet",
+      "title": "Anthropic — Raising the bar on SWE-bench Verified",
+      "type": "engineering_post",
+      "qualityScore": 94,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Minimal scaffold: bash + edit tool only, give max control to the model",
+        "Explicitly 'tested them to uncover any ways that the model might misunderstand the spec' and iterated descriptions",
+        "Forced absolute paths to prevent relative-path errors after cd",
+        "String replacement edits found to have highest reliability after experimenting with alternatives",
+        "Scaffolding iteration, not the model, drove the score from 45% to 49%"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/multi-agent-research-system",
+      "title": "Anthropic — How we built our multi-agent research system",
+      "type": "engineering_post",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Built a tool-testing agent that attempts the tool and rewrites the description to avoid failures",
+        "Description improvements cut future-agent task time by 40%",
+        "Full production tracing for systematic failure diagnosis; token usage alone explains 80% of variance in BrowseComp",
+        "Evaluations must tolerate multiple valid paths to the same goal — strict trajectory equality is wrong",
+        "Human review caught subtle failure modes (source quality bias) that automated systems missed"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "title": "Claude Code — Best Practices",
+      "type": "official_docs",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Highest-leverage pattern: give the model a way to verify its own work (tests, screenshots, scripts)",
+        "Context-window exhaustion is the dominant cause of performance degradation",
+        "Hooks are deterministic guarantees; CLAUDE.md instructions are advisory",
+        "Treat CLAUDE.md like code: review, prune, test behavior shifts when rules are added",
+        "Failure patterns: kitchen-sink session, repeated corrections, over-specified CLAUDE.md, trust-then-verify gap"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/overview",
+      "title": "Anthropic — Tool use with Claude (overview)",
+      "type": "official_docs",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 6 },
+      "keyInsights": [
+        "strict:true on tool definitions guarantees schema conformance; costs extra tokens",
+        "Claude Opus is more likely than Sonnet to ask for missing required parameters rather than hallucinate",
+        "Tool-use system-prompt token counts vary by model (346 on 4.x, 264 on Haiku 3.5, 530 on Opus 3)",
+        "tool_choice: auto|any|tool|none — differs in token accounting",
+        "Server tools (web_search, code_execution) execute on Anthropic infra; client tools stream tool_use → tool_result"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/research/project-vend-1",
+      "title": "Anthropic — Project Vend: Claude as a shopkeeper",
+      "type": "research_post",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 8, "depth": 9, "examples": 7, "uniqueness": 10 },
+      "keyInsights": [
+        "Long-horizon autonomous agent exposed emergent failures not visible in short-context evals",
+        "Concrete failure modes: hallucinated payment accounts, under-cost pricing, over-discounting, ignoring high-value offers",
+        "Identity-crisis episode demonstrated context-accumulation instability",
+        "Observability via financial record tracking enabled systematic diagnosis of economic outcomes",
+        "Better scaffolding (structured reflection tools, CRM) likely addresses many failures — confirms scaffold-iteration as primary lever"
+      ]
+    },
+    {
+      "url": "https://github.com/ShishirPatil/gorilla/tree/main/berkeley-function-call-leaderboard",
+      "title": "Berkeley Function Calling Leaderboard (BFCL)",
+      "type": "benchmark",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "AST-based validation for syntax + executable evaluation for actual callability",
+        "Categories: simple, parallel, multiple, multi_turn, live_multiple, web_search, memory",
+        "First comprehensive executable function-call eval — not just format-conformance",
+        "Distinguishes Live (single-turn) from Non-Live categories",
+        "Format sensitivity is an explicit evaluation axis"
+      ]
+    },
+    {
+      "url": "https://github.com/sierra-research/tau-bench",
+      "title": "TAU-bench — simulated user + agent + tools",
+      "type": "benchmark",
+      "qualityScore": 84,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Three-way interactions: user simulator + agent + domain tools (unlike BFCL which is tool-only)",
+        "Pass@k (Pass¹ Pass² Pass³ Pass⁴) for explicit reliability scoring",
+        "Airline + retail domains with policy constraints",
+        "Auto-error identification tools for fault classification (agent fault vs user fault vs policy violation)",
+        "Compares across closed and open models on realistic multi-turn flows"
+      ]
+    },
+    {
+      "url": "https://github.com/princeton-nlp/SWE-bench",
+      "title": "SWE-bench — Can LLMs resolve real-world GitHub issues?",
+      "type": "benchmark",
+      "qualityScore": 86,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Input = codebase + issue; Output = patch; Score = pass/fail on existing test suite",
+        "Variants: Lite (subset), Verified (500 human-confirmed-solvable), Multimodal",
+        "Evaluator uses Docker for reproducibility — patch applied in container, test suite runs",
+        "Functional correctness over code-similarity metrics",
+        "Benchmark validates tool-using agent capability because solving requires navigation + understanding + editing"
+      ]
+    },
+    {
+      "url": "https://inspect.aisi.org.uk/",
+      "title": "Inspect AI — UK AISI eval framework",
+      "type": "framework",
+      "qualityScore": 83,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Three-part model: Datasets + Solvers + Scorers",
+        "Solvers are chained components (prompt engineering + elicitation strategies)",
+        "Scorers: text match, model-graded, or custom",
+        "Built-in tools: bash, Python, text editing, web search, browsing, computer",
+        "Sandboxing: Docker, Kubernetes, Modal, Proxmox — for untrusted model code",
+        "Supports running external agents (Claude Code, Gemini CLI) inside eval tasks"
+      ]
+    },
+    {
+      "url": "https://www.promptfoo.dev/docs/providers/anthropic/",
+      "title": "Promptfoo — Anthropic provider docs",
+      "type": "framework",
+      "qualityScore": 75,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "YAML config for side-by-side model comparison across providers",
+        "Tool configuration via inline input_schema + name + description",
+        "Model-graded assertions: llm-rubric, factuality",
+        "Structured outputs incompatible with citations + message prefilling",
+        "strict:true for schema conformance on tool calls"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/evals",
+      "title": "OpenAI Evals — framework for LM evaluations",
+      "type": "framework",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 8, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Open-source registry of benchmarks + custom eval authoring",
+        "Completion Function Protocol for prompt chains and tool-using agents",
+        "Data fetched via Git-LFS for select evals",
+        "Eval templates pattern — contributors follow existing shapes",
+        "Framework is LM-or-system agnostic (not OpenAI-specific)"
+      ]
+    },
+    {
+      "url": "https://github.com/confident-ai/deepeval",
+      "title": "DeepEval — LLM-app evaluation in pytest style",
+      "type": "framework",
+      "qualityScore": 77,
+      "scores": { "authority": 8, "recency": 9, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "ToolCorrectness metric — did right tools get called with right args",
+        "ArgumentCorrectness metric — validates tool-call arguments specifically",
+        "TaskCompletion metric — did the agent accomplish its goal",
+        "StepEfficiency — unnecessary steps penalty",
+        "Plan{Adherence,Quality} — multi-step plan evaluation",
+        "LLMTestCase + @observe decorator; end-to-end or component-level"
+      ]
+    },
+    {
+      "url": "https://docs.langchain.com/langsmith/evaluation-concepts",
+      "title": "LangSmith — evaluation concepts",
+      "type": "framework",
+      "qualityScore": 72,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 6 },
+      "keyInsights": [
+        "Pairwise evaluators compare two application versions (heuristic, LLM, or human judge)",
+        "Dataset splits = named subsets; versions auto-created on example change",
+        "Manually curated 10-20 examples covering common + edge cases as starting point",
+        "Pairwise useful 'when directly scoring an output is difficult but comparing is straightforward'",
+        "Explicit mention of correct-tool-selection and argument-formatting as eval targets"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/inspector",
+      "title": "MCP Inspector — dev tool for testing MCP servers",
+      "type": "tool",
+      "qualityScore": 74,
+      "scores": { "authority": 8, "recency": 10, "depth": 6, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "React UI + Node proxy bridging browser to MCP servers via various transports",
+        "Form-based tool execution with real-time response visualization",
+        "Defers deep validation to the server; omits optional fields when empty",
+        "CLI mode for programmatic / scripted server testing",
+        "Request history + visual error display — useful for debugging tool-description mismatches"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/openai-agents-python/blob/main/docs/tracing.md",
+      "title": "OpenAI Agents SDK — Tracing docs",
+      "type": "sdk_docs",
+      "qualityScore": 76,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "Traces comprise hierarchical spans: LLM generations, tool calls, handoffs, guardrails, custom events",
+        "function_span() wraps every tool call, stores inputs/outputs (toggleable for privacy)",
+        "Tracing enabled by default, disableable via env / code / per-run",
+        "Platform dashboard for visualizing complete workflow structure",
+        "Sensitive-data capture is an explicit configurable dimension"
+      ]
+    },
+    {
+      "url": "https://github.com/kevin1024/vcrpy",
+      "title": "VCR.py — record/replay HTTP interactions",
+      "type": "library",
+      "qualityScore": 70,
+      "scores": { "authority": 7, "recency": 7, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "YAML cassettes capture request + response pairs per test context",
+        "Replay phase intercepts recognized requests, returns recorded response — no network call",
+        "Benefits: offline capability, determinism, speed, zero API cost",
+        "Cassette invalidation = delete file and re-record; maintenance is lightweight",
+        "Applicable pattern for LLM APIs (harness regression tests), but doesn't catch description regressions"
+      ]
+    },
+    {
+      "url": "https://github.com/NousResearch/Hermes-Function-Calling",
+      "title": "Hermes Function Calling — open-weights tool-use format",
+      "type": "reference_implementation",
+      "qualityScore": 65,
+      "scores": { "authority": 7, "recency": 8, "depth": 5, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "<tool_call>{json}</tool_call> XML-wrapped JSON as the expected output format",
+        "validator.py + Pydantic schema enforcement for output validation",
+        "template_tests directory for structured test fixtures",
+        "Recursive iteration handling with a max-depth parameter",
+        "Format-correctness focus over accuracy quantification in public docs"
+      ]
+    },
+    {
+      "url": "https://vitest.dev/api/",
+      "title": "Vitest API reference — test.runIf, test.each, test.concurrent",
+      "type": "framework_docs",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 9, "uniqueness": 5 },
+      "keyInsights": [
+        "test.runIf(condition)(name, fn) and test.skipIf(condition)(name, fn) for env-gated tests",
+        "test.each([...cases])(name, fn) with printf-style %s/%d/%i/%j formatting",
+        "test.for([...]) — like each but doesn't spread; provides TestContext for concurrent snapshots",
+        "test.concurrent(name, fn, timeout?) — consecutive tests parallelized; use { expect } from context for snapshot correctness",
+        "Per-test timeout: 3rd arg (number) or options object { timeout }"
+      ]
+    },
+    {
+      "url": "/mnt/c/Users/avife/tools/packages/harness-e2e/test/read.e2e.hard.test.ts + write.e2e.hard.test.ts + packages/write/test/*.test.ts",
+      "title": "In-repo anchor — existing test infrastructure",
+      "type": "repo_anchor",
+      "qualityScore": 100,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 10 },
+      "keyInsights": [
+        "Trace-capturing helper collectTrace() records turns, toolsByName, toolSeq, finalContent, full events",
+        "runE2E(opts) dispatches on resolveBackend() (ollama | bedrock) — test bodies are backend-agnostic",
+        "it.runIf(() => available) + beforeAll probe (ollamaModelAvailable / bedrockAvailable) gates real-model tests",
+        "Per-test timeouts 180_000 / 240_000 / 300_000 ms passed as third arg, not global",
+        "Bash-decoy tests (H7, W8) surface tool-bypass as console.warn, not test failure (drift signal without CI red)",
+        "InMemoryLedger + recordRead() helper drives read-before-mutate gate + STALE_READ tests",
+        "Discriminated-union result kinds (text | directory | attachment | error) with specific error codes for LLM recovery",
+        "makeSession() with DEFAULT_SENSITIVE_PATTERNS + permission hook variants covers fail-open-to-hook vs hard-deny (D11)",
+        "Bedrock gated by loadDotEnv() + AWS_BEARER_TOKEN_BEDROCK; zero-dep .env loader walks up from cwd",
+        "E2E_BACKEND + BEDROCK_MODEL_ID env switches backend without touching test code"
+      ]
+    }
+  ]
+}

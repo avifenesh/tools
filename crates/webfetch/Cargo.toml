@@ -1,0 +1,45 @@
+[package]
+name = "harness-webfetch"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "WebFetch tool for AI agent harnesses — HTTP GET/POST with SSRF defense, readability+markdown extraction, redirect-chain reporting, size caps, and per-session cache"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "harness-webfetch-cli"
+path = "src/bin/cli.rs"
+
+[dependencies]
+harness-core = { path = "../harness-core" }
+
+anyhow.workspace = true
+async-trait = "0.1"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "io-std", "io-util", "net", "time", "fs", "sync"] }
+
+# HTTP client (rustls so we avoid native openssl linking in WSL)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+# URL parsing for redirect + host checks
+url = "2"
+# Readability main-content extractor (Mozilla port)
+readable-readability = "0.4"
+# HTML → Markdown converter
+html2md = "0.2"
+# SHA-256 for cache key
+sha2 = "0.10"
+# UUID for spill filenames
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+# Minimal HTTP server for tests
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"

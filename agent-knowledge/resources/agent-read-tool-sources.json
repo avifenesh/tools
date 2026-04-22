@@ -1,0 +1,264 @@
+{
+  "topic": "Read tool — examples and best practices in AI agent harnesses",
+  "slug": "agent-read-tool",
+  "generated": "2026-04-19T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 20,
+  "sourceBreakdown": {
+    "officialDocs": 13,
+    "researchPosts": 2,
+    "sourceCode": 3,
+    "conceptualGuides": 2
+  },
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "title": "Best Practices for Claude Code",
+      "qualityScore": 96,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Context window fills fast; performance degrades as it fills",
+        "Use Grep/Glob to locate, Read to inspect, subagents to offload",
+        "Named failure pattern: 'infinite exploration' (unbounded reading)",
+        "Use `/clear` between unrelated tasks",
+        "Reference files with `@` or let Claude fetch itself via Bash/MCP/Read"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/context-window",
+      "title": "Explore the context window",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 9 },
+      "keyInsights": [
+        "Interactive walkthrough of how startup prompts, MCP tools, and file reads consume the 200k window",
+        "MCP tool schemas are deferred by default; loaded on demand via tool_search",
+        "Every Read permanently bills against context",
+        "Status lines can track live token usage"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview",
+      "title": "Tool use with Claude (overview)",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Client tools vs server tools: where execution happens",
+        "Anthropic-schema tools (bash, text_editor) are trained-in",
+        "tool_use / tool_result contract",
+        "Strict tool use enforces schema conformance"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/how-tool-use-works",
+      "title": "How tool use works",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "while stop_reason == tool_use loop",
+        "Server-executed tools can pause_turn when hitting iteration cap",
+        "Anthropic-schema tools outperform custom equivalents for the same operation",
+        "Tool use fits for side effects, fresh data, structured outputs, external-system calls"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/building-effective-agents",
+      "title": "Building Effective Agents",
+      "qualityScore": 91,
+      "scores": { "authority": 10, "recency": 8, "depth": 9, "examples": 7, "uniqueness": 10 },
+      "keyInsights": [
+        "Spent effort on ACI (agent-computer interface) design comparable to HCI",
+        "Concrete lesson: switched to absolute filepaths after model errors with relative paths",
+        "Poka-yoke: make wrong inputs impossible via the schema",
+        "Give tool definitions as much prompt engineering attention as prompts"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "title": "Create custom subagents",
+      "qualityScore": 87,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Subagents run in their own context window",
+        "Can be tool-scoped (e.g. Read/Grep/Glob only) to enforce read-only behavior",
+        "Preserve main context by delegating large file reads",
+        "Description field drives when Claude delegates"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/overview",
+      "title": "Claude Code overview",
+      "qualityScore": 78,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 5 },
+      "keyInsights": [
+        "Claude Code reads codebase, edits files, runs commands",
+        "Works in terminal, IDE, desktop, web",
+        "CLAUDE.md loaded every session; files referenced via @"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/settings",
+      "title": "Claude Code settings",
+      "qualityScore": 74,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 6, "uniqueness": 5 },
+      "keyInsights": [
+        "Permission scopes: Managed / User / Project / Local",
+        "Tool access controlled via settings.json",
+        "Read tool permissions can be allowlisted per scope"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/repomap.html",
+      "title": "Aider repo map",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 8, "depth": 8, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "Repo map gives a concise index of classes/functions across the repo",
+        "Graph-ranking algorithm selects relevant portions within --map-tokens budget (default 1k)",
+        "LLM uses the map to request files via /add",
+        "Aider philosophy: proactive curation, not reactive reads"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/usage/commands.html",
+      "title": "Aider commands (/add, /read-only, /drop)",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 8, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "/add makes files editable; /read-only for reference",
+        "/drop frees context tokens",
+        "/ls lists currently included files",
+        "Editable vs read-only distinction is core to Aider's model"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/usage/tips.html",
+      "title": "Aider tips",
+      "qualityScore": 76,
+      "scores": { "authority": 9, "recency": 8, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Only add files you think need editing",
+        "Pre-create new files with /add before editing",
+        "Paste specific error outputs, not full logs",
+        "Thoughtful curation beats comprehensive file dumps"
+      ]
+    },
+    {
+      "url": "https://github.com/Aider-AI/aider/blob/main/aider/coders/base_coder.py",
+      "title": "Aider base_coder.py (source)",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Files wrapped in fence markers with relative path prefix",
+        "Line numbers exist in code but commented out by default",
+        "Images handled via base64 encoding",
+        "Read-only files use separate get_read_only_files_content()"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/exploring-clines-tools/cline-tools-guide",
+      "title": "Cline tools guide",
+      "qualityScore": 72,
+      "scores": { "authority": 8, "recency": 9, "depth": 6, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "read_file complements replace_in_file for precise edits",
+        "Use read_file for full content; search_files for regex patterns",
+        "Implicit pattern: read first, modify second"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/features/plan-and-act",
+      "title": "Cline Plan vs Act modes",
+      "qualityScore": 75,
+      "scores": { "authority": 8, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Plan Mode: read + search only, no writes",
+        "Small tasks skip planning; medium use Plan selectively; large use /deep-planning",
+        "Enable Checkpoints before Act for rollback",
+        "Start in Plan mode for unfamiliar code"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/prompting/prompt-engineering-guide",
+      "title": "Cline prompt engineering guide",
+      "qualityScore": 73,
+      "scores": { "authority": 8, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Explicit file paths trigger context-based rules reliably",
+        "Multi-layer context evaluator: mentioned paths, open tabs, visible panes, session history",
+        "Conditional rules via glob patterns conserve context budget",
+        "200k token budget constraint drives design"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/tools",
+      "title": "OpenCode tools",
+      "qualityScore": 82,
+      "scores": { "authority": 8, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "read tool supports line-range partial reads",
+        "Permission system: allow/deny/ask per tool",
+        "Default ripgrep-style .gitignore filtering",
+        "Combine read with grep/glob for discovery"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/agents/",
+      "title": "OpenCode agents",
+      "qualityScore": 80,
+      "scores": { "authority": 8, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Tool access via permission system (allow/deny/ask)",
+        "Plan mode restricts writes/bash; Build has all tools",
+        "Explore subagent is fast, read-only",
+        "Last matching rule takes precedence in permission rules"
+      ]
+    },
+    {
+      "url": "https://opencode.ai/docs/rules/",
+      "title": "OpenCode rules / AGENTS.md loading",
+      "qualityScore": 75,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "AGENTS.md preloaded via upward directory traversal",
+        "Precedence: local AGENTS.md → global ~/.config/opencode/AGENTS.md → CLAUDE.md compatibility",
+        "instructions field in opencode.json supports glob patterns",
+        "Lazy-load external files when possible"
+      ]
+    },
+    {
+      "url": "https://github.com/continuedev/continue/blob/main/core/tools/definitions/readFile.ts",
+      "title": "Continue readFile tool definition (source)",
+      "qualityScore": 83,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Tool name: readFile (BuiltInToolNames.ReadFile)",
+        "Single parameter: filepath (relative/absolute/tilde/file:// URI)",
+        "Properties: readOnly, instant execution, allowed by default",
+        "evaluateFileAccessPolicy enforces workspace boundary"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK tools",
+      "qualityScore": 81,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "FileSearchTool retrieves from OpenAI Vector Stores (Responses models only)",
+        "Parameters: vector_store_ids, max_num_results, filters, ranking_options",
+        "Custom file-reading via @function_tool decorator",
+        "Pair FileSearch with max_num_results to limit context"
+      ]
+    }
+  ],
+  "selfEvaluation": {
+    "coverage": 9,
+    "diversity": 9,
+    "examples": 9,
+    "accuracy": 9,
+    "gaps": [
+      "Could not fetch official Codex CLI reference (403/404) — Codex details are synthesized from repo + docs fragments",
+      "Continue's full built-in tools page was 404 on docs site; relied on source definition file",
+      "No direct coverage of Cursor/Windsurf/Zed AI read tools"
+    ]
+  }
+}

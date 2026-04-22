@@ -1,0 +1,544 @@
+{
+  "topic": "Skill / reusable-capability pattern in autonomous agent frameworks",
+  "slug": "skill-tool-in-autonomous-agents",
+  "generated": "2026-04-22T00:00:00Z",
+  "depth": "deep",
+  "totalSources": 40,
+  "complementaryTo": "skill-tool-design-across-harnesses.md",
+  "sources": [
+    {
+      "url": "https://voyager.minedojo.org/",
+      "title": "Voyager — An Open-Ended Embodied Agent with Large Language Models",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 6, "depth": 10, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Coined 'skill library' concept for LLM-agent era; canonical runtime-learned skill architecture",
+        "Each skill indexed by embedding of its description; top-5 retrieval for new tasks",
+        "Automatic curriculum + iterative prompting + self-verification = skill library growth loop",
+        "3.3x more items discovered, 2.3x longer distance traveled, 15.3x faster tech-tree milestones vs prior SOTA"
+      ]
+    },
+    {
+      "url": "https://github.com/MineDojo/Voyager",
+      "title": "Voyager source code — MineDojo/Voyager",
+      "qualityScore": 88,
+      "scores": { "authority": 9, "recency": 6, "depth": 9, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Skills implemented as JavaScript functions executing through Mineflayer",
+        "skill_library/ directory; skills loaded via skill_library_dir parameter",
+        "Three agents: curriculum agent (maximize exploration), skill library (code storage/retrieval), iterative prompting mechanism",
+        "66.5% JS + 33.5% Python split; Node.js integration for Minecraft"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2305.16291",
+      "title": "Voyager paper (Wang et al. NeurIPS 2023)",
+      "qualityScore": 94,
+      "scores": { "authority": 10, "recency": 6, "depth": 10, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Formal academic description of skill library mechanics",
+        "Skills are 'temporally extended, interpretable, and compositional' code programs",
+        "Iterative prompting feedback loops: environment feedback, execution errors, self-verification"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2311.05997",
+      "title": "JARVIS-1 — Open-World Multi-Task Agents with Memory-Augmented Multimodal LMs",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 6, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Extends Voyager with multimodal memory (pre-trained knowledge + game survival experience)",
+        "Handles 200+ Minecraft tasks",
+        "Memory-augmented planning; closer to replay-buffer than explicit skill library"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2308.10144",
+      "title": "ExpeL — LLM Agents Are Experiential Learners (2023)",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 6, "depth": 7, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Learns natural-language insights from experience without gradient updates",
+        "Mid-point between Voyager (code) and pure CLAUDE.md (prose)",
+        "Recall extracted insights at inference time"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2405.15793",
+      "title": "SWE-agent paper (Yang et al. 2024)",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 8, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Introduced Agent-Computer Interface (ACI) concept",
+        "ACI design significantly enhances agent's ability to edit code + navigate repos + run tests",
+        "Per-task tool surface parameterization via YAML config"
+      ]
+    },
+    {
+      "url": "https://swe-agent.com/latest/config/tools/",
+      "title": "SWE-agent tool bundles reference",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Tool bundles: structured folders with executables + config.yaml + install.sh",
+        "Bundles not called 'skills' but functionally equivalent to the Voyager-sense skill primitive"
+      ]
+    },
+    {
+      "url": "https://github.com/SWE-agent/SWE-agent/tree/main/tools",
+      "title": "SWE-agent /tools directory",
+      "qualityScore": 83,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "14 tool bundles: windowed, edit_anthropic, search, filemap, forfeit, image_tools, registry, submit, web_browser, ...",
+        "Each bundle has bin/ shell scripts + config.yaml + install.sh"
+      ]
+    },
+    {
+      "url": "https://github.com/SWE-agent/SWE-agent/blob/main/tools/windowed/config.yaml",
+      "title": "SWE-agent windowed tool bundle config",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 9, "uniqueness": 6 },
+      "keyInsights": [
+        "Declarative tool definition with signature, docstring, arguments",
+        "5 commands: goto, open, create, scroll_up, scroll_down — state queried via _state",
+        "JSON Schema-compatible declarative structure; harness builds tool registry at startup"
+      ]
+    },
+    {
+      "url": "https://github.com/SWE-agent/SWE-agent/blob/main/tools/edit_anthropic/config.yaml",
+      "title": "SWE-agent edit_anthropic bundle",
+      "qualityScore": 78,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "Single-tool bundle: str_replace_editor clone of Anthropic's text_editor",
+        "Commands: view, create, str_replace, insert, undo_edit",
+        "Stateful via _state_anthropic"
+      ]
+    },
+    {
+      "url": "https://docs.openhands.dev/overview/skills",
+      "title": "OpenHands skills overview",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Adopts 'extended AgentSkills standard' with optional keyword triggers",
+        "Three activation modes: always-on, keyword-triggered, agent-invoked",
+        ".agents/skills/ preferred; .openhands/skills/ and .openhands/microagents/ deprecated"
+      ]
+    },
+    {
+      "url": "https://docs.openhands.dev/usage/prompting/microagents-overview",
+      "title": "OpenHands microagents legacy docs",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Microagents are deprecated terminology for skills",
+        "Migration path to .agents/skills/ documented",
+        "Three loading mechanisms: always-on, user-triggered, agent-invoked"
+      ]
+    },
+    {
+      "url": "https://docs.openhands.dev/usage/prompting/microagents-keyword",
+      "title": "OpenHands keyword-triggered skills",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Lexical keyword matching for skill activation",
+        "triggers: YAML frontmatter field — OpenHands-specific extension to Anthropic spec",
+        "Complementary to description-based activation"
+      ]
+    },
+    {
+      "url": "https://docs.openhands.dev/usage/prompting/microagents-repo",
+      "title": "OpenHands repo microagent (AGENTS.md)",
+      "qualityScore": 75,
+      "scores": { "authority": 10, "recency": 10, "depth": 6, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "AGENTS.md as repository-specific always-on context",
+        "Spectrum-adjacent to skills but not formally a skill"
+      ]
+    },
+    {
+      "url": "https://github.com/OpenHands/extensions",
+      "title": "OpenHands extensions registry",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "45 extensions total: 36 skills + 9 plugins across 2 marketplaces",
+        "Plugins have hooks/ + scripts/ + SKILL.md; skills are pure markdown",
+        "Example skills: code-review, kubernetes, prd, ssh, github, jupyter",
+        "Also works as Claude Code plugin marketplace (cross-compatibility)"
+      ]
+    },
+    {
+      "url": "https://github.com/All-Hands-AI/OpenHands/tree/main/openhands/runtime/plugins",
+      "title": "OpenHands runtime plugins directory",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Three plugins: agent_skills, jupyter, vscode",
+        "agent_skills = Python helper library called via IPythonRunCellAction (NOT function calling)",
+        "Critical disambiguation: 'agent_skills' plugin ≠ SKILL.md standard skills; same word, different thing"
+      ]
+    },
+    {
+      "url": "https://github.com/OpenHands/extensions/blob/main/skills/code-review/SKILL.md",
+      "title": "OpenHands code-review SKILL.md example",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 10, "uniqueness": 6 },
+      "keyInsights": [
+        "Concrete example of OpenHands SKILL.md structure",
+        "Minimal frontmatter (name, description, triggers), extensive body with PERSONA + framework sections",
+        "Demonstrates 'skill as prompt-engineered persona' pattern common in autonomous contexts"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2402.01030",
+      "title": "CodeAct paper — Wang et al. ICLR 2025",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Python code as action space beats JSON function calling by ~20% on agent benchmarks",
+        "Foundation for OpenHands' IPython-as-skill-activation pattern",
+        "Argument for reconsidering function-calling as the universal tool interface"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK — Tools",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Three skill-adjacent primitives: Agent.as_tool() (agent-as-skill), ToolSearchTool (schema lazy-load), Codex container.skill_id (spec mount)",
+        "defer_loading=True hides tool schemas until tool search retrieves them",
+        "No formally-named 'Skill' class in generic Agents SDK — skill concept is Codex-specific"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/skills/",
+      "title": "OpenAI Codex skills docs",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Codex adopts agentskills.io standard directly",
+        "SKILL.md + scripts/ + references/ + assets/ + agents/openai.yaml (OpenAI-specific)",
+        "Progressive disclosure: metadata → instructions → resources",
+        "Two activation modes: explicit /skills command and implicit description-match"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/skills",
+      "title": "OpenAI skills repository",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Three categories: .system (auto-installed), .curated (vetted, installable), .experimental (early-stage)",
+        "Example: gh-address-comments for PR workflows",
+        "Primarily Python (76.7%); scripted automation focus"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex/tree/main/codex-rs/core-skills",
+      "title": "Codex core-skills Rust crate",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Reference library-layer skill primitive implementation",
+        "Types: AvailableSkills, SkillMetadata, SkillPolicy, SkillLoadOutcome, SkillMetadataBudget, SkillDependencyInfo",
+        "Modules: loader, manager, model, render, injection, config_rules, remote",
+        "detect_implicit_skill_invocation_for_command() for pattern-matched activation",
+        "Used by both Codex CLI (interactive) and Codex Cloud (autonomous) — skill primitive in the core crate"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/cloud/",
+      "title": "OpenAI Codex Cloud docs",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Codex Cloud: long-running background autonomous agents",
+        "Parallel task execution in managed cloud environments",
+        "Skills available via both CLI and Cloud surfaces"
+      ]
+    },
+    {
+      "url": "https://github.com/NousResearch/Hermes-Function-Calling",
+      "title": "Nous Research Hermes Function Calling",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "<tool_call> / <tool_response> ChatML tags for function calling",
+        "Hermes-3 GOAP (Goal-Oriented Action Planning) with <scratch_pad>",
+        "No skill primitive — pure function calling + recursive inference loop",
+        "No 'Claw' toolkit found in docs (confirmed with prior guide)"
+      ]
+    },
+    {
+      "url": "https://microsoft.github.io/autogen/stable/user-guide/core-user-guide/components/tools.html",
+      "title": "Microsoft AutoGen tools",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "No skill concept; capabilities are BaseTool subclasses + FunctionTool + Workbench (MCP)",
+        "AssistantAgent register_for_execution is from older versions",
+        "Reusability via tool abstraction, not instruction abstraction"
+      ]
+    },
+    {
+      "url": "https://microsoft.github.io/autogen/dev/user-guide/core-user-guide/design-patterns/intro.html",
+      "title": "Microsoft AutoGen design patterns",
+      "qualityScore": 77,
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Component-based architecture: Model Clients, Tools, Code Executors, Workbench",
+        "Multi-agent design patterns via message protocols",
+        "No explicit skill domain concept"
+      ]
+    },
+    {
+      "url": "https://www.microsoft.com/en-us/research/articles/magentic-one-a-generalist-multi-agent-system-for-solving-complex-tasks/",
+      "title": "Magentic-One — Microsoft Research",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "5-agent architecture: Orchestrator + WebSurfer + FileSurfer + Coder + ComputerTerminal",
+        "Agent-as-skill-domain: 'encapsulating distinct skills in separate agents' — explicit OOP framing",
+        "Orchestrator two-loop design (task ledger outer, progress inner)",
+        "No formal skill registry; specialist agents are the skill primitive"
+      ]
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/langchain/overview",
+      "title": "LangChain concepts / tools overview",
+      "qualityScore": 75,
+      "scores": { "authority": 10, "recency": 10, "depth": 6, "examples": 6, "uniqueness": 5 },
+      "keyInsights": [
+        "No skill concept; Tool is the primary reusable capability abstraction",
+        "LangGraph subgraphs as subagent composition, not skills",
+        "Deep Agents mentioned as higher-level but not skill-based"
+      ]
+    },
+    {
+      "url": "https://github.com/langchain-ai/deepagents",
+      "title": "LangChain deepagents",
+      "qualityScore": 75,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Batteries-included agent harness on LangGraph",
+        "Tools: write_todos, read_file, write_file, edit_file, ls, glob, grep, execute, task (subagent)",
+        "No skill primitive; customization via tool addition and prompt customization",
+        "Auto-summarization for long contexts"
+      ]
+    },
+    {
+      "url": "https://pydantic.dev/docs/ai/tools-toolsets/toolsets/",
+      "title": "Pydantic-AI Toolsets",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Toolset = bundle of tools + custom instructions + metadata + runtime composition",
+        "Composition patterns: CombinedToolset, FilteredToolset, PrefixedToolset, RenamedToolset, WrapperToolset",
+        "Skill-adjacent but doesn't support SKILL.md spec; no progressive disclosure",
+        "Strong candidate for adapter-based Agent Skills integration"
+      ]
+    },
+    {
+      "url": "https://docs.crewai.com/concepts/skills",
+      "title": "CrewAI skills documentation",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Clean 2026 adoption of Agent Skills standard",
+        "Explicit 'Skills are NOT tools' distinction — most common confusion",
+        "Three-axis model: skills (how to think) + tools (what to do) + backstory (who you are)",
+        "Agent-level and crew-level scope; agent-level takes precedence",
+        "Pattern B: injection into task prompt (not a separate tool call)"
+      ]
+    },
+    {
+      "url": "https://docs.crewai.com/concepts/agents",
+      "title": "CrewAI agents",
+      "qualityScore": 75,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Pre-skill model: agents have role + goal + backstory + tools + LLM",
+        "Backstory is context/persona, not formally skills",
+        "Static capability configuration at initialization (no runtime accrual)"
+      ]
+    },
+    {
+      "url": "https://docs.letta.com/letta-code/skills/",
+      "title": "Letta Code skills",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Runtime skill creation via skill-creator skill — agent can write new SKILL.md mid-session",
+        "Multi-scope: global (~/.letta/skills/), agent-scoped (~/.letta/agents/{id}/skills/), project-scoped (.agents/skills/)",
+        "On-demand loading via tool call; skills live outside active memory for efficiency",
+        "Only production system that productionizes Voyager-style runtime skill accumulation (reduced to authored-skill-creation-as-a-skill)"
+      ]
+    },
+    {
+      "url": "https://github.com/letta-ai/letta",
+      "title": "Letta framework (formerly MemGPT)",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Stateful-agent platform with memory blocks + skills + subagents",
+        "Emphasizes advanced memory and continual learning",
+        "Bundles pre-built skills for memory + continual learning",
+        "Runtime capability extension in production"
+      ]
+    },
+    {
+      "url": "https://ampcode.com/manual#agent-skills",
+      "title": "Amp Agent Skills section",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Pattern B: catalog-only, no dedicated Skill tool",
+        "Skills integrate transparently; bodies load on-demand",
+        "Storage precedence: .agents/skills/, ~/.config/agents/skills/, built-in",
+        "Skills can bundle mcp.json for per-skill MCP integration"
+      ]
+    },
+    {
+      "url": "https://docs.firebender.com/multi-agent/skills",
+      "title": "Firebender multi-agent skills",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Runtime skill selection — agent chooses which to load based on task",
+        "Markdown files + YAML frontmatter",
+        "Android-coding domain specialization",
+        "Conditional autonomy via disable-model-invocation / user-invocable flags"
+      ]
+    },
+    {
+      "url": "https://docs.factory.ai/cli/configuration/skills",
+      "title": "Factory CLI skills",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Skills discoverable and composable — Droid chains multiple skills in a plan",
+        "Conditional autonomy: gate PRs but never merge without human review",
+        "Invocation via /skill-name or Droid choice",
+        "Reinforces skill-chaining as autonomous workflow primitive"
+      ]
+    },
+    {
+      "url": "https://docs.databricks.com/aws/en/assistant/skills",
+      "title": "Databricks Genie skills",
+      "qualityScore": 83,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Data-platform vertical adopter; description-based auto-activation",
+        "Best-practice: narrow scope, step-by-step guidance, separated concerns (markdown vs scripts)",
+        "Workspace skills (shared) + user skills (personal)",
+        "Autonomous 'Agent mode' with automatic relevant-skill loading"
+      ]
+    },
+    {
+      "url": "https://docs.github.com/en/copilot/concepts/agents/about-agent-skills",
+      "title": "GitHub Copilot agent skills",
+      "qualityScore": 80,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Copilot adoption of Agent Skills open standard",
+        "Scopes: project (.github/skills/, .claude/skills/, .agents/skills/), personal (~/.copilot/skills/)",
+        "Organization/enterprise skills 'coming soon'",
+        "No autonomous-specific documentation yet"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview",
+      "title": "Claude Platform Agent Skills overview",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "API-level skills: container: { skill_id } parameter mounts skills in code execution VM",
+        "Beta headers required: code-execution-2025-08-25, skills-2025-10-02, files-api-2025-04-14",
+        "Three skill types / three loading levels explicit",
+        "Custom Skills via /v1/skills endpoints; pre-built pptx/xlsx/docx/pdf skills",
+        "Cross-surface limitation: Skills don't sync between API / Claude.ai / Claude Code"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices",
+      "title": "Claude Agent Skills best practices",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Evaluation-driven development: build evals BEFORE writing skills",
+        "Concise-is-key; default assumption 'Claude is already smart'",
+        "Three degrees of freedom: high (text instructions), medium (pseudocode), low (specific scripts)",
+        "Test with all models you'll use; Haiku vs Sonnet vs Opus need different specificity",
+        "Claude-A-creates-skill / Claude-B-uses-skill iteration pattern",
+        "MCP tool references must be fully qualified (ServerName:tool_name) to avoid collisions"
+      ]
+    },
+    {
+      "url": "https://agentskills.io/what-are-skills",
+      "title": "agentskills.io — What are skills?",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Three-stage progressive disclosure: Discovery → Activation → Execution",
+        "Skill benefits: self-documenting, extensible, portable (just files)",
+        "Official framing: 'lightweight, open format for extending AI agent capabilities'"
+      ]
+    },
+    {
+      "url": "https://agentskills.io/specification",
+      "title": "agentskills.io — Specification",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Required frontmatter: name (max 64 chars), description (max 1024 chars)",
+        "Optional frontmatter: license, compatibility (max 500), metadata, allowed-tools (experimental)",
+        "Directory structure: SKILL.md + scripts/ + references/ + assets/",
+        "Three-tier progressive disclosure: metadata (~100 tokens) / instructions (<5000) / resources (unbounded)",
+        "Keep SKILL.md body under 500 lines; flatten references one level deep from SKILL.md"
+      ]
+    },
+    {
+      "url": "https://agentskills.io/client-implementation/adding-skills-support",
+      "title": "agentskills.io — Adding skills support",
+      "qualityScore": 94,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 10 },
+      "keyInsights": [
+        "Explicit autonomous-vs-HITL section on cloud-hosted agents (no user filesystem)",
+        "Trust considerations: project-level skills from untrusted repos — gate loading",
+        "Dedupe activations — avoid re-injection if skill already in context",
+        "Protect skill content from compaction — flag as non-prunable",
+        "Subagent delegation for complex skill workflows (optional advanced pattern)",
+        "Lenient validation recommended — warn on spec issues but load anyway"
+      ]
+    },
+    {
+      "url": "https://simonwillison.net/2025/Oct/16/claude-skills/",
+      "title": "Simon Willison — Claude Skills are awesome, maybe a bigger deal than MCP",
+      "qualityScore": 88,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "'General computer automation' framing — implicitly autonomous-leaning",
+        "MCP cost: 'tens of thousands of tokens of context'; skills: 'few dozen extra tokens per skill'",
+        "Composable skills scenario: data journalism + census + visualization + publishing",
+        "Predicts 'Cambrian explosion in Skills' — implies scalability for 100+ skills"
+      ]
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills",
+      "title": "Anthropic blog — Equipping agents for the real world with Agent Skills",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Oct 16 2025 engineering post — the canonical announcement",
+        "'General-purpose agents that interact with full-fledged computing environments' — autonomous framing",
+        "Progressive disclosure core principle; analogy to well-organized manual (TOC → chapters → appendix)",
+        "Claude Code as primary example of skill-enabled autonomous agent"
+      ]
+    }
+  ]
+}

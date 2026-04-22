@@ -1,0 +1,338 @@
+{
+  "topic": "WebFetch / URL fetch tool design across AI agent harnesses",
+  "slug": "webfetch-tool-design-across-harnesses",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "scope": "Design-space deep dive across every major harness and library on fourteen dimensions (tool name, URL validation, redirect policy, HTTP verb scope, auth/headers, timeout, size cap, content-type handling, markdown extraction, caching, prompt-injection defense, SSRF defense, permission model, error surface). Counterpart to glob-impl-and-prompts-in-major-tools.md and exec-tool-design-across-harnesses.md.",
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code — Tools reference",
+      "type": "officialDocs",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Canonical tool list including WebFetch (permission-required) and WebSearch (permission-required)",
+        "WebFetch is named with capital W and F, matching Claude Code's convention (Read/Write/Edit/Glob/Grep/Bash/WebFetch/WebSearch)",
+        "The permission-requirement shape is part of the model's view of the tool; WebFetch uses the standard permission system rather than a special gate"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/data-usage",
+      "title": "Claude Code — Data usage (WebFetch domain safety check section)",
+      "type": "officialDocs",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Before fetching, WebFetch sends only the hostname (not URL or path) to api.anthropic.com for a safety-blocklist check",
+        "Results cached per hostname for five minutes — corrects the often-cited '15-minute cache' as really the hostname-safety preflight cache",
+        "skipWebFetchPreflight: true is the opt-out; combine with WebFetch(domain:...) permission rules if skipping, to avoid regressing the safety floor",
+        "This check runs regardless of model provider (Anthropic/Vertex/Bedrock/Foundry) and is not affected by CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/permissions",
+      "title": "Claude Code — Configure permissions (WebFetch rules, sandbox allowedDomains)",
+      "type": "officialDocs",
+      "qualityScore": 93,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "WebFetch(domain:example.com) is the only permission-rule syntax for the tool — hostname granularity, no per-path rules",
+        "Sandbox 'network.allowedDomains' and 'network.deniedDomains' with wildcard support (*.example.com); deniedDomains takes precedence on conflict",
+        "Explicit Warning: 'Note that using WebFetch alone does not prevent network access. If Bash is allowed, Claude can still use curl, wget, or other tools to reach any URL.' — the tool is NOT the whole defense",
+        "Permissions and sandboxing are complementary layers; WebFetch rules live in permissions, Bash-via-network lives in sandbox"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/web-fetch-tool",
+      "title": "Anthropic API — web_fetch tool (web_fetch_20250910 / web_fetch_20260209)",
+      "type": "officialDocs",
+      "qualityScore": 98,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 10 },
+      "keyInsights": [
+        "THE primary-source defense wording: 'Enabling the web fetch tool in environments where Claude processes untrusted input alongside sensitive data poses data exfiltration risks.'",
+        "URL-provenance restriction (the most structurally robust prompt-injection defense in the ecosystem): 'Claude is not allowed to dynamically construct URLs. Claude can only fetch URLs that have been explicitly provided by the user or that come from previous web search or web fetch results.'",
+        "Full error-code enum: invalid_input, url_too_long (>250 chars), url_not_allowed, url_not_accessible, too_many_requests, unsupported_content_type, max_uses_exceeded, unavailable",
+        "Parameters: max_uses (no default), allowed_domains / blocked_domains (mutually exclusive), citations {enabled}, max_content_tokens",
+        "JavaScript-rendered pages explicitly not supported ('does not support websites dynamically rendered via JavaScript')",
+        "Content types: text and PDF (base64 document block); anything else returns unsupported_content_type",
+        "Tool-result block format: web_fetch_tool_result with content.type = 'web_fetch_result' + retrieved_at timestamp + document source",
+        "2026 dynamic-filtering version uses code execution internally to filter results before context entry"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/server-tools",
+      "title": "Anthropic API — Server tools (shared mechanics, domain filtering)",
+      "type": "officialDocs",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Domain filter semantics: scheme must be absent, subdomains auto-included, one wildcard per entry which must be in the path (example.com/* valid; *.example.com invalid)",
+        "allowed_domains and blocked_domains are mutually exclusive per request",
+        "Homograph-attack warning: Unicode chars can bypass ASCII-looking allowlists; normalize to ASCII before matching",
+        "allowed_callers: ['direct'] disables dynamic filtering to regain ZDR eligibility on _20260209 versions",
+        "server_tool_use block has srvtoolu_ prefix distinguishing it from client tool_use"
+      ]
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/web-fetch.ts",
+      "title": "Gemini CLI — web-fetch.ts source (packages/core)",
+      "type": "sourceCode",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 10, "uniqueness": 10 },
+      "keyInsights": [
+        "Only mainstream tool with tool-layer SSRF defense: rejects 'localhost' and '127.0.0.1' by hostname, calls isPrivateIp() for RFC1918 ranges",
+        "URL_FETCH_TIMEOUT_MS = 10000 (10 s wall-clock)",
+        "Two-tier size caps: MAX_CONTENT_LENGTH = 250000 (250 KB standard), MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024 (10 MB direct-fetch)",
+        "sanitizeXml() function escapes & < > \" ' before embedding any content in generated Gemini prompts (defense against prompt-structure breakage, not imperative content)",
+        "HTML converted via html-to-text (full page, not readability); wordwrap: false; selectors config for <a> href preservation with baseUrl resolution",
+        "Binary (image/video/PDF) returned as base64 to the model as a media block",
+        "Fallback path: executeFallback() with retryWithBackoff() — self-healing retry loop similar to Gemini CLI's sandbox-denial parser for shell",
+        "Error codes (coarse): INVALID_TOOL_PARAMS, WEB_FETCH_PROCESSING_ERROR, WEB_FETCH_FALLBACK_FAILED"
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/webfetch.ts",
+      "title": "OpenCode — webfetch.ts source",
+      "type": "sourceCode",
+      "qualityScore": 92,
+      "scores": { "authority": 9, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Zod schema: { url: string, format: 'text'|'markdown'|'html' (default 'markdown'), timeout?: number (max 120) }",
+        "URL validation: scheme-only ('URL must start with http:// or https://'); no SSRF defense at tool layer",
+        "DEFAULT_TIMEOUT = 30 * 1000 (30 s); MAX_TIMEOUT = 120 * 1000 (120 s)",
+        "MAX_RESPONSE_SIZE = 5 * 1024 * 1024 (5 MB); hard-reject on overflow ('Response too large (exceeds 5MB limit)') — no truncation",
+        "Size check applied twice: Content-Length header AND arrayBuffer.byteLength post-fetch (catches lying servers)",
+        "Turndown config: headingStyle: 'atx', hr: '---', bulletListMarker: '-', codeBlockStyle: 'fenced', emDelimiter: '*'; strips script/style/meta/link pre-conversion",
+        "Cloudflare-challenge retry: on 403 with cf-mitigated: 'challenge' header, retries with User-Agent: 'opencode' — only ecosystem example",
+        "Permission model is single 'webfetch: allow/deny/ask' — coarser than Claude Code's WebFetch(domain:...)",
+        "Stringy errors: 'URL must start with http:// or https://', 'Response too large', 'Request timed out'"
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/webfetch.txt",
+      "title": "OpenCode — webfetch.txt (the verbatim model-facing description)",
+      "type": "sourceCode",
+      "qualityScore": 94,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 6, "uniqueness": 10 },
+      "keyInsights": [
+        "Verbatim: 'Fetches content from a specified URL. Takes a URL and optional format as input. Fetches the URL content, converts to requested format (markdown by default).'",
+        "Explicit statement of HTTP-to-HTTPS upgrade behavior in the description — model is informed",
+        "'Should only be used when no better-targeted alternative exists' — routing advice in the description",
+        "Read-only framing; 'may summarize very large content' disclosure"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch",
+      "title": "MCP Fetch reference server — README + schema",
+      "type": "reference",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Tool name: 'fetch'; schema: url (required), max_length (default 5000, max 1_000_000), start_index (default 0), raw (default false)",
+        "HTML-to-markdown via readabilipy + markdownify (readability-style main-content extraction) — the gold standard",
+        "The README explicitly warns: 'This server can access local/internal IP addresses and may represent a security risk.' — no SSRF defense",
+        "robots.txt honored by default for autonomous tool calls; overridable with --ignore-robots-txt",
+        "Distinct UA strings for autonomous vs user-initiated requests; overridable with --user-agent",
+        "--proxy-url for proxy support",
+        "Truncation message: '<error>Content truncated. Call the fetch tool with a start_index of {next_start}...' — teaches model-driven pagination"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/blob/main/src/fetch/src/mcp_server_fetch/server.py",
+      "title": "MCP Fetch — server.py source",
+      "type": "sourceCode",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 9, "depth": 10, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Exact readability pipeline: readabilipy.simple_json.simple_json_from_html_string(html, use_readability=True), then markdownify.markdownify(content, heading_style=markdownify.ATX)",
+        "On extraction failure: returns '<error>Page failed to be simplified from HTML</error>' — typed error, not silent empty",
+        "response = await client.get(..., follow_redirects=True, ...) — redirects silently followed, chain not surfaced",
+        "robots.txt parsed with Protego; error on disallowed includes URL, UA, and full robots.txt body",
+        "Pydantic Fetch model with AnyUrl validation",
+        "McpError(ErrorData(code=INTERNAL_ERROR, message=...)) for HTTP >= 400"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/cloud/internet-access",
+      "title": "Codex Cloud — Internet access configuration",
+      "type": "officialDocs",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Three-tier model: Off / On with restrictions / Unrestricted",
+        "Read-only HTTP-method filter option: GET, HEAD, OPTIONS allowed; POST/PUT/PATCH/DELETE blocked",
+        "'Common dependencies' preset ~80 domains: npm, PyPI, Maven, GitHub/GitLab, Docker, Quay, plus language ecosystems (Rust, Go, Ruby)",
+        "Setup scripts retain internet (pre-execution); agent phase is default-blocked",
+        "Explicit prompt-injection framing: 'agents could inadvertently follow embedded instructions within fetched web content' — recommend restricting only to needed domains/methods"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/cli/features",
+      "title": "Codex CLI — Features (tool surface + web_search)",
+      "type": "officialDocs",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "Full tool surface: shell, apply_patch, update_plan, view_image, write_stdout, web_search — NO dedicated WebFetch",
+        "web_search default is cached (OpenAI-maintained index, prompt-injection mitigation); live via web_search = 'live'; disable via web_search = 'disabled'",
+        "web_search is not a fetch tool; doesn't return full page content, returns search index hits",
+        "URL fetching at Codex happens via shell + curl/wget, subject to network-policy tier"
+      ]
+    },
+    {
+      "url": "https://pydantic.dev/docs/ai/tools-toolsets/common-tools/",
+      "title": "Pydantic-AI — Common tools (web_fetch_tool, duckduckgo, tavily, exa)",
+      "type": "officialDocs",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 9, "depth": 6, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "web_fetch_tool markets SSRF protection as a first-class feature (links to OWASP SSRF page) — only ecosystem example of that marketing",
+        "Converts HTML to markdown (library unspecified publicly)",
+        "Pair tool pattern: web_fetch_tool (default-safe fetch) + tavily_search_tool (paid, with include_domains/exclude_domains) = cohesive web surface",
+        "tavily_search_tool parameters can be locked at construction or left LLM-controllable — a pattern for tool-param policy"
+      ]
+    },
+    {
+      "url": "https://github.com/continuedev/continue/blob/main/core/tools/definitions/fetchUrlContent.ts",
+      "title": "Continue.dev — fetchUrlContent.ts definition",
+      "type": "sourceCode",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 9, "depth": 7, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "Tool schema: { url: string (required) } — just a URL, no format/timeout params",
+        "Description: 'Can be used to view the contents of a website using a URL. Do NOT use this for files.' — routing-by-description pattern",
+        "DEFAULT_FETCH_URL_CHAR_LIMIT = 20000 (20 KB char truncation)",
+        "Fetching delegated to URLContextProvider — same code path that backs the @url manual context reference; tool is a thin wrapper",
+        "Permission default: allowedWithPermission",
+        "No URL validation / redirect reporting / SSRF defense at tool layer"
+      ]
+    },
+    {
+      "url": "https://github.com/cline/cline",
+      "title": "Cline — README (web tools: @url + browser_action)",
+      "type": "officialDocs",
+      "qualityScore": 70,
+      "scores": { "authority": 8, "recency": 9, "depth": 5, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "No dedicated agent-callable WebFetch; URL fetching is the @url context-provider (user-initiated, not agent-initiated)",
+        "'@url: Paste in a URL for the extension to fetch and convert to markdown, useful when you want to give Cline the latest docs'",
+        "Agent web access is browser_action (Puppeteer-backed browser automation)",
+        "Structural consequence: model-generated URLs can't be autonomously fetched (no tool for it); the exfiltration-via-hallucinated-URL attack has no vehicle"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK — Tools (WebSearchTool, HostedMCPTool, ComputerTool)",
+      "type": "officialDocs",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 5 },
+      "keyInsights": [
+        "No first-party HTTP WebFetch in the SDK",
+        "WebSearchTool (hosted by OpenAI): filters, user_location, search_context_size; returns search results, not full-page content",
+        "HostedMCPTool exposes remote MCP tools — the path to getting a fetch tool is via MCP Fetch server",
+        "ComputerTool with environment = 'browser' enables headless-browser flows via the Computer/AsyncComputer protocol",
+        "Prompt-injection defense is delegated to the hosted tool or the MCP server; SDK tool layer is untyped on this"
+      ]
+    },
+    {
+      "url": "https://github.com/microsoft/playwright-mcp",
+      "title": "Playwright MCP — README and tool catalog",
+      "type": "reference",
+      "qualityScore": 83,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "Tool surface: browser_navigate, browser_snapshot (accessibility tree, not screenshot), browser_click, browser_type, browser_drag, browser_wait, browser_tab_*, browser_console_messages, browser_network_requests",
+        "'Playwright MCP is not a security boundary' — explicit disclaimer",
+        "Accessibility-tree snapshots are more LLM-friendly than screenshots and don't require a vision model",
+        "Clear mental model: browser automation is strictly a superset of HTTP fetch, but expensive and non-deterministic; ship separately"
+      ]
+    },
+    {
+      "url": "https://github.com/browser-use/browser-use",
+      "title": "browser-use — Playwright-backed browser automation for agents",
+      "type": "reference",
+      "qualityScore": 72,
+      "scores": { "authority": 7, "recency": 10, "depth": 6, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Python library wrapping Playwright for agent use; browser-use open/state/click/type/screenshot API",
+        "Agents get a full headless browser (JS execution, form filling, navigation, screenshots)",
+        "No SSRF or prompt-injection defense at the library layer; the browser is the primitive",
+        "Confirms the ecosystem split: browser tools are their own category, not a superset of HTTP fetch"
+      ]
+    },
+    {
+      "url": "https://docs.crewai.com/en/tools/web-scraping/scrapewebsitetool",
+      "title": "CrewAI — ScrapeWebsiteTool",
+      "type": "officialDocs",
+      "qualityScore": 65,
+      "scores": { "authority": 8, "recency": 9, "depth": 4, "examples": 5, "uniqueness": 4 },
+      "keyInsights": [
+        "Schema: { website_url: string (required) } — minimal",
+        "No publicly documented SSRF / size-cap / content-type handling in the docs; implementation details not surfaced to authors",
+        "CrewAI's web surface is a catalog of integrations (ScrapeWebsiteTool, FirecrawlScrapeWebsiteTool, WebsiteSearchTool, SerperDevTool) rather than one first-party primitive"
+      ]
+    },
+    {
+      "url": "https://docs.openhands.dev/modules/usage/agents",
+      "title": "OpenHands — Agents (CodeActAgent, BrowsingAgent)",
+      "type": "officialDocs",
+      "qualityScore": 70,
+      "scores": { "authority": 9, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 5 },
+      "keyInsights": [
+        "CodeActAgent: code-as-action space (bash + Python) via an interactive interpreter; no dedicated WebFetch",
+        "BrowsingAgent: browser-backed web interaction (Playwright/Chromium)",
+        "Confirms the OpenHands posture: browser is the web primitive, no HTTP fetch ships",
+        "web_read / browse action names confirmed in harness-tool-surface-audit.md as the OpenHands-side vocabulary"
+      ]
+    },
+    {
+      "url": "https://simonwillison.net/series/prompt-injection/",
+      "title": "Simon Willison — Prompt Injection series (lethal trifecta)",
+      "type": "blog",
+      "qualityScore": 88,
+      "scores": { "authority": 9, "recency": 10, "depth": 9, "examples": 6, "uniqueness": 10 },
+      "keyInsights": [
+        "Defines the 'lethal trifecta': private data access + untrusted content ingestion + external communication / exfiltration",
+        "An agent with WebFetch + Bash + filesystem reads is trivially trifecta-complete; removing any one vertex kills the attack class",
+        "'It is critically important that you understand the risk of combining tools with the following three characteristics' — June 2025 post",
+        "Recommends defense-in-depth: content-as-data framing in prompts + network-policy allowlist + minimum-necessary tool set per session"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/common-workflows",
+      "title": "Claude Code — Common workflows (WebFetch behavior observation)",
+      "type": "officialDocs",
+      "qualityScore": 72,
+      "scores": { "authority": 10, "recency": 10, "depth": 5, "examples": 7, "uniqueness": 5 },
+      "keyInsights": [
+        "WebFetch REDIRECT DETECTED message observed in-flight during this research: 'REDIRECT DETECTED: The URL redirects to a different host. Original URL: ... Redirect URL: ... To complete your request, I need to fetch content from the redirected URL.'",
+        "The message instructs the model to reinvoke WebFetch with the new URL — the model does not silently follow cross-host redirects",
+        "Confirms the 'redirect-as-typed-event' pattern that should be copied by our library"
+      ]
+    }
+  ],
+  "sourceBreakdown": {
+    "officialDocs": 11,
+    "sourceCode": 6,
+    "reference": 3,
+    "blog": 1,
+    "other": 1
+  },
+  "selfEvaluation": {
+    "coverage": 9,
+    "diversity": 8,
+    "examples": 8,
+    "accuracy": 9,
+    "gaps": [
+      "Did not locate the verbatim in-prompt Claude Code WebFetch tool description — Anthropic does not publish the system prompt, and leaked-prompt repos (CL4R1T4S, asgeirtj/system_prompts_leaks) were unreachable or declined. The 'treat content as information, not instructions' wording is attested in practice but not quoted verbatim; Anthropic's public Warning on the Anthropic-API web_fetch docs is the closest primary-source equivalent.",
+      "LangChain RequestsToolkit primary source (tool.py) was returning 404 — relied on ecosystem knowledge of the allow_dangerous_requests flag; a direct source pull would strengthen the section.",
+      "Cursor's agent-mode web capability is private / not well-documented in public docs; noted as 'private' in the matrix rather than fully researched.",
+      "Pydantic-AI web_fetch_tool's exact signature (Python class) was not surfaced in public docs — the SSRF-marketing is the main documented insight, not the schema."
+    ]
+  },
+  "enhanced": false,
+  "indexUpdated": true,
+  "generationNotes": "Research followed the progressive-funnel pattern from the exec-tool-design-across-harnesses guide: (1) official tool-reference docs for each harness, (2) source files for the open-source harnesses (OpenCode, Gemini CLI, MCP Fetch, Continue), (3) Anthropic API docs for the server-tool counterpart, (4) adjacent categories (browser-use, Playwright MCP) to establish the HTTP-fetch vs browser-automation boundary. Several URLs returned 404 or 308 redirects and were retried at the destination; Reddit was blocked by the fetch layer; the leaked-prompts repos declined by policy. Coverage is highest for the 'ship a WebFetch tool' harnesses (Claude Code, Anthropic API, Gemini CLI, OpenCode, MCP Fetch, Continue) and lower for the 'no WebFetch, use browser' harnesses (Cline, OpenHands, AutoGen WebSurfer) — which reflects the actual structure of the design space rather than a research gap."
+}

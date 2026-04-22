@@ -1,0 +1,35 @@
+{
+  "name": "@agent-sh/harness-tools-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AI agent harness tools for Bedrock Converse and OpenAI-compatible APIs",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avifenesh/tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/avifenesh/tools/issues"
+  },
+  "homepage": "https://github.com/avifenesh/tools#readme",
+  "author": "Avi Fenesh",
+  "license": "MIT",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "turbo run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9",
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3"
+  }
+}

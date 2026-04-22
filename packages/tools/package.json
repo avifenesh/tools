@@ -1,0 +1,116 @@
+{
+  "name": "@agent-sh/harness-tools",
+  "version": "0.1.0",
+  "description": "Umbrella package re-exporting @agent-sh/harness-* agent tools (read, write, grep, glob, bash, webfetch, lsp, skill) under one entry point",
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "tool-use",
+    "read-file",
+    "bedrock",
+    "openai",
+    "mcp"
+  ],
+  "license": "MIT",
+  "author": "Avi Fenesh",
+  "homepage": "https://github.com/avifenesh/tools/tree/main/packages/tools#readme",
+  "bugs": {
+    "url": "https://github.com/avifenesh/tools/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avifenesh/tools.git",
+    "directory": "packages/tools"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./read": {
+      "types": "./dist/read.d.ts",
+      "import": "./dist/read.js",
+      "require": "./dist/read.cjs"
+    },
+    "./write": {
+      "types": "./dist/write.d.ts",
+      "import": "./dist/write.js",
+      "require": "./dist/write.cjs"
+    },
+    "./grep": {
+      "types": "./dist/grep.d.ts",
+      "import": "./dist/grep.js",
+      "require": "./dist/grep.cjs"
+    },
+    "./glob": {
+      "types": "./dist/glob.d.ts",
+      "import": "./dist/glob.js",
+      "require": "./dist/glob.cjs"
+    },
+    "./bash": {
+      "types": "./dist/bash.d.ts",
+      "import": "./dist/bash.js",
+      "require": "./dist/bash.cjs"
+    },
+    "./webfetch": {
+      "types": "./dist/webfetch.d.ts",
+      "import": "./dist/webfetch.js",
+      "require": "./dist/webfetch.cjs"
+    },
+    "./lsp": {
+      "types": "./dist/lsp.d.ts",
+      "import": "./dist/lsp.js",
+      "require": "./dist/lsp.cjs"
+    },
+    "./skill": {
+      "types": "./dist/skill.d.ts",
+      "import": "./dist/skill.js",
+      "require": "./dist/skill.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@agent-sh/harness-core": "workspace:*",
+    "@agent-sh/harness-read": "workspace:*",
+    "@agent-sh/harness-write": "workspace:*",
+    "@agent-sh/harness-grep": "workspace:*",
+    "@agent-sh/harness-glob": "workspace:*",
+    "@agent-sh/harness-bash": "workspace:*",
+    "@agent-sh/harness-webfetch": "workspace:*",
+    "@agent-sh/harness-lsp": "workspace:*",
+    "@agent-sh/harness-skill": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

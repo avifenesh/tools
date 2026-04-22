@@ -1,0 +1,337 @@
+{
+  "topic": "Write and Edit tools across AI agent ecosystems — autonomous coders, frameworks, and tool-use methodologies",
+  "slug": "agent-write-across-ecosystems",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "scopeNote": "Complements agent-write-edit-tools.md (dev harnesses). This guide covers autonomous agents (OpenHands, SWE-agent, Devin, Agentless), frameworks (AutoGPT, BabyAGI, CrewAI, LangChain, LangGraph/deepagents, Autogen), and methodology lineage (Hermes, OpenAI Agents SDK ApplyPatchTool, MCP filesystem servers).",
+  "confidenceNote": "Confidence rating combines source authority, code-level verification (did we read the actual implementation?), and recency. High = source code or paper examined directly. Medium = official docs examined. Low = indirect reference or source returned partial content.",
+  "sources": [
+    {
+      "url": "https://github.com/All-Hands-AI/OpenHands/blob/main/openhands/agenthub/codeact_agent/tools/str_replace_editor.py",
+      "title": "OpenHands str_replace_editor tool definition",
+      "type": "source",
+      "qualityScore": 92,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Five commands: view, create, str_replace, insert, undo_edit — direct port of Anthropic text_editor schema",
+        "old_str must EXACTLY match one or more consecutive lines including whitespace",
+        "Uniqueness required; recommends 3-5 lines of context for disambiguation",
+        "create cannot overwrite existing files",
+        "Persistent state across calls (enables undo_edit)",
+        "Absolute paths required; binary-aware preview (Excel/PowerPoint/PDF/Word)"
+      ]
+    },
+    {
+      "url": "https://github.com/All-Hands-AI/OpenHands/blob/main/openhands/agenthub/codeact_agent/function_calling.py",
+      "title": "OpenHands function_calling.py — tool registration",
+      "type": "source",
+      "qualityScore": 85,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 9, "depth": 7, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Two file-edit tools: deprecated LLMBasedFileEditTool (V0) and current str_replace_editor_tool",
+        "V0 is scheduled for removal April 2026 (migration to V1 agentic architecture)",
+        "LLMBasedFileEditTool takes path/content/start/end/impl_source — entire region regeneration",
+        "str_replace_editor_tool created via create_str_replace_editor_tool()"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2407.16741",
+      "title": "OpenHands: An Open Platform for AI Software Developers as Generalist Agents (ICLR 2025)",
+      "type": "paper",
+      "qualityScore": 88,
+      "confidence": "medium",
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "ICLR 2025 paper; platform for generalist AI software-developer agents",
+        "CodeActAgent core: code, CLI, browser interaction",
+        "Evaluation covers 15 tasks including SWE-bench",
+        "Full paper details behind PDF — implementation specifics require repo"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2405.15793",
+      "title": "SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering",
+      "type": "paper",
+      "qualityScore": 90,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 8, "depth": 9, "examples": 7, "uniqueness": 10 },
+      "keyInsights": [
+        "Coins the term Agent-Computer Interface (ACI)",
+        "12.5% pass@1 on SWE-bench; 87.7% on HumanEvalFix",
+        "Thesis: LM agents are a new end-user category requiring purpose-built interfaces",
+        "ACI covers file create/edit, repo navigation, test execution"
+      ]
+    },
+    {
+      "url": "https://swe-agent.com/latest/background/aci/",
+      "title": "SWE-agent Documentation — Agent-Computer Interface background",
+      "type": "docs",
+      "qualityScore": 86,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Windowed file viewer optimal at 100 lines per turn",
+        "Lint-gate on edit: syntax-invalid edits are rejected",
+        "Full-directory string search lists files with matches (succinct)",
+        "Returns explicit 'ran successfully and did not produce any output' on silent commands"
+      ]
+    },
+    {
+      "url": "https://github.com/SWE-agent/SWE-agent/blob/main/tools/windowed_edit_linting/config.yaml",
+      "title": "SWE-agent windowed_edit_linting tool bundle config",
+      "type": "source",
+      "qualityScore": 88,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 9, "depth": 8, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Edit command signature: `edit <start_line>:<end_line>\\n<text>\\nend_of_edit`",
+        "Parameters: start_line (int), end_line (int, inclusive), replacement_text (string)",
+        "Indentation is the caller's responsibility",
+        "Multiple tool bundles: edit_linting, edit_anthropic, windowed, windowed_edit_*"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2402.01030",
+      "title": "CodeAct: Executable Code Actions Elicit Better LLM Agents",
+      "type": "paper",
+      "qualityScore": 82,
+      "confidence": "medium",
+      "scores": { "authority": 10, "recency": 7, "depth": 8, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "Advocates Python code actions over JSON/text tool-call format",
+        "CodeActAgent finetuned from Llama2/Mistral; basis for OpenHands' agent design",
+        "Action space consolidation argument — arbitrary Python beats predefined JSON"
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2407.01489",
+      "title": "Agentless: Demystifying LLM-based Software Engineering Agents",
+      "type": "paper",
+      "qualityScore": 86,
+      "confidence": "medium",
+      "scores": { "authority": 10, "recency": 8, "depth": 8, "examples": 7, "uniqueness": 10 },
+      "keyInsights": [
+        "Three phases: localization, repair, validation — no agentic loop",
+        "32% on SWE-bench Lite at $0.70/task",
+        "Counter-argument to agentic editing for this task class"
+      ]
+    },
+    {
+      "url": "https://github.com/OpenAutoCoder/Agentless/blob/main/agentless/repair/repair.py",
+      "title": "Agentless repair phase source",
+      "type": "source",
+      "qualityScore": 89,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 8, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Three edit formats: edit_file(filename, start, end, content), SEARCH/REPLACE, str_replace (Anthropic-only)",
+        "Sampling: greedy T=0 + additional T=0.8 up to max_samples",
+        "Prompt caching across samples",
+        "Fails are logged and loop continues; no re-sample trigger, just draw from next candidate"
+      ]
+    },
+    {
+      "url": "https://www.cognition.ai/blog/swe-bench-technical-report",
+      "title": "Cognition AI — Devin SWE-bench technical report",
+      "type": "blog",
+      "qualityScore": 70,
+      "confidence": "medium",
+      "scores": { "authority": 9, "recency": 7, "depth": 5, "examples": 4, "uniqueness": 8 },
+      "keyInsights": [
+        "Devin operates with shell, editor, browser in sandboxed VM",
+        "Evaluation method: extract final filesystem diffs as patch",
+        "Internal editor + repair loop details undisclosed"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK (Python) — Tools overview",
+      "type": "docs",
+      "qualityScore": 90,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Hosted tools: WebSearchTool, FileSearchTool, CodeInterpreterTool, HostedMCPTool, ImageGenerationTool, ToolSearchTool",
+        "Local tools: ComputerTool, ShellTool, ApplyPatchTool",
+        "ApplyPatchTool works via ApplyPatchEditor protocol implementation",
+        "@function_tool decorator is the primary custom-tool mechanism"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/openai-agents-python/blob/main/src/agents/tool.py",
+      "title": "OpenAI Agents SDK tool.py — ApplyPatchTool definition",
+      "type": "source",
+      "qualityScore": 84,
+      "confidence": "medium",
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "ApplyPatchTool is a dataclass with needs_approval (bool | callable) and on_approval (callback)",
+        "ApplyPatchEditor and ApplyPatchOperation imported from .editor",
+        "ApplyPatchApprovalFunction: (ctx, op, patch_str) -> {approve: bool, reason?: str}",
+        "Approval gating is first-class"
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/ref/tool/",
+      "title": "OpenAI Agents SDK API reference — tool module",
+      "type": "docs",
+      "qualityScore": 80,
+      "confidence": "medium",
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 5, "uniqueness": 8 },
+      "keyInsights": [
+        "ApplyPatchTool has needs_approval and on_approval fields",
+        "ApplyPatchOnApprovalFunction callback returns ApplyPatchOnApprovalFunctionResult"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/cookbook/examples/gpt-5/gpt-5_new_params_and_tools",
+      "title": "GPT-5 New Parameters and Tools Cookbook",
+      "type": "cookbook",
+      "qualityScore": 75,
+      "confidence": "medium",
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Freeform function calling: raw text payloads without JSON wrapping",
+        "Relevant because V4A patches can be modeled as freeform custom tools",
+        "Also covers verbosity parameter, CFG, minimal reasoning mode"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/blob/main/src/filesystem/README.md",
+      "title": "MCP Filesystem server README",
+      "type": "docs",
+      "qualityScore": 92,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "write_file(path, content) — whole-file overwrite, flagged as dangerous",
+        "edit_file(path, edits[{oldText, newText}], dryRun?) — multi-edit with git-style diff output",
+        "Allowed-directories sandboxing via CLI + MCP Roots protocol",
+        "read_text_file supports head/tail; search_files has excludePatterns"
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers/blob/main/src/filesystem/lib.ts",
+      "title": "MCP Filesystem server lib.ts — applyFileEdits implementation",
+      "type": "source",
+      "qualityScore": 94,
+      "confidence": "high",
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "Sequential edit application in memory; fail-fast before disk write",
+        "Exact-match first, then line-by-line whitespace-tolerant fallback",
+        "Line-ending normalization on old/new text and file content",
+        "Diff via createTwoFilesPatch with dynamic backtick escaping",
+        "Atomic write via temp file + rename (defeats symlink race)",
+        "Throws 'Could not find exact match for edit:' on miss"
+      ]
+    },
+    {
+      "url": "https://github.com/NousResearch/Hermes-Function-Calling",
+      "title": "NousResearch Hermes-Function-Calling repository",
+      "type": "source",
+      "qualityScore": 78,
+      "confidence": "high",
+      "scores": { "authority": 9, "recency": 8, "depth": 7, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Four XML tags: <tools>, <tool_call>, <tool_response>, <scratch_pad>",
+        "Tool call payload: JSON object {name, arguments}",
+        "Focus: financial data retrieval demo (yfinance); no file-edit tools",
+        "validate_and_extract_tool_calls + validate_function_call_schema pipeline"
+      ]
+    },
+    {
+      "url": "https://github.com/NousResearch/hermes-agent",
+      "title": "NousResearch hermes-agent",
+      "type": "source",
+      "qualityScore": 74,
+      "confidence": "medium",
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 5, "uniqueness": 8 },
+      "keyInsights": [
+        "Provider-agnostic agent harness (OpenAI/Anthropic/OpenRouter/NVIDIA)",
+        "40+ tools; six terminal backends (local/Docker/SSH/Daytona/Singularity/Modal)",
+        "Subagent delegation, cron scheduling, closed learning loop",
+        "Not model-specific despite the name"
+      ]
+    },
+    {
+      "url": "https://github.com/crewAIInc/crewAI-tools/blob/main/crewai_tools/tools/file_writer_tool/file_writer_tool.py",
+      "title": "CrewAI FileWriterTool source",
+      "type": "source",
+      "qualityScore": 82,
+      "confidence": "high",
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Parameters: filename, directory (default './'), overwrite (default False), content",
+        "Whole-file writer only — no diff/edit support",
+        "Refuses to overwrite by default; uses 'w' or 'x' mode based on overwrite flag",
+        "No read-before-write, no atomicity (no temp file), no backup",
+        "Auto-creates directory via os.makedirs"
+      ]
+    },
+    {
+      "url": "https://docs.langchain.com/oss/python/integrations/providers/overview",
+      "title": "LangChain FileManagementToolkit overview",
+      "type": "docs",
+      "qualityScore": 78,
+      "confidence": "high",
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "Seven tools: CopyFileTool, DeleteFileTool, FileSearchTool, MoveFileTool, ReadFileTool, WriteFileTool, ListDirectoryTool",
+        "Whole-file only; no edit/diff tool",
+        "root_dir sandboxing strongly recommended",
+        "Docs explicit: without root_dir, easy for LLM to pollute working directory"
+      ]
+    },
+    {
+      "url": "https://github.com/langchain-ai/deepagents",
+      "title": "LangChain deepagents",
+      "type": "source",
+      "qualityScore": 80,
+      "confidence": "medium",
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 9 },
+      "keyInsights": [
+        "Claude-Code-inspired open-source agent framework built on LangGraph",
+        "File tools: read_file, write_file, edit_file, ls, glob, grep + write_todos planner",
+        "execute tool for shell access",
+        "Sub-agent delegation, automatic context summarization",
+        "MIT licensed"
+      ]
+    },
+    {
+      "url": "https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/magentic-one.html",
+      "title": "Microsoft Autogen Magentic-One + FileSurfer docs",
+      "type": "docs",
+      "qualityScore": 76,
+      "confidence": "high",
+      "scores": { "authority": 9, "recency": 9, "depth": 6, "examples": 5, "uniqueness": 8 },
+      "keyInsights": [
+        "Magentic-One Coder agent uses code executors (Docker/Local) for file writes — no dedicated FileEditor",
+        "FileSurfer: read-only agent with open_path, page_up, page_down, find_on_page_ctrl_f, find_next",
+        "Default 5120-character viewport in FileSurfer",
+        "File edits happen via shell commands generated by the Coder agent"
+      ]
+    }
+  ],
+  "selfEvaluation": {
+    "coverage": 8,
+    "diversity": 9,
+    "examples": 8,
+    "accuracy": 8,
+    "gaps": [
+      "Devin internals are proprietary; comparison is indirect",
+      "Claude Agent SDK autonomous patterns not deeply explored — the scope prompt listed it but the Agents SDK (OpenAI) and Claude Code / Agent SDK (Anthropic) have different autonomous surfaces; we focused on OpenAI's because it has ApplyPatchTool as a library primitive",
+      "'Claw' is not a publicly documented Nous Research framework; the user may have had a specific internal artifact in mind. Guide explicitly flags this.",
+      "ChatDev and other multi-agent dev simulators have minimal public detail on edit tool semantics",
+      "Detailed benchmark-by-benchmark SWE-bench numbers for OpenHands, SWE-agent latest runs not exhaustively compiled — the existing Aider leaderboard and SWE-bench.com entries cover this, and the focus here was on tool semantics not leaderboard rankings"
+    ],
+    "confidenceBreakdown": {
+      "high": ["OpenHands str_replace_editor", "SWE-agent edit N:M syntax", "MCP filesystem applyFileEdits behavior", "Agentless three edit formats", "CrewAI FileWriterTool", "OpenAI Agents SDK ApplyPatchTool shape", "LangChain FileManagementToolkit", "Hermes Function Calling XML format"],
+      "medium": ["Devin internals", "deepagents edit_file semantics", "Autogen file edit flow", "LangGraph Write tools"],
+      "speculative": ["Any claim about Nous 'Claw'"]
+    }
+  }
+}

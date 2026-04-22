@@ -1,0 +1,271 @@
+{
+  "topic": "Write and Edit tools -- examples and best practices in AI agent harnesses",
+  "slug": "agent-write-edit-tools",
+  "generated": "2026-04-19T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "sourceBreakdown": {
+    "officialDocs": 9,
+    "researchBlogs": 5,
+    "sourceCode": 5,
+    "benchmarkReports": 3
+  },
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code Tools Reference",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "Lists Write, Edit, MultiEdit, NotebookEdit as distinct built-in tools with permission-required gating",
+        "Edit makes targeted edits to specific files; Write creates or overwrites; NotebookEdit modifies Jupyter notebook cells",
+        "LSP tool auto-reports type errors and warnings after edits, enabling self-correction loops"
+      ]
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/text-editor-tool",
+      "title": "Anthropic Text Editor Tool (str_replace_based_edit_tool)",
+      "qualityScore": 96,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 10, "uniqueness": 8 },
+      "keyInsights": [
+        "Schema-less Anthropic-provided tool with commands view, str_replace, create, insert",
+        "text_editor_20250728 adds optional max_characters parameter for truncating file views",
+        "Claude 4 line removed the undo_edit command; earlier 20250124 version had it",
+        "Standard error messages include 'Found N matches', 'No match found', and 'File not found' with is_error: true",
+        "Line numbers in view output are essential for insert_line and view_range parameters"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/agent-sdk/overview",
+      "title": "Claude Agent SDK Overview",
+      "qualityScore": 92,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Agent SDK exposes Read, Write, Edit, Bash, Monitor, Glob, Grep, WebSearch, WebFetch, AskUserQuestion as built-ins",
+        "allowed_tools / allowedTools narrows capability per agent",
+        "PostToolUse hooks with matcher Edit|Write enable audit-logging every file mutation"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/best-practices",
+      "title": "Claude Code Best Practices",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "Verification (tests, screenshots, expected outputs) is the single highest-leverage practice",
+        "Explore-plan-code-commit workflow separates research from execution",
+        "CLAUDE.md should be concise; bloated memory files cause Claude to ignore instructions",
+        "Common failure pattern: correcting over and over pollutes context with failed approaches"
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/common-workflows",
+      "title": "Claude Code Common Workflows",
+      "qualityScore": 82,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 4 },
+      "keyInsights": [
+        "Plan Mode uses read-only operations so exploration doesn't mutate files",
+        "@-mentions add files to context without waiting for Claude to Read them",
+        "Worktree isolation lets parallel sessions edit without collision"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/more/edit-formats.html",
+      "title": "Aider Edit Formats Explained",
+      "qualityScore": 90,
+      "scores": { "authority": 9, "recency": 9, "depth": 9, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Four formats: whole, diff (SEARCH/REPLACE), diff-fenced, udiff",
+        "diff-fenced is a Gemini-specific workaround for fencing issues",
+        "udiff was specifically built to reduce lazy-coding placeholders"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/unified-diffs.html",
+      "title": "Aider Unified Diffs",
+      "qualityScore": 93,
+      "scores": { "authority": 9, "recency": 9, "depth": 10, "examples": 8, "uniqueness": 10 },
+      "keyInsights": [
+        "udiff improved benchmark accuracy from 20% to 61% on GPT-4 Turbo",
+        "Cut laziness 3X by psychologically cueing the model it's writing for a machine",
+        "Design principles: FAMILIAR, SIMPLE, HIGH-LEVEL, FLEXIBLE",
+        "Aider's parser applies nine recovery strategies before giving up"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/leaderboards/",
+      "title": "Aider Polyglot Leaderboard",
+      "qualityScore": 88,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 5, "uniqueness": 10 },
+      "keyInsights": [
+        "GPT-5 (high) + diff: 88.0% correct on polyglot benchmark",
+        "o3-pro (high) + diff: 84.9%",
+        "Gemini 2.5 Pro + diff-fenced: 83.1% with 99.6% well-formed responses",
+        "o3 + gpt-4.1 architect mode: 78.2% with 100% well-formed"
+      ]
+    },
+    {
+      "url": "https://aider.chat/2023/07/02/benchmarks.html",
+      "title": "Aider's Original Edit Format Benchmark (July 2023)",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 4, "depth": 9, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "whole format scored 46% on GPT-3.5 first-attempt, beating all function-call variants",
+        "GPT-3.5 frequently returned invalid function-call JSON with name: python",
+        "Complex edit formats divert model focus from coding"
+      ]
+    },
+    {
+      "url": "https://aider.chat/2024/01/25/benchmarks-0125.html",
+      "title": "Aider January 2024 GPT-4 Turbo Benchmarks",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 5, "depth": 8, "examples": 6, "uniqueness": 7 },
+      "keyInsights": [
+        "GPT-4 Turbo 0125 performed worse with udiff than November 2023 predecessor",
+        "Same model improved on SEARCH/REPLACE format vs previous release",
+        "udiff remained best-performing format overall despite regression"
+      ]
+    },
+    {
+      "url": "https://aider.chat/2024/03/08/claude-3.html",
+      "title": "Aider on Claude 3 and Edit Formats",
+      "qualityScore": 78,
+      "scores": { "authority": 9, "recency": 4, "depth": 7, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Claude 3 Opus worked best with SEARCH/REPLACE blocks",
+        "Claude 3 Sonnet only reliable on whole-file format",
+        "Edit-format capability correlates directly with model capability"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/troubleshooting/edit-errors.html",
+      "title": "Aider Troubleshooting: Edit Errors",
+      "qualityScore": 85,
+      "scores": { "authority": 9, "recency": 8, "depth": 8, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "Over 25k tokens of context degrades instruction-following",
+        "Weaker models disobey system prompts about edit format",
+        "Architect mode uses a separate editor model for reliability"
+      ]
+    },
+    {
+      "url": "https://aider.chat/docs/llms.html",
+      "title": "Aider: Best LLMs and Edit Format Pairings",
+      "qualityScore": 76,
+      "scores": { "authority": 9, "recency": 9, "depth": 6, "examples": 4, "uniqueness": 6 },
+      "keyInsights": [
+        "Top models for Aider: Gemini 2.5 Pro, DeepSeek R1/V3, Claude 3.7 Sonnet, o3/o4-mini, GPT-4.1",
+        "Sub-GPT-3.5 models typically cannot reliably use diff formats"
+      ]
+    },
+    {
+      "url": "https://github.com/Aider-AI/aider/blob/main/aider/coders/editblock_prompts.py",
+      "title": "Aider's SEARCH/REPLACE Prompt Source",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 9 },
+      "keyInsights": [
+        "SEARCH section must EXACTLY MATCH file content character-for-character",
+        "Only first match is replaced per block",
+        "Break large changes into multiple small blocks",
+        "Use two blocks (delete + insert) to move code"
+      ]
+    },
+    {
+      "url": "https://github.com/Aider-AI/aider/blob/main/aider/coders/udiff_prompts.py",
+      "title": "Aider's Unified Diff Prompt Source",
+      "qualityScore": 86,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Generate edits matching diff -U0 output",
+        "Omit line numbers from @@ headers",
+        "Replace entire function blocks when modifying functions",
+        "Preserve indentation precisely"
+      ]
+    },
+    {
+      "url": "https://github.com/Aider-AI/aider/blob/main/aider/coders/editblock_coder.py",
+      "title": "Aider SEARCH/REPLACE Parser Source",
+      "qualityScore": 84,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 5, "uniqueness": 9 },
+      "keyInsights": [
+        "Fuzzy matching with ~80% similarity threshold, ±10% length variation",
+        "Whitespace normalization detects uniform indentation drift",
+        "Ellipsis (...) expansion splits blocks at placeholders",
+        "Cross-file matching when a single-file match fails"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/api/docs/guides/tools-apply-patch",
+      "title": "OpenAI apply_patch Tool Documentation",
+      "qualityScore": 94,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "Three operations: create_file, update_file, delete_file",
+        "Agents SDK provides applyDiff and ApplyPatchTool helpers",
+        "Path validation is harness responsibility; prevent directory traversal",
+        "Pair with shell tool for file discovery",
+        "Decide rollback behavior explicitly for multi-patch operations"
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/cookbook/examples/gpt4-1_prompting_guide",
+      "title": "OpenAI GPT-4.1 Prompting Guide (V4A format)",
+      "qualityScore": 91,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "V4A wraps patches in *** Begin Patch / *** End Patch sentinels",
+        "Uses 3 lines of context before and after each change",
+        "@@ anchors scope location to classes/functions",
+        "No line numbers; context lines identify locations",
+        "SEARCH/REPLACE and pseudo-XML formats also tested well"
+      ]
+    },
+    {
+      "url": "https://github.com/openai/codex/blob/main/codex-rs/apply-patch/src/lib.rs",
+      "title": "OpenAI Codex apply-patch Source",
+      "qualityScore": 85,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 7, "uniqueness": 8 },
+      "keyInsights": [
+        "Reference parser tolerates relative and absolute paths",
+        "Fuzzy matching handles Unicode normalization (curly quotes vs ASCII)",
+        "Multi-chunk files use repeated @@ sections",
+        "Replacements apply in descending order to preserve indices"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/tools-reference/all-cline-tools",
+      "title": "Cline All Tools Reference",
+      "qualityScore": 83,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "write_to_file (path, content) creates or overwrites files",
+        "replace_in_file performs targeted SEARCH/REPLACE-style edits",
+        "Tool protocol uses XML tags with nested path and content",
+        "Heuristic: write_to_file for new files or >50% rewrites, replace_in_file otherwise"
+      ]
+    },
+    {
+      "url": "https://docs.cline.bot/features/background-edit",
+      "title": "Cline Background Edit Feature",
+      "qualityScore": 74,
+      "scores": { "authority": 9, "recency": 9, "depth": 7, "examples": 4, "uniqueness": 7 },
+      "keyInsights": [
+        "Streams line-by-line diff to chat panel instead of opening diff editor",
+        "Pairs well with auto-approve mode for bulk small edits",
+        "Checkpoints still created for rollback"
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sst/opencode/dev/packages/opencode/src/tool/edit.txt",
+      "title": "OpenCode Edit Tool Description",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Read-before-Edit invariant enforced (must Read or operation fails)",
+        "Match indentation precisely; never include line-number prefix",
+        "Multi-match requires context or replaceAll flag",
+        "Explicit guidance: avoid emojis unless user requests them"
+      ]
+    }
+  ]
+}

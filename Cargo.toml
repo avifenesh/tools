@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/harness-core",
+    "crates/grep",
+    "crates/glob",
+    "crates/bash",
+    "crates/webfetch",
+    "crates/read",
+    "crates/write",
+    "crates/lsp",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+repository = "https://github.com/agent-sh/harness-tools"
+
+[workspace.dependencies]
+# Shared dependency versions across all harness-* crates.
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros", "io-std", "io-util", "process", "signal", "sync", "time"] }
+
+# Grep-specific (ripgrep library form)
+grep = "0.3"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+grep-printer = "0.2"
+ignore = "0.4"
+
+# Glob engine (bash-glob matcher; picomatch-equivalent)
+globset = "0.4"
+
+# Test deps
+tempfile = "3"

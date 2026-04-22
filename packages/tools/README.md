@@ -1,0 +1,30 @@
+# @agent-sh/harness-tools
+
+Umbrella package re-exporting every `@agent-sh/harness-*` tool under one import. Install this if you want everything.
+
+Part of the [`@agent-sh/harness-*`](https://github.com/avifenesh/tools) monorepo — see the top-level README for architectural context and the full tool surface.
+
+## Install
+
+```sh
+npm install @agent-sh/harness-tools
+```
+
+Requires Node ≥ 20.
+
+## Usage
+
+```ts
+import { read, grep, glob, bash, webfetch, skill } from "@agent-sh/harness-tools";
+
+// Or import a single tool via its subpath:
+import { read } from "@agent-sh/harness-tools/read";
+```
+
+## Contract
+
+This is a foundation package; see the per-tool packages it supports for concrete contracts.
+
+## License
+
+MIT © Avi Fenesh

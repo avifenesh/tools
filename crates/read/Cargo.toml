@@ -1,0 +1,28 @@
+[package]
+name = "harness-read"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Read tool for AI agent harnesses — filesystem read with pagination, binary sniff, directory listing, attachment shape, NOT_FOUND fuzzy siblings"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "harness-read-cli"
+path = "src/bin/cli.rs"
+
+[dependencies]
+harness-core = { path = "../harness-core" }
+
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "io-std", "io-util", "fs"] }
+sha2 = "0.10"
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,306 @@
+{
+  "topic": "Exec/shell/code-interpreter tool design across major AI agent harnesses and libraries",
+  "slug": "exec-tool-design-across-harnesses",
+  "generated": "2026-04-20T00:00:00Z",
+  "depth": "medium",
+  "totalSources": 22,
+  "notes": "This guide is a design-space deep-dive, complementing harness-tool-surface-audit.md which covers the ship-list. Each source is scored on Authority (official vs blog), Recency (2025-2026 content prioritized), Depth (design rationale vs feature checklist), Examples (schemas, code), and Uniqueness (does it add a dimension not covered elsewhere). Overall qualityScore = 3*authority + 2*recency + 2*depth + 2*examples + 1*uniqueness (max 100).",
+  "sources": [
+    {
+      "url": "https://code.claude.com/docs/en/tools-reference",
+      "title": "Claude Code tools reference",
+      "qualityScore": 96,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "Bash tool runs each command in a separate process (no persistent shell session), but cwd carries over across calls when inside project dir / additionalDirectories.",
+        "Environment variables do NOT persist across Bash calls; export FOO=bar in call 1 is invisible in call 2. CLAUDE_ENV_FILE is the escape hatch.",
+        "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1 disables cwd carry-over entirely; subagent sessions never carry over.",
+        "If cd escapes project/additional dirs, Claude Code resets and appends 'Shell cwd was reset to <dir>' to tool result.",
+        "Monitor tool (v2.1.98+): background command → each output line fed back to model as event. Uses same permission rules as Bash.",
+        "PowerShell tool: preview on non-Windows; auto mode unsupported in preview; on Windows, sandboxing is not supported.",
+        "Monitor not available on Amazon Bedrock, Google Vertex AI, Microsoft Foundry, or when telemetry is disabled."
+      ]
+    },
+    {
+      "url": "https://code.claude.com/docs/en/agent-sdk/overview",
+      "title": "Claude Agent SDK overview",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 10, "depth": 7, "examples": 9, "uniqueness": 6 },
+      "keyInsights": [
+        "Agent SDK exposes Bash, Monitor, Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, AskUserQuestion as default tools.",
+        "Permissions: allowed_tools / allowedTools whitelist is the primary pre-approval knob; subagents inherit via AgentDefinition.tools.",
+        "Hooks (PreToolUse, PostToolUse, Stop, SessionStart, SessionEnd, UserPromptSubmit) are the library-style permission pattern.",
+        "`permission_mode: 'acceptEdits'` pre-approves Edit/Write for autonomous flows.",
+        "Agent SDK is a superset of Client SDK — includes the tool loop + tool execution, not just message API."
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/agent-approvals-security",
+      "title": "Codex CLI agent approvals & security",
+      "qualityScore": 95,
+      "scores": { "authority": 10, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Three sandbox modes: read-only, workspace-write (default), danger-full-access.",
+        "Four approval policies: untrusted, on-request (default with --full-auto), never, granular.",
+        "macOS uses sandbox-exec Seatbelt; Linux uses bwrap + seccomp; Windows WSL2 uses Linux sandbox.",
+        "Protected paths (.git, .agents, .codex) stay read-only even under workspace-write.",
+        "Network disabled by default across all modes; enable via network_access=true in [sandbox_workspace_write] or per-permission network rules.",
+        "--yolo / --dangerously-bypass-approvals-and-sandbox for full access.",
+        "Telemetry off by default; log_user_prompt=false recommended to avoid storing sensitive data.",
+        "Destructive tool calls always require approval when tool advertises destructive annotation."
+      ]
+    },
+    {
+      "url": "https://developers.openai.com/codex/config-reference",
+      "title": "Codex CLI config reference",
+      "qualityScore": 90,
+      "scores": { "authority": 10, "recency": 10, "depth": 9, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "sandbox_mode values: read-only, workspace-write, danger-full-access.",
+        "approval_policy: untrusted, on-request, never, granular (+legacy on-failure).",
+        "workspace-write sub-options: writable_roots, exclude_slash_tmp, exclude_tmpdir_env_var, network_access.",
+        "shell_environment_policy: inherit (all/core/none), set, include_only, exclude, ignore_default_excludes (preserves KEY/SECRET/TOKEN).",
+        "permissions.<name>.network: enabled, mode (limited/full), domains allowlist/denylist, unix_sockets, enable_socks5.",
+        "features.unified_exec is PTY-backed and defaults to enabled on non-Windows.",
+        "allow_login_shell defaults to true — .bashrc/.zshrc run and shape environment."
+      ]
+    },
+    {
+      "url": "https://github.com/sst/opencode/blob/dev/packages/opencode/src/tool/bash.ts",
+      "title": "OpenCode bash.ts source",
+      "qualityScore": 92,
+      "scores": { "authority": 9, "recency": 10, "depth": 9, "examples": 10, "uniqueness": 7 },
+      "keyInsights": [
+        "Zod schema: command, timeout (ms, optional), workdir (optional), description (5-10 word summary, required).",
+        "Default timeout 2*60*1000 ms (2 min), overridable via OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS.",
+        "On timeout: process killed with 3-second force-kill window; metadata flag 'bash tool terminated command after exceeding timeout'.",
+        "Output capped at Truncate.MAX_LINES and Truncate.MAX_BYTES; overflow streamed to temp file; metadata points model at path.",
+        "Two permission types: external_directory (paths outside project) and bash (with source-pattern and arity-based prefixes).",
+        "Description text dynamically generated from bash.txt with ${directory}, ${os}, ${shell}, ${chaining}, ${maxLines}, ${maxBytes} substitutions.",
+        "workdir resolved via resolvePath() including Windows path normalization and POSIX→Windows via cygpath."
+      ]
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/shell.ts",
+      "title": "Gemini CLI shell.ts source",
+      "qualityScore": 91,
+      "scores": { "authority": 9, "recency": 10, "depth": 9, "examples": 9, "uniqueness": 8 },
+      "keyInsights": [
+        "ShellToolParams: command (req), description (opt), dir_path (opt), is_background (opt), delay_ms (opt, default 200ms), additional_permissions (opt).",
+        "Timeout is inactivity-based — getShellToolInactivityTimeout() resets on stdout/stderr data, binary detection, or exit.",
+        "OUTPUT_UPDATE_INTERVAL_MS = 1000 ms — batches updates to at most 1/second.",
+        "Binary detection halts stream immediately: '[Binary output detected. Halting stream...]'.",
+        "Network policy three-step: explicit additional_permissions.network → getProactiveToolSuggestions() inference → isNetworkReliantCommand() → auto-expand.",
+        "No hardcoded allowlist; command-prefix matching against stored approvals; session vs persistent approval modes.",
+        "Sandbox-denial parsing: parses denial message, extracts blocked path, re-requests with expanded permission set (self-healing loop)."
+      ]
+    },
+    {
+      "url": "https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/tools/shellBackgroundTools.ts",
+      "title": "Gemini CLI shellBackgroundTools.ts source",
+      "qualityScore": 86,
+      "scores": { "authority": 9, "recency": 10, "depth": 8, "examples": 9, "uniqueness": 7 },
+      "keyInsights": [
+        "Two tools: list_background_processes (no params) and read_background_output (pid req, lines opt default 100, delay_ms opt).",
+        "Processes tracked via PID in session-scoped registry; log files at ShellExecutionService.getLogFilePath(pid).",
+        "Session isolation: verifies process belongs to current session to prevent cross-session log reads.",
+        "Security: symlink detection, 64KB buffer cap.",
+        "Returns formatted list with PID, status, command, exit code, signal."
+      ]
+    },
+    {
+      "url": "https://github.com/continuedev/continue/blob/main/core/tools/definitions/runTerminalCommand.ts",
+      "title": "Continue.dev runTerminalCommand definition",
+      "qualityScore": 82,
+      "scores": { "authority": 9, "recency": 10, "depth": 7, "examples": 8, "uniqueness": 6 },
+      "keyInsights": [
+        "Minimal schema: command (string, req), waitForCompletion (bool, opt; true=foreground default).",
+        "Platform-specific shell: PowerShell for Windows, zsh/bash for Unix.",
+        "Explicitly documented as non-stateful across commands.",
+        "Background commands should be stopped via shell commands, not Ctrl+C.",
+        "File editing banned: description routes model to Edit/MultiEdit tools.",
+        "Commands requiring special privileges restricted.",
+        "Default permission: allowedWithPermission; security evaluated via evaluateTerminalCommandSecurity."
+      ]
+    },
+    {
+      "url": "https://github.com/All-Hands-AI/OpenHands/blob/main/openhands/events/action/commands.py",
+      "title": "OpenHands CmdRunAction & IPythonRunCellAction",
+      "qualityScore": 93,
+      "scores": { "authority": 9, "recency": 10, "depth": 10, "examples": 9, "uniqueness": 9 },
+      "keyInsights": [
+        "CmdRunAction fields: command, is_input (feeds stdin to running PID — structural answer to interactive commands), thought, blocking, is_static, cwd, hidden, confirmation_state, security_risk.",
+        "Empty command prints current tmux window — poll-state affordance.",
+        "IPythonRunCellAction fields: code, thought, include_extra, kernel_init_code, confirmation_state, security_risk.",
+        "IPython action backed by Jupyter kernel — variables, imports, module state persist across calls.",
+        "kernel_init_code runs on kernel restart — recovery affordance.",
+        "Two separate actions because tmux shell state ≠ Jupyter kernel state; kernel is not a subprocess of shell.",
+        "Default is_static=false → runs in persistent tmux session; is_static=true → fresh subprocess."
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2402.01030",
+      "title": "CodeAct: Executable Code Actions Elicit Better LLM Agents (Wang et al., ICLR 2025)",
+      "qualityScore": 87,
+      "scores": { "authority": 9, "recency": 8, "depth": 9, "examples": 6, "uniqueness": 10 },
+      "keyInsights": [
+        "Unified Python action space outperforms predefined JSON tool schemas by up to 20% success rate on 17 LLMs tested.",
+        "Rationale: dynamic composition of tools, multi-turn adaptation, loop/conditionals, state reuse.",
+        "Motivates OpenHands' IPythonRunCellAction choice — Python-as-action is only maximally useful when kernel state persists.",
+        "Key advantage: model can execute code, observe, revise priors, emit new actions — iterative self-debugging."
+      ]
+    },
+    {
+      "url": "https://arxiv.org/abs/2405.15793",
+      "title": "SWE-agent: Agent-Computer Interfaces (Yang et al.)",
+      "qualityScore": 84,
+      "scores": { "authority": 9, "recency": 8, "depth": 8, "examples": 7, "uniqueness": 9 },
+      "keyInsights": [
+        "Custom ACI significantly improves agent ability to navigate repos and execute tests beyond raw-bash baseline.",
+        "Wrapped commands filter noise for agent comprehension — raw shell output overwhelms models.",
+        "Achieved pass@1 of 12.5% on SWE-bench and 87.7% on HumanEvalFix with ACI design.",
+        "Motivates our recommendation to keep Bash as escape-hatch and invest in typed tools (Read/Write/Edit/Grep/Glob)."
+      ]
+    },
+    {
+      "url": "https://swe-agent.com/latest/background/aci/",
+      "title": "SWE-agent ACI design rationale",
+      "qualityScore": 88,
+      "scores": { "authority": 10, "recency": 9, "depth": 9, "examples": 8, "uniqueness": 8 },
+      "keyInsights": [
+        "Search commands list filenames only — 'extensive context proved too confusing for the model'.",
+        "File viewer shows exactly 100 lines/turn (deliberate constraint), with goto/scroll_up/scroll_down.",
+        "Edit commands gated by a linter — syntactically incorrect edits rejected before applying.",
+        "Empty-output convention: 'Your command ran successfully and did not produce any output.' — explicit acknowledgment.",
+        "Raw bash provides unfiltered output that overwhelms LMs; ACI wrappers optimize for agent decision-making."
+      ]
+    },
+    {
+      "url": "https://openai.github.io/openai-agents-python/tools/",
+      "title": "OpenAI Agents SDK tools",
+      "qualityScore": 89,
+      "scores": { "authority": 10, "recency": 10, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Four execution-related tools: CodeInterpreterTool (hosted OpenAI Python sandbox), ShellTool (hosted container or local executor), LocalShellTool (legacy local), ComputerTool (GUI/browser via Computer protocol).",
+        "ShellTool hosted modes: container_auto (per-request provisioning) or container_reference (reuse); network policy disabled/allowlist.",
+        "ShellTool local mode: async executor function, runs in your process (no sandbox by default).",
+        "CodeInterpreterTool runs in OpenAI-managed sandboxed environment; minimal schema.",
+        "ComputerTool requires local Computer/AsyncComputer implementation; emits screenshot/action sequences via Responses API."
+      ]
+    },
+    {
+      "url": "https://github.com/cline/cline/blob/main/src/core/tools/executeCommandTool.ts",
+      "title": "Cline executeCommandTool (TypeScript)",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 7, "uniqueness": 6 },
+      "keyInsights": [
+        "Schema: command (string), requires_approval (bool — model-supplied classifier of safety).",
+        "CommandExecutor delegates to CommandOrchestrator for output streaming + timeout.",
+        "Long-running commands use 'proceed while running' pattern: background tracking via trackBackgroundCommand; foreground tracking via currentProcess.",
+        "suppressUserInteraction option coordinates with updateBackgroundCommandState to prevent ask() dialog conflicts.",
+        "Interactive input supported via orchestrator.",
+        "Model-supplied requires_approval is a trust hole for autonomous agents — planning model should not be the permission source of truth."
+      ]
+    },
+    {
+      "url": "https://github.com/cline/cline/tree/main/src/integrations/terminal",
+      "title": "Cline terminal integration architecture",
+      "qualityScore": 75,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "Architecture: CommandExecutor + CommandOrchestrator + constants + types + standalone mode.",
+        "Shell selection delegated to manager.getOrCreateTerminal() — platform-specific, not in executor.",
+        "Foreground + background dual-tracking pattern for long-running commands."
+      ]
+    },
+    {
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "title": "MCP reference servers",
+      "qualityScore": 74,
+      "scores": { "authority": 10, "recency": 10, "depth": 6, "examples": 5, "uniqueness": 7 },
+      "keyInsights": [
+        "Seven active reference servers: Everything, Fetch, Filesystem, Git, Memory, Sequential Thinking, Time.",
+        "NO canonical exec/shell/code-interpreter reference server exists.",
+        "Archived Puppeteer server offered browser-based JS execution; no shell server either archived or current.",
+        "Implication: MCP does not solve exec for tool libraries — tool must be first-class in the harness."
+      ]
+    },
+    {
+      "url": "https://microsoft.github.io/autogen/stable/reference/python/autogen_ext.code_executors.local.html",
+      "title": "AutoGen LocalCommandLineCodeExecutor",
+      "qualityScore": 80,
+      "scores": { "authority": 9, "recency": 9, "depth": 8, "examples": 8, "uniqueness": 7 },
+      "keyInsights": [
+        "Constructor: timeout (default 60s), work_dir, functions, functions_module, cleanup_temp_files, virtual_env_context.",
+        "Supported languages: bash, shell, sh, pwsh, powershell, ps1, python — language as config, not tool parameter.",
+        "Each code block written to a file and executed as a separate subprocess (file-per-block).",
+        "Security: regex filter against dangerous commands.",
+        "Lifecycle: start(), stop(), restart().",
+        "create_default_code_executor() prefers DockerCommandLineCodeExecutor if Docker is available, falls back to local with warning."
+      ]
+    },
+    {
+      "url": "https://e2b.dev/docs/quickstart",
+      "title": "E2B Code Interpreter quickstart",
+      "qualityScore": 76,
+      "scores": { "authority": 9, "recency": 10, "depth": 6, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Firecracker microVM per sandbox.",
+        "Python + JavaScript SDKs.",
+        "SDK methods: sandbox.commands.run() for shell; sandbox.runCode() / sandbox.run_code() for code.",
+        "Sandbox.create() lifecycle — persistent for sandbox lifetime; cleanup on delete.",
+        "Implies: a tool library should be sandbox-agnostic; E2B is a consumer of the Bash tool, not a competitor."
+      ]
+    },
+    {
+      "url": "https://daytona.io/docs/",
+      "title": "Daytona sandbox for AI agents",
+      "qualityScore": 72,
+      "scores": { "authority": 8, "recency": 10, "depth": 6, "examples": 6, "uniqueness": 6 },
+      "keyInsights": [
+        "Open-source, secure, elastic infrastructure for running AI-generated code.",
+        "SDKs in Python, TypeScript, Ruby, Go.",
+        "Sandboxes are 'full composable computers' with filesystem, Git, LSP, and pseudo-terminal.",
+        "Methods: sandbox.process.code_run() (code), sandbox.process.execute_command() (shell).",
+        "Lifecycle: create → use → delete."
+      ]
+    },
+    {
+      "url": "https://lucumr.pocoo.org/2025/6/12/agentic-coding/",
+      "title": "Armin Ronacher — Agentic Coding Tools",
+      "qualityScore": 78,
+      "scores": { "authority": 8, "recency": 9, "depth": 8, "examples": 6, "uniqueness": 8 },
+      "keyInsights": [
+        "'LLM chaos monkey' — tools must be bulletproof against incorrect usage patterns.",
+        "Tools need speed and clarity; 'crashes are tolerable, hangs are problematic'.",
+        "User-side sandbox answer: dev env in Docker; author disables all permission checks ('claude-yolo') and manages risk at container level.",
+        "Effective tools: simple, idempotent scripts + observability (log to files for agent self-diagnosis).",
+        "Avoid unnecessary output verbosity — token efficiency in agentic loops."
+      ]
+    },
+    {
+      "url": "https://simonwillison.net/tags/claude-code/",
+      "title": "Simon Willison — Claude Code coverage",
+      "qualityScore": 76,
+      "scores": { "authority": 8, "recency": 10, "depth": 7, "examples": 5, "uniqueness": 8 },
+      "keyInsights": [
+        "Skeptical of AI-based safeguards: 'unconvinced by prompt injection protections that rely on AI, since they're non-deterministic by nature'.",
+        "Prefers robust sandbox by default: 'restricts file access and network connections in a deterministic way'.",
+        "Claude Code revenue / usage scale validates design pragmatism — permission system is good enough in practice.",
+        "Session log recovery noted as unexpected benefit — suggests audit/log-first design pays off."
+      ]
+    },
+    {
+      "url": "https://firejail.wordpress.com/",
+      "title": "Firejail SUID sandbox",
+      "qualityScore": 68,
+      "scores": { "authority": 7, "recency": 6, "depth": 7, "examples": 7, "uniqueness": 7 },
+      "keyInsights": [
+        "Linux namespaces + seccomp-bpf primitives; lightweight C with minimal dependencies.",
+        "Pre-configured profiles for 1000+ desktop apps.",
+        "Agent harness integration: prefix subprocess with `firejail`, use `--private`, `--net=none`, `--noprofile` for isolation.",
+        "Candidate for an @agent-sh/harness-sandbox-firejail adapter package."
+      ]
+    }
+  ]
+}
