@@ -1,0 +1,35 @@
+# @agent-sh/harness-tools
+
+## 0.2.0
+
+### Minor Changes
+
+- 6dbe9b0: Initial public release.
+
+  Nine standalone tools plus an umbrella, each with a full cross-language design spec, per-tool permission model, fail-closed hooks, and discriminated-union result shapes. Matching Rust ports ship under `crates/` and are validated against real LLM traces via the `packages/harness-e2e` harness.
+
+  Included in this release:
+
+  - `@agent-sh/harness-core` — shared types, errors, permissions, operation adapters
+  - `@agent-sh/harness-read` — safe bounded file reading
+  - `@agent-sh/harness-write` — atomic write + edit + multiedit with read-before-edit ledger
+  - `@agent-sh/harness-grep` — ripgrep-backed search with discriminated output_mode
+  - `@agent-sh/harness-glob` — file discovery by pattern
+  - `@agent-sh/harness-bash` — shell with cwd-carry, timeouts, background jobs
+  - `@agent-sh/harness-webfetch` — HTTP with SSRF defense and readability+markdown extraction
+  - `@agent-sh/harness-lsp` — language-server operations with 1-indexed positions
+  - `@agent-sh/harness-skill` — [Agent Skills](https://agentskills.io) activation
+  - `@agent-sh/harness-tools` — umbrella re-export of every tool
+
+### Patch Changes
+
+- Updated dependencies [6dbe9b0]
+  - @agent-sh/harness-core@0.2.0
+  - @agent-sh/harness-read@0.2.0
+  - @agent-sh/harness-write@0.2.0
+  - @agent-sh/harness-grep@0.2.0
+  - @agent-sh/harness-glob@0.2.0
+  - @agent-sh/harness-bash@0.2.0
+  - @agent-sh/harness-webfetch@0.2.0
+  - @agent-sh/harness-lsp@0.2.0
+  - @agent-sh/harness-skill@0.2.0

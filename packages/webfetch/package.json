@@ -1,6 +1,6 @@
 {
   "name": "@agent-sh/harness-webfetch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "WebFetch tool for AI agent harnesses — HTTP GET/POST with SSRF defense, readability+markdown extraction, redirect-chain reporting, size caps, and per-session cache",
   "keywords": [
     "ai",

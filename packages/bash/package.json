@@ -1,6 +1,6 @@
 {
   "name": "@agent-sh/harness-bash",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bash tool for AI agent harnesses — autonomous shell execution with pluggable executor, permission hook, cwd-carry, inactivity timeout, and background job support",
   "keywords": [
     "ai",
