@@ -18,6 +18,7 @@ import {
   bedrockAvailable,
   loadDotEnv,
   makeSkillExecutor,
+  makeSkillExecutorRust,
   modelLabel,
   ollamaModelAvailable,
   passAtK,
@@ -27,6 +28,19 @@ import {
   warmupOllama,
   type AgentTraceEvent,
 } from "../src/index.js";
+
+/**
+ * Engine-swap for parity testing. HARNESS_SKILL_ENGINE=rust routes every
+ * skill call through `harness-skill-cli`. Default (unset) uses TS.
+ */
+const SKILL_ENGINE = (process.env.HARNESS_SKILL_ENGINE ?? "ts").toLowerCase();
+const pickSkillExecutor: typeof makeSkillExecutor =
+  SKILL_ENGINE === "rust"
+    ? ((session) => {
+        const r = makeSkillExecutorRust(session);
+        return { tool: r.tool, execute: r.execute };
+      })
+    : makeSkillExecutor;
 
 loadDotEnv();
 
@@ -210,7 +224,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "# API Style\n\nAll endpoints MUST use plural nouns (`/users` not `/user`). Errors MUST include a `code` field. Reply with one sentence summarizing these rules.",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -252,7 +266,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "Reply with exactly the phrase 'thread skill activated'.",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -296,7 +310,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "Pre-commit checklist: 1. tests pass, 2. types check, 3. lint clean. Report these three items.",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -346,7 +360,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "To inspect history, call `bash(git log --oneline -20)`. Report the skill was activated.",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -383,7 +397,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "Should not be reached by model invocation.",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -430,7 +444,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "#!/bin/bash\necho 'ok'",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -467,7 +481,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
         "Hello, $ARGUMENTS! Reply with this exact greeting, then nothing else.",
       );
       const session = makeSession(root);
-      const tools = [makeSkillExecutor(session)];
+      const tools = [pickSkillExecutor(session)];
       const { trace, onTrace } = collectTrace();
       const res = await runE2E(
         runOpts(
@@ -521,7 +535,7 @@ describe(`skill e2e hard [${LABEL}]`, () => {
             trust: { trustedRoots: [root] },
             activated: new Set<string>(),
           };
-          const tools = [makeSkillExecutor(session)];
+          const tools = [pickSkillExecutor(session)];
           const { trace, onTrace } = collectTrace();
           const res = await runE2E(
             runOpts(

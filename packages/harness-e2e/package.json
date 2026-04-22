@@ -126,6 +126,10 @@
     "aggregate:skill:update": "tsx scripts/aggregate.ts --suite test/skill.e2e.hard.test.ts --backends ollama:gemma4:e2b-it-q4_K_M,ollama:gemma4:26b-a4b-it-q4_K_M,ollama:qwen3:8b,ollama:qwen3.5:27b-q4_K_M --out baselines/skill-hard.json --update",
     "aggregate:skill:check": "tsx scripts/aggregate.ts --suite test/skill.e2e.hard.test.ts --backends ollama:gemma4:e2b-it-q4_K_M,ollama:gemma4:26b-a4b-it-q4_K_M,ollama:qwen3:8b,ollama:qwen3.5:27b-q4_K_M --out baselines/skill-hard.json --check",
     "aggregate:skill:bedrock": "tsx scripts/aggregate.ts --suite test/skill.e2e.hard.test.ts --backends bedrock --out baselines/skill-hard-bedrock.json --update",
+    "test:skill:rust:27b": "HARNESS_SKILL_ENGINE=rust E2E_MODEL=qwen3.5:27b-q4_K_M vitest run test/skill.e2e.hard.test.ts",
+    "test:skill:rust:gemma:large": "HARNESS_SKILL_ENGINE=rust E2E_MODEL=gemma4:26b-a4b-it-q4_K_M vitest run test/skill.e2e.hard.test.ts",
+    "aggregate:skill:rust:update": "HARNESS_SKILL_ENGINE=rust tsx scripts/aggregate.ts --suite test/skill.e2e.hard.test.ts --backends ollama:gemma4:e2b-it-q4_K_M,ollama:gemma4:26b-a4b-it-q4_K_M,ollama:qwen3:8b,ollama:qwen3.5:27b-q4_K_M --out baselines/skill-hard-rust.json --update",
+    "aggregate:skill:rust:check": "HARNESS_SKILL_ENGINE=rust tsx scripts/aggregate.ts --suite test/skill.e2e.hard.test.ts --backends ollama:gemma4:e2b-it-q4_K_M,ollama:gemma4:26b-a4b-it-q4_K_M,ollama:qwen3:8b,ollama:qwen3.5:27b-q4_K_M --out baselines/skill-hard-rust.json --check",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

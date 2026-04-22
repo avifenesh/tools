@@ -676,6 +676,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness-skill"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "globset",
+ "harness-core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "harness-webfetch"
 version = "0.1.0"
 dependencies = [

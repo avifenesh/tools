@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Write/Edit/MultiEdit tool for AI agent harnesses — atomic write, read-before-edit ledger, OLD_STRING_NOT_UNIQUE with match locations, OLD_STRING_NOT_FOUND with fuzzy candidates, sequential multi-edit pipeline"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/write#readme"
+documentation = "https://docs.rs/harness-write"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "filesystem", "editor"]
+categories = ["api-bindings", "filesystem"]
 
 [lib]
 path = "src/lib.rs"
@@ -14,8 +20,8 @@ name = "harness-write-cli"
 path = "src/bin/cli.rs"
 
 [dependencies]
-harness-core = { path = "../harness-core" }
-harness-read = { path = "../read" }
+harness-core = { path = "../harness-core", version = "0.1.0" }
+harness-read = { path = "../read", version = "0.1.0" }
 
 anyhow.workspace = true
 serde.workspace = true

@@ -16,6 +16,7 @@ export * from "./webfetchExecutorRust.js";
 export * from "./lspExecutor.js";
 export * from "./lspExecutorRust.js";
 export * from "./skillExecutor.js";
+export * from "./skillExecutorRust.js";
 export * from "./bedrock.js";
 export * from "./bedrockAgent.js";
 export * from "./runner.js";

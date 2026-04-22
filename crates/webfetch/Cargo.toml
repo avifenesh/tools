@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "WebFetch tool for AI agent harnesses — HTTP GET/POST with SSRF defense, readability+markdown extraction, redirect-chain reporting, size caps, and per-session cache"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/webfetch#readme"
+documentation = "https://docs.rs/harness-webfetch"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "http", "webfetch"]
+categories = ["api-bindings", "web-programming::http-client"]
 
 [lib]
 path = "src/lib.rs"
@@ -14,7 +20,7 @@ name = "harness-webfetch-cli"
 path = "src/bin/cli.rs"
 
 [dependencies]
-harness-core = { path = "../harness-core" }
+harness-core = { path = "../harness-core", version = "0.1.0" }
 
 anyhow.workspace = true
 async-trait = "0.1"

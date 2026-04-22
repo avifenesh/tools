@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Glob tool for AI agent harnesses — bash-style pattern matching with .gitignore enumeration, alias pushback, NOT_FOUND siblings, and auto-split absolute-path patterns"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/glob#readme"
+documentation = "https://docs.rs/harness-glob"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "glob", "filesystem"]
+categories = ["api-bindings", "filesystem"]
 
 [lib]
 path = "src/lib.rs"
@@ -14,7 +20,7 @@ name = "harness-glob-cli"
 path = "src/bin/cli.rs"
 
 [dependencies]
-harness-core = { path = "../harness-core" }
+harness-core = { path = "../harness-core", version = "0.1.0" }
 
 anyhow.workspace = true
 serde.workspace = true

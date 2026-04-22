@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Bash tool for AI agent harnesses — autonomous shell execution with tokio process management, cwd-carry, inactivity timeout, head+tail spill, background jobs"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/bash#readme"
+documentation = "https://docs.rs/harness-bash"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "shell", "subprocess"]
+categories = ["api-bindings", "command-line-utilities"]
 
 [lib]
 path = "src/lib.rs"
@@ -14,7 +20,7 @@ name = "harness-bash-cli"
 path = "src/bin/cli.rs"
 
 [dependencies]
-harness-core = { path = "../harness-core" }
+harness-core = { path = "../harness-core", version = "0.1.0" }
 
 anyhow.workspace = true
 async-trait = "0.1"

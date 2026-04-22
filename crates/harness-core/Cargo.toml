@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Shared types and traits for @agent-sh/harness-* Rust tools: ToolError, PermissionPolicy, ReadOperations"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/harness-core#readme"
+documentation = "https://docs.rs/harness-core"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "tool-use", "bedrock"]
+categories = ["api-bindings", "development-tools"]
 
 [dependencies]
 serde.workspace = true

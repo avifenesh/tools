@@ -5,6 +5,12 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "LSP tool for AI agent harnesses — language-server-protocol operations (hover, definition, references, symbols) with manifest, lazy-spawn policy, pluggable client adapter"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/lsp#readme"
+documentation = "https://docs.rs/harness-lsp"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "lsp", "language-server"]
+categories = ["api-bindings", "development-tools"]
 
 [lib]
 path = "src/lib.rs"
@@ -14,7 +20,7 @@ name = "harness-lsp-cli"
 path = "src/bin/cli.rs"
 
 [dependencies]
-harness-core = { path = "../harness-core" }
+harness-core = { path = "../harness-core", version = "0.1.0" }
 
 anyhow.workspace = true
 async-trait = "0.1"
