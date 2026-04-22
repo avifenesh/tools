@@ -37,7 +37,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm -r --filter '!@agent-sh/harness-e2e' build
+        run: pnpm exec turbo run build --filter='!@agent-sh/harness-e2e'
 
       - name: Create release PR or publish
         uses: changesets/action@v1

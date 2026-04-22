@@ -31,14 +31,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm -r --filter '!@agent-sh/harness-e2e' typecheck
-
       - name: Build
-        run: pnpm -r --filter '!@agent-sh/harness-e2e' build
+        run: pnpm exec turbo run build --filter='!@agent-sh/harness-e2e'
+
+      - name: Typecheck
+        run: pnpm exec turbo run typecheck --filter='!@agent-sh/harness-e2e'
 
       - name: Test
-        run: pnpm -r --filter '!@agent-sh/harness-e2e' test
+        run: pnpm exec turbo run test --filter='!@agent-sh/harness-e2e'
 
   rust:
     name: Rust
