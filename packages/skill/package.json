@@ -53,7 +53,7 @@
   },
   "dependencies": {
     "@agent-sh/harness-core": "workspace:*",
-    "valibot": "^0.42.1"
+    "valibot": "^1.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

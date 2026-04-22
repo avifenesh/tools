@@ -24,8 +24,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -43,8 +43,8 @@ importers:
   packages/core:
     dependencies:
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -71,8 +71,8 @@ importers:
         specifier: ^0.3.1
         version: 0.3.1
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -99,8 +99,8 @@ importers:
         specifier: ^0.3.1
         version: 0.3.1
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -167,8 +167,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
       vscode-jsonrpc:
         specifier: ^8.2.1
         version: 8.2.1
@@ -195,8 +195,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -217,8 +217,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -282,8 +282,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@mozilla/readability':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.6.0
+        version: 0.6.0
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
@@ -294,8 +294,8 @@ importers:
         specifier: ^7.0.0
         version: 7.25.0
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/jsdom':
         specifier: ^21.1.7
@@ -325,8 +325,8 @@ importers:
         specifier: workspace:*
         version: link:../read
       valibot:
-        specifier: ^0.42.1
-        version: 0.42.1(typescript@5.9.3)
+        specifier: ^1.2.0
+        version: 1.2.0(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
@@ -758,8 +758,8 @@ packages:
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
 
-  '@mozilla/readability@0.5.0':
-    resolution: {integrity: sha512-Z+CZ3QaosfFaTqvhQsIktyGrjFjSC0Fa4EMph4mqKnWhmyoGICsV/8QK+8HpXut6zV7zwfWwqDmEjtk1Qf6EgQ==}
+  '@mozilla/readability@0.6.0':
+    resolution: {integrity: sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==}
     engines: {node: '>=14.0.0'}
 
   '@nodelib/fs.scandir@2.1.5':
@@ -1728,8 +1728,8 @@ packages:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
     engines: {node: '>= 4.0.0'}
 
-  valibot@0.42.1:
-    resolution: {integrity: sha512-3keXV29Ar5b//Hqi4MbSdV7lfVp6zuYLZuA9V1PvQUsXqogr+u5lvLPLk3A4f74VUXDnf/JfWMN6sB+koJ/FFw==}
+  valibot@1.2.0:
+    resolution: {integrity: sha512-mm1rxUsmOxzrwnX5arGS+U4T25RdvpPjPN4yR0u9pUBov9+zGVtO84tif1eY4r6zWxVxu3KzIyknJy3rxfRZZg==}
     peerDependencies:
       typescript: '>=5'
     peerDependenciesMeta:
@@ -2226,7 +2226,7 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
-  '@mozilla/readability@0.5.0': {}
+  '@mozilla/readability@0.6.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -3136,7 +3136,7 @@ snapshots:
 
   universalify@0.1.2: {}
 
-  valibot@0.42.1(typescript@5.9.3):
+  valibot@1.2.0(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
 
