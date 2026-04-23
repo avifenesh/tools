@@ -48,7 +48,10 @@ fn is_inside(candidate: &str, root: &str) -> bool {
     }
     candidate.starts_with(root)
         && (candidate.len() == root.len()
-            || candidate.as_bytes().get(root.len()) == Some(&b'/'))
+            || matches!(
+                candidate.as_bytes().get(root.len()),
+                Some(&b'/') | Some(&b'\\')
+            ))
 }
 
 fn matches_pattern(path: &str, pattern: &str) -> bool {
@@ -86,4 +89,24 @@ fn matches_pattern(path: &str, pattern: &str) -> bool {
         }
     }
     path.contains(pattern)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_inside;
+
+    #[test]
+    fn posix_boundary() {
+        assert!(is_inside("/a/b/c", "/a/b"));
+        assert!(is_inside("/a/b", "/a/b"));
+        assert!(!is_inside("/a/bc", "/a/b"));
+    }
+
+    #[test]
+    fn windows_boundary() {
+        // Canonicalize on Windows returns `\\?\C:\...` with `\` separators.
+        assert!(is_inside(r"\\?\C:\Users\avife\tools\src\main.rs", r"\\?\C:\Users\avife\tools"));
+        assert!(is_inside(r"C:\Users\avife\tools\src", r"C:\Users\avife\tools"));
+        assert!(!is_inside(r"C:\Users\avife\tools2", r"C:\Users\avife\tools"));
+    }
 }

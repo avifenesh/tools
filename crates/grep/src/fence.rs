@@ -70,7 +70,10 @@ fn is_inside(candidate: &str, root: &str) -> bool {
     }
     candidate.starts_with(root)
         && (candidate.len() == root.len()
-            || candidate.as_bytes().get(root.len()) == Some(&b'/'))
+            || matches!(
+                candidate.as_bytes().get(root.len()),
+                Some(&b'/') | Some(&b'\\')
+            ))
 }
 
 /// Minimal glob-style matcher for sensitive patterns. We support:
