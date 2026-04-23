@@ -1,0 +1,98 @@
+name: Release (Rust)
+
+# Triggered by pushing a tag like `rust-v0.1.1`. The tag itself is just a
+# signal — the version that actually gets published is whatever is in
+# each crate's Cargo.toml. We publish every workspace crate whose current
+# version is not yet on crates.io, in dependency order. Re-runs are
+# idempotent: already-published (name, version) pairs are skipped.
+
+on:
+  push:
+    tags:
+      - "rust-v*"
+
+concurrency:
+  group: release-rust-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish crates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --workspace --locked
+
+      - name: Test
+        run: cargo test --workspace --locked
+
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Dep order: core first, then leaves, then write (needs read),
+          # then the umbrella (needs all).
+          crates=(
+            harness-core
+            harness-read
+            harness-grep
+            harness-glob
+            harness-bash
+            harness-webfetch
+            harness-lsp
+            harness-skill
+            harness-write
+            harness-tools
+          )
+
+          is_published() {
+            local name="$1" version="$2"
+            local ua="harness-release/1.0 (github.com/${GITHUB_REPOSITORY})"
+            local body
+            body=$(curl -sS -A "$ua" "https://crates.io/api/v1/crates/${name}") || return 1
+            echo "$body" | jq -e --arg v "$version" '.versions | map(.num) | index($v) != null' > /dev/null
+          }
+
+          for name in "${crates[@]}"; do
+            version=$(cargo metadata --no-deps --format-version 1 \
+              | jq -r --arg n "$name" '.packages[] | select(.name == $n) | .version')
+            if [ -z "$version" ]; then
+              echo "::error::No version found for $name"
+              exit 1
+            fi
+            echo ""
+            echo "=== $name @ $version ==="
+            if is_published "$name" "$version"; then
+              echo "Already on crates.io — skipping."
+              continue
+            fi
+            # Retry loop for the new-crate rate limit (429). Subsequent
+            # publishes of an existing crate name have a much higher
+            # ceiling, so this is mostly protection for brand-new names.
+            attempts=0
+            until cargo publish -p "$name" --locked; do
+              attempts=$((attempts + 1))
+              if [ "$attempts" -ge 6 ]; then
+                echo "::error::cargo publish $name failed after $attempts attempts"
+                exit 1
+              fi
+              echo "Retrying in 60s (attempt $attempts/6)..."
+              sleep 60
+            done
+          done
+
+          echo ""
+          echo "All crates up to date."

@@ -1,6 +1,6 @@
 [package]
 name = "harness-write"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -21,7 +21,7 @@ path = "src/bin/cli.rs"
 
 [dependencies]
 harness-core = { path = "../harness-core", version = "0.1.0" }
-harness-read = { path = "../read", version = "0.1.0" }
+harness-read = { path = "../read", version = "0.1.1" }
 
 anyhow.workspace = true
 serde.workspace = true
