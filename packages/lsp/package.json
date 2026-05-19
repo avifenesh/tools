@@ -54,7 +54,7 @@
   },
   "dependencies": {
     "@agent-sh/harness-core": "workspace:*",
-    "valibot": "^0.42.1",
+    "valibot": "^1.2.0",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5"
   },
