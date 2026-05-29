@@ -68,6 +68,11 @@
       "import": "./dist/webfetch.js",
       "require": "./dist/webfetch.cjs"
     },
+    "./websearch": {
+      "types": "./dist/websearch.d.ts",
+      "import": "./dist/websearch.js",
+      "require": "./dist/websearch.cjs"
+    },
     "./lsp": {
       "types": "./dist/lsp.d.ts",
       "import": "./dist/lsp.js",
@@ -104,6 +109,7 @@
     "@agent-sh/harness-glob": "workspace:*",
     "@agent-sh/harness-bash": "workspace:*",
     "@agent-sh/harness-webfetch": "workspace:*",
+    "@agent-sh/harness-websearch": "workspace:*",
     "@agent-sh/harness-lsp": "workspace:*",
     "@agent-sh/harness-skill": "workspace:*"
   },

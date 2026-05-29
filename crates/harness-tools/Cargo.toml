@@ -23,5 +23,6 @@ harness-grep = { path = "../grep", version = "0.1.1" }
 harness-glob = { path = "../glob", version = "0.1.1" }
 harness-bash = { path = "../bash", version = "0.1.1" }
 harness-webfetch = { path = "../webfetch", version = "0.1.0" }
+harness-websearch = { path = "../websearch", version = "0.1.0" }
 harness-lsp = { path = "../lsp", version = "0.1.1" }
 harness-skill = { path = "../skill", version = "0.1.0" }

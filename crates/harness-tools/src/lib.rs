@@ -20,4 +20,5 @@ pub use harness_lsp as lsp;
 pub use harness_read as read;
 pub use harness_skill as skill;
 pub use harness_webfetch as webfetch;
+pub use harness_websearch as websearch;
 pub use harness_write as write;

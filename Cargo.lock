@@ -702,6 +702,7 @@ dependencies = [
  "harness-read",
  "harness-skill",
  "harness-webfetch",
+ "harness-websearch",
  "harness-write",
 ]
 
@@ -727,6 +728,26 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "harness-websearch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "harness-core",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
 ]
 
 [[package]]

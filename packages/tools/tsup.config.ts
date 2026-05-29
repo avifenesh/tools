@@ -10,6 +10,7 @@ export default defineConfig({
     glob: "src/glob.ts",
     bash: "src/bash.ts",
     webfetch: "src/webfetch.ts",
+    websearch: "src/websearch.ts",
     lsp: "src/lsp.ts",
     skill: "src/skill.ts",
   },

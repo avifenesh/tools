@@ -1,0 +1,43 @@
+[package]
+name = "harness-websearch"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "WebSearch tool for AI agent harnesses — declarative web search via a session-configured SearXNG backend, with SSRF defense, permission hook, result-count cap, and a discriminated result surface"
+repository.workspace = true
+homepage = "https://github.com/avifenesh/tools/tree/main/crates/websearch#readme"
+documentation = "https://docs.rs/harness-websearch"
+readme = "README.md"
+keywords = ["ai", "agent", "llm", "search", "websearch"]
+categories = ["api-bindings", "web-programming::http-client"]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "harness-websearch-cli"
+path = "src/bin/cli.rs"
+
+[dependencies]
+harness-core = { path = "../harness-core", version = "0.1.0" }
+
+anyhow.workspace = true
+async-trait = "0.1"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "io-std", "io-util", "net", "time", "sync"] }
+
+# HTTP client (rustls so we avoid native openssl linking in WSL)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip"] }
+# URL parsing for backend + host checks
+url = "2"
+
+[dev-dependencies]
+tempfile.workspace = true
+# Minimal HTTP server for tests
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"

@@ -13,6 +13,8 @@ export * from "./bashExecutor.js";
 export * from "./bashExecutorRust.js";
 export * from "./webfetchExecutor.js";
 export * from "./webfetchExecutorRust.js";
+export * from "./websearchExecutor.js";
+export * from "./websearchExecutorRust.js";
 export * from "./lspExecutor.js";
 export * from "./lspExecutorRust.js";
 export * from "./skillExecutor.js";

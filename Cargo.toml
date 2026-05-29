@@ -6,6 +6,7 @@ members = [
     "crates/glob",
     "crates/bash",
     "crates/webfetch",
+    "crates/websearch",
     "crates/read",
     "crates/write",
     "crates/lsp",
