@@ -27,6 +27,11 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "pi": {
+    "extensions": [
+      "./dist/pi-extension.js"
+    ]
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -82,6 +87,11 @@
       "types": "./dist/skill.d.ts",
       "import": "./dist/skill.js",
       "require": "./dist/skill.cjs"
+    },
+    "./pi-extension": {
+      "types": "./dist/pi-extension.d.ts",
+      "import": "./dist/pi-extension.js",
+      "require": "./dist/pi-extension.cjs"
     }
   },
   "files": [
@@ -111,12 +121,22 @@
     "@agent-sh/harness-webfetch": "workspace:*",
     "@agent-sh/harness-websearch": "workspace:*",
     "@agent-sh/harness-lsp": "workspace:*",
-    "@agent-sh/harness-skill": "workspace:*"
+    "@agent-sh/harness-skill": "workspace:*",
+    "typebox": "1.1.37"
   },
   "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
     "@types/node": "^22.9.0",
     "tsup": "^8.3.5",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": {
+      "optional": true
+    }
   }
 }

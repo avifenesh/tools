@@ -13,6 +13,7 @@ export default defineConfig({
     websearch: "src/websearch.ts",
     lsp: "src/lsp.ts",
     skill: "src/skill.ts",
+    "pi-extension": "src/pi-extension.ts",
   },
   format: ["esm", "cjs"],
   dts: true,
