@@ -1,6 +1,6 @@
 {
   "name": "@agent-sh/harness-websearch",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "WebSearch tool for AI agent harnesses — self-hosted SearXNG metasearch with SSRF defense, declarative query controls, result-count cap, and a discriminated result surface",
   "keywords": [
     "ai",

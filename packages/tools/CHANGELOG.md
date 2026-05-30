@@ -1,5 +1,16 @@
 # @agent-sh/harness-tools
 
+## 0.3.0
+
+### Minor Changes
+
+- 3aac413: Add WebSearch and make `@agent-sh/harness-tools` the PI extension umbrella for the full tool surface.
+
+### Patch Changes
+
+- Updated dependencies [3aac413]
+  - @agent-sh/harness-websearch@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
