@@ -1,11 +1,11 @@
 [package]
 name = "harness-tools"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
-description = "Umbrella re-export for harness-* AI agent tools: core, read, write, grep, glob, bash, webfetch, lsp, skill"
+description = "Umbrella re-export for harness-* AI agent tools: core, read, write, grep, glob, bash, webfetch, websearch, lsp, skill"
 homepage = "https://github.com/avifenesh/tools/tree/main/crates/harness-tools#readme"
 documentation = "https://docs.rs/harness-tools"
 readme = "README.md"

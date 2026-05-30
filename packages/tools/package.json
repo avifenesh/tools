@@ -1,7 +1,7 @@
 {
   "name": "@agent-sh/harness-tools",
   "version": "0.2.0",
-  "description": "Umbrella package re-exporting @agent-sh/harness-* agent tools (read, write, grep, glob, bash, webfetch, lsp, skill) under one entry point",
+  "description": "Umbrella package and PI extension for @agent-sh/harness-* agent tools (read, write, grep, glob, bash, webfetch, websearch, lsp, skill)",
   "keywords": [
     "ai",
     "agent",

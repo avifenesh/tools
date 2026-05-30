@@ -2,7 +2,7 @@
 
 TypeScript-first agent tools, designed for real LLMs.
 
-Each tool in this repo (`read`, `write`, `grep`, `glob`, `bash`, `webfetch`, `lsp`, `skill`) ships as its own `@agent-sh/harness-*` npm package, plus an umbrella `@agent-sh/harness-tools` that re-exports them. Matching Rust ports live under `crates/` and maintain TS parity.
+Each tool in this repo (`read`, `write`, `grep`, `glob`, `bash`, `webfetch`, `websearch`, `lsp`, `skill`) ships as its own `@agent-sh/harness-*` npm package, plus an umbrella `@agent-sh/harness-tools` that re-exports them. Matching Rust ports live under `crates/` and maintain TS parity.
 
 The tools are meant to be consumed by autonomous agents (Claude, GPT, Qwen, Gemini, ...), not by deterministic callers. That framing shapes every design call — see [`CLAUDE.md`](./CLAUDE.md) and the per-tool specs under [`agent-knowledge/design/`](./agent-knowledge/design/).
 
@@ -17,6 +17,7 @@ The tools are meant to be consumed by autonomous agents (Claude, GPT, Qwen, Gemi
 | [`@agent-sh/harness-glob`](./packages/glob) | File discovery by pattern with ignore-awareness, mtime-sorted results, workspace fence. |
 | [`@agent-sh/harness-bash`](./packages/bash) | Shell with tokio-style cwd-carry, inactivity + wall-clock timeouts, head+tail spill-to-file on overflow, background jobs (`bash_output` / `bash_kill`). |
 | [`@agent-sh/harness-webfetch`](./packages/webfetch) | HTTP `GET`/`POST` with tool-layer SSRF defense, readability+markdown extraction, redirect-chain reporting, size caps, per-session cache. |
+| [`@agent-sh/harness-websearch`](./packages/websearch) | Web search via a session-configured SearXNG backend with SSRF defense, permission hook, and bounded result counts. |
 | [`@agent-sh/harness-lsp`](./packages/lsp) | Language-server operations (hover, definition, references, documentSymbol, workspaceSymbol, implementation) with 1-indexed positions, lazy-spawn, `server_starting` retry hints. |
 | [`@agent-sh/harness-skill`](./packages/skill) | [Agent Skills](https://agentskills.io) `SKILL.md` activation with progressive disclosure, permission-gated activation, trust-gated project skills. |
 | [`@agent-sh/harness-tools`](./packages/tools) | Umbrella re-export for the whole surface. Install this one for everything. |

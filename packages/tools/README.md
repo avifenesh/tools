@@ -15,11 +15,13 @@ Requires Node ≥ 20.
 ## Usage
 
 ```ts
-import { read, grep, glob, bash, webfetch, skill } from "@agent-sh/harness-tools";
+import { read, grep, glob, bash, webfetch, websearch, lsp, skill } from "@agent-sh/harness-tools";
 
 // Or import a single tool via its subpath:
 import { read } from "@agent-sh/harness-tools/read";
 ```
+
+This package also exposes `./pi-extension` through `pi.extensions` for PI Coding Agent hosts.
 
 ## Contract
 

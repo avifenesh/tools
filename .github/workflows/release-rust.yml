@@ -52,6 +52,7 @@ jobs:
             harness-glob
             harness-bash
             harness-webfetch
+            harness-websearch
             harness-lsp
             harness-skill
             harness-write

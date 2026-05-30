@@ -15,6 +15,7 @@
       "@agent-sh/harness-glob",
       "@agent-sh/harness-bash",
       "@agent-sh/harness-webfetch",
+      "@agent-sh/harness-websearch",
       "@agent-sh/harness-lsp",
       "@agent-sh/harness-skill",
       "@agent-sh/harness-tools"
