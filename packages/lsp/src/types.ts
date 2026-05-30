@@ -13,13 +13,13 @@ export type LspOperation =
 
 export interface LspParams {
   readonly operation: LspOperation;
-  readonly path?: string;
+  readonly path?: string | undefined;
   /** 1-indexed line; matches grep/read output. Converted to LSP 0-indexed internally. */
-  readonly line?: number;
+  readonly line?: number | undefined;
   /** 1-indexed character column. */
-  readonly character?: number;
-  readonly query?: string;
-  readonly head_limit?: number;
+  readonly character?: number | undefined;
+  readonly query?: string | undefined;
+  readonly head_limit?: number | undefined;
 }
 
 /**

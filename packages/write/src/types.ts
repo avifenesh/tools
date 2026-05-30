@@ -9,7 +9,7 @@ import type {
 export interface EditSpec {
   readonly old_string: string;
   readonly new_string: string;
-  readonly replace_all?: boolean;
+  readonly replace_all?: boolean | undefined;
 }
 
 export interface WriteParams {
@@ -21,14 +21,14 @@ export interface EditParams {
   readonly path: string;
   readonly old_string: string;
   readonly new_string: string;
-  readonly replace_all?: boolean;
-  readonly dry_run?: boolean;
+  readonly replace_all?: boolean | undefined;
+  readonly dry_run?: boolean | undefined;
 }
 
 export interface MultiEditParams {
   readonly path: string;
   readonly edits: readonly EditSpec[];
-  readonly dry_run?: boolean;
+  readonly dry_run?: boolean | undefined;
 }
 
 export interface ValidateContext {

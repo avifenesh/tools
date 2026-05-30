@@ -8,12 +8,12 @@ export type WebFetchExtract = "markdown" | "raw" | "both";
 
 export interface WebFetchParams {
   readonly url: string;
-  readonly method?: WebFetchMethod;
-  readonly body?: string;
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly extract?: WebFetchExtract;
-  readonly timeout_ms?: number;
-  readonly max_redirects?: number;
+  readonly method?: WebFetchMethod | undefined;
+  readonly body?: string | undefined;
+  readonly headers?: Readonly<Record<string, string>> | undefined;
+  readonly extract?: WebFetchExtract | undefined;
+  readonly timeout_ms?: number | undefined;
+  readonly max_redirects?: number | undefined;
 }
 
 /**

@@ -6,9 +6,9 @@ import type {
 
 export interface GlobParams {
   readonly pattern: string;
-  readonly path?: string;
-  readonly head_limit?: number;
-  readonly offset?: number;
+  readonly path?: string | undefined;
+  readonly head_limit?: number | undefined;
+  readonly offset?: number | undefined;
 }
 
 /**

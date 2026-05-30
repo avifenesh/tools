@@ -8,17 +8,17 @@ export type GrepOutputMode = "files_with_matches" | "content" | "count";
 
 export interface GrepParams {
   readonly pattern: string;
-  readonly path?: string;
-  readonly glob?: string;
-  readonly type?: string;
-  readonly output_mode?: GrepOutputMode;
-  readonly case_insensitive?: boolean;
-  readonly multiline?: boolean;
-  readonly context_before?: number;
-  readonly context_after?: number;
-  readonly context?: number;
-  readonly head_limit?: number;
-  readonly offset?: number;
+  readonly path?: string | undefined;
+  readonly glob?: string | undefined;
+  readonly type?: string | undefined;
+  readonly output_mode?: GrepOutputMode | undefined;
+  readonly case_insensitive?: boolean | undefined;
+  readonly multiline?: boolean | undefined;
+  readonly context_before?: number | undefined;
+  readonly context_after?: number | undefined;
+  readonly context?: number | undefined;
+  readonly head_limit?: number | undefined;
+  readonly offset?: number | undefined;
 }
 
 /**

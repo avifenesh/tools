@@ -5,22 +5,22 @@ import type {
 
 export interface BashParams {
   readonly command: string;
-  readonly cwd?: string;
-  readonly timeout_ms?: number;
-  readonly description?: string;
-  readonly background?: boolean;
-  readonly env?: Readonly<Record<string, string>>;
+  readonly cwd?: string | undefined;
+  readonly timeout_ms?: number | undefined;
+  readonly description?: string | undefined;
+  readonly background?: boolean | undefined;
+  readonly env?: Readonly<Record<string, string>> | undefined;
 }
 
 export interface BashOutputParams {
   readonly job_id: string;
-  readonly since_byte?: number;
-  readonly head_limit?: number;
+  readonly since_byte?: number | undefined;
+  readonly head_limit?: number | undefined;
 }
 
 export interface BashKillParams {
   readonly job_id: string;
-  readonly signal?: "SIGTERM" | "SIGKILL";
+  readonly signal?: "SIGTERM" | "SIGKILL" | undefined;
 }
 
 /**

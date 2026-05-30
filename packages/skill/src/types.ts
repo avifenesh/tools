@@ -25,7 +25,7 @@ export interface SkillTrustPolicy {
 
 export interface SkillParams {
   readonly name: string;
-  readonly arguments?: string | Readonly<Record<string, string>>;
+  readonly arguments?: string | Readonly<Record<string, string>> | undefined;
 }
 
 /**

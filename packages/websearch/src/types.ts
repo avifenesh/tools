@@ -8,11 +8,11 @@ export type WebSearchSafeSearch = "off" | "moderate" | "strict";
 
 export interface WebSearchParams {
   readonly query: string;
-  readonly count?: number;
-  readonly time_range?: WebSearchTimeRange;
-  readonly language?: string;
-  readonly safe_search?: WebSearchSafeSearch;
-  readonly categories?: readonly string[];
+  readonly count?: number | undefined;
+  readonly time_range?: WebSearchTimeRange | undefined;
+  readonly language?: string | undefined;
+  readonly safe_search?: WebSearchSafeSearch | undefined;
+  readonly categories?: readonly string[] | undefined;
 }
 
 export interface WebSearchResultItem {
