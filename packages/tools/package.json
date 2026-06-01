@@ -129,7 +129,7 @@
     "@types/node": "^22.9.0",
     "tsup": "^8.3.5",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.4"
+    "vitest": "^4.1.0"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
