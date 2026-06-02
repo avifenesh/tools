@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import path from "node:path";
 import {
   toolError,
   withFileLock,
@@ -66,6 +67,7 @@ async function executeEdit(
   const preflight = await preflightMutation(ops, session, resolvedPath);
   if ("error" in preflight) return err(preflight.error);
   const { existingContent, existingBytes, previousSha } = preflight;
+  const gateWarnings = preflight.warnings ?? [];
 
   const editResult = applyEdit(existingContent, {
     old_string: params.old_string,
@@ -147,6 +149,7 @@ async function executeEdit(
     });
   }
 
+  const allWarnings = [...gateWarnings, ...editResult.warnings];
   const result: TextWriteResult = {
     kind: "text",
     output: formatEditSuccess({
@@ -155,7 +158,7 @@ async function executeEdit(
       replaceAll: params.replace_all === true,
       bytesBefore: existingBytes.length,
       bytesAfter: newBytes.length,
-      warnings: editResult.warnings,
+      warnings: allWarnings,
     }),
     meta: {
       path: resolvedPath,
@@ -164,9 +167,7 @@ async function executeEdit(
       sha256: newSha,
       mtime_ms: mtime,
       previous_sha256: previousSha,
-      ...(editResult.warnings.length > 0
-        ? { warnings: editResult.warnings }
-        : {}),
+      ...(allWarnings.length > 0 ? { warnings: allWarnings } : {}),
     },
   };
   return result;
@@ -176,6 +177,7 @@ export interface PreflightOk {
   readonly existingContent: string;
   readonly existingBytes: Uint8Array;
   readonly previousSha: string;
+  readonly warnings?: readonly string[];
 }
 
 export interface PreflightErr {
@@ -258,19 +260,38 @@ export async function preflightMutation(
     };
   }
 
+  const currentSha = sha256Hex(bytes);
+  const warnings: string[] = [];
+
+  // Read-before-mutate gate. Fail-open per Read spec D11: when the file has no
+  // ledger entry (never Read this session), don't hard-deny — ask the
+  // permission hook if one is wired, deny only on an explicit deny, otherwise
+  // continue with a warning. STALE_READ stays hard, and only runs when there
+  // *is* a ledger entry to compare against.
   const ledgerEntry = session.ledger?.getLatest(resolvedPath);
   if (!ledgerEntry) {
-    return {
-      error: toolError(
-        "NOT_READ_THIS_SESSION",
-        `File has not been Read in this session: ${resolvedPath}\n\nCall Read on this path first, then retry the edit.`,
-        { meta: { path: resolvedPath } },
-      ),
-    };
-  }
-
-  const currentSha = sha256Hex(bytes);
-  if (ledgerEntry.sha256 !== currentSha) {
+    if (session.permissions.hook !== undefined) {
+      const decision = await session.permissions.hook({
+        tool: "edit",
+        path: resolvedPath,
+        action: "write_unread",
+        always_patterns: [path.dirname(resolvedPath) + "/*"],
+        metadata: { reason: "not_read_this_session" },
+      });
+      if (decision === "deny") {
+        return {
+          error: toolError(
+            "DENIED_BY_HOOK",
+            `Edit of an un-Read file denied by permission hook: ${resolvedPath}`,
+            { meta: { path: resolvedPath } },
+          ),
+        };
+      }
+    }
+    warnings.push(
+      `File was not Read in this session before editing: ${resolvedPath}. Editing blind; prefer Read first so the edit anchors on current content.`,
+    );
+  } else if (ledgerEntry.sha256 !== currentSha) {
     return {
       error: toolError(
         "STALE_READ",
@@ -291,6 +312,7 @@ export async function preflightMutation(
     existingContent: content,
     existingBytes: bytes,
     previousSha: currentSha,
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }
 

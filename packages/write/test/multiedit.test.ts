@@ -109,6 +109,51 @@ describe("multiEdit — dry_run", () => {
   });
 });
 
+describe("multiEdit — read-before-mutate gate (fail-open)", () => {
+  it("edits an un-Read file (no hook): succeeds with a gate warning", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "a.txt", "x\ny\n");
+    const r = await multiEdit(
+      {
+        path: target,
+        edits: [
+          { old_string: "x", new_string: "X" },
+          { old_string: "y", new_string: "Y" },
+        ],
+      },
+      makeSession(dir),
+    );
+    expect(r.kind).toBe("text");
+    if (r.kind !== "text") return;
+    expect(readFileUtf8(target)).toBe("X\nY\n");
+    expect(r.output).toContain("Warning:");
+    expect(r.output).toContain("not Read in this session");
+    expect(r.meta).toHaveProperty("warnings");
+    if (!("warnings" in r.meta)) return;
+    expect(r.meta.warnings?.[0]).toContain("not Read in this session");
+  });
+
+  it("refuses an un-Read file when the permission hook denies", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "a.txt", "x\n");
+    const session = makeSession(dir, {
+      permissions: {
+        roots: [dir],
+        sensitivePatterns: [],
+        hook: async () => "deny",
+      },
+    });
+    const r = await multiEdit(
+      { path: target, edits: [{ old_string: "x", new_string: "X" }] },
+      session,
+    );
+    expect(r.kind).toBe("error");
+    if (r.kind !== "error") return;
+    expect(r.error.code).toBe("DENIED_BY_HOOK");
+    expect(readFileUtf8(target)).toBe("x\n");
+  });
+});
+
 describe("multiEdit — rejects empty edits array", () => {
   it("fails schema validation", async () => {
     const dir = makeTempDir();
