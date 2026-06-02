@@ -1,5 +1,14 @@
 import type { OllamaMessage, OllamaTool, OllamaToolCall } from "./ollama.js";
 import { ollamaChat } from "./ollama.js";
+import { openaiChat } from "./openai.js";
+
+// Chat client selector. The agent loop is transport-agnostic; E2E_BACKEND=openai
+// routes to an OpenAI /v1 server (e.g. local llama.cpp on :8001) instead of
+// Ollama /api/chat. Both return the same OllamaChatResponse shape.
+const chatClient =
+  (process.env.E2E_BACKEND ?? "").toLowerCase() === "openai"
+    ? openaiChat
+    : ollamaChat;
 
 export interface ToolExecutor {
   readonly tool: OllamaTool;
@@ -55,7 +64,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
     if (opts.baseUrl !== undefined) {
       (chatOpts as { baseUrl: string }).baseUrl = opts.baseUrl;
     }
-    const res = await ollamaChat(chatOpts);
+    const res = await chatClient(chatOpts);
     const msg = res.message;
     const calls = msg.tool_calls ?? [];
 

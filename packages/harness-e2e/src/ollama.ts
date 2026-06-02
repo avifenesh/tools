@@ -79,6 +79,13 @@ export async function ollamaModelAvailable(
   model: string,
   baseUrl = "http://localhost:11434",
 ): Promise<boolean> {
+  // When the harness is pointed at an OpenAI /v1 server (E2E_BACKEND=openai,
+  // e.g. local llama.cpp on :8001), probe that surface instead of /api/show.
+  if ((process.env.E2E_BACKEND ?? "").toLowerCase() === "openai") {
+    const { openaiModelAvailable } = await import("./openai.js");
+    const oaiBase = process.env.E2E_OPENAI_BASE_URL ?? "http://127.0.0.1:8001/v1";
+    return openaiModelAvailable(model, oaiBase);
+  }
   try {
     const res = await fetch(`${baseUrl}/api/show`, {
       method: "POST",
