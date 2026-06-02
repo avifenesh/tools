@@ -55,7 +55,6 @@ Non-goals: filename/path search (that is the Glob tool), semantic/AST search, ve
 ### Deliberate omissions
 
 - No `replace_all` / `-r`. This tool is read-only; mutations go through Edit.
-- No `--fixed-strings` flag. If the model wants literal search, it escapes regex metachars. We flag this in the description with an example (`interface\{\}`).
 - No `hidden` or `no_ignore`. The default posture is "respect gitignore, skip hidden." A workspace-level override is a session-config decision, not a per-call parameter — see §6.
 - No `sort_by`. Results in `content` mode are mtime-sorted (newest first, matching Glob and opencode). Results in `files_with_matches` mode are mtime-sorted. `count` is alphabetical by path for stable diffs.
 - No `binary`. Binary files are skipped (rg default); there is no escape hatch at the tool boundary.
@@ -64,7 +63,8 @@ Non-goals: filename/path search (that is the Glob tool), semantic/AST search, ve
 ### Parameter validation
 
 - `pattern` empty → `INVALID_PARAM`: "pattern is required".
-- `pattern` does not compile → `INVALID_REGEX`: surface ripgrep's error verbatim (it already names the offending character).
+- `pattern` does not compile → `INVALID_REGEX`: surface ripgrep's error verbatim (it already names the offending character). The error hint also points to `fixed_strings: true` as the escape-free alternative.
+- `fixed_strings: true` → pattern is passed to ripgrep with `-F` (literal search); the regex compile-probe is skipped (a literal cannot be an invalid regex). Use to search exact strings with metacharacters (`( ) . * { }`) without escaping.
 - `output_mode` unknown → `INVALID_PARAM`: list the three valid values.
 - `context_*` set while `output_mode != "content"` → `INVALID_PARAM`. Context only makes sense for line output; rejecting the combination keeps the surface honest.
 - `head_limit < 0` or `offset < 0` → `INVALID_PARAM`.
@@ -74,7 +74,7 @@ Non-goals: filename/path search (that is the Glob tool), semantic/AST search, ve
 
 Tool description must call out:
 
-> Regex syntax is ripgrep's (Rust `regex` crate). To match literal `{` `}` `(` `)` `[` `]` `.` `*` `+` `?` `|` `^` `$` `\\`, escape them (`interface\\{\\}` to find `interface{}`). By default `.` does not match newlines — set `multiline: true` if your pattern needs to cross lines.
+> Regex syntax is ripgrep's (Rust `regex` crate). To match literal `{` `}` `(` `)` `[` `]` `.` `*` `+` `?` `|` `^` `$` `\\`, escape them (`interface\\{\\}` to find `interface{}`) — or set `fixed_strings: true` to treat the whole pattern as a literal string with no escaping. By default `.` does not match newlines — set `multiline: true` if your pattern needs to cross lines.
 
 Research backing: the Claude Code Grep tool's description carries the same warning because models consistently try `interface{}` on Go code and get zero hits otherwise (see `agent-knowledge/agent-search-tools.md` §"Ripgrep as the Universal Engine").
 

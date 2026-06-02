@@ -23,6 +23,7 @@ export const GrepParamsSchema = v.strictObject({
   output_mode: v.optional(OutputModeSchema),
   case_insensitive: v.optional(v.boolean()),
   multiline: v.optional(v.boolean()),
+  fixed_strings: v.optional(v.boolean()),
   context_before: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(0, "context_before must be >= 0")),
   ),
@@ -125,7 +126,7 @@ export const GREP_TOOL_NAME = "grep";
 export const GREP_TOOL_DESCRIPTION = `Search file contents with a ripgrep-compatible regex and return structured results.
 
 Usage:
-- pattern is required. Regex syntax is ripgrep's (Rust regex). Escape literal metacharacters: use 'interface\\\\{\\\\}' to match 'interface{}'. '.' does not match newlines unless multiline: true.
+- pattern is required. Regex syntax is ripgrep's (Rust regex). Escape literal metacharacters: use 'interface\\\\{\\\\}' to match 'interface{}'. '.' does not match newlines unless multiline: true. To search an EXACT string with regex metacharacters like ( ) . * { } treated as plain text, set fixed_strings: true instead of escaping (e.g. fixed_strings: true with pattern foo(bar) or a.b.c).
 - path defaults to the session cwd. Absolute paths preferred; relative paths resolve against cwd.
 - Filter by the 'glob' parameter (e.g. '*.ts', '*.{js,tsx}') or by 'type' (e.g. 'js', 'py', 'rust'). 'type' takes ONE name only — for multiple extensions, use 'glob' with a brace list like '*.{ts,tsx,js}'. 'type' is more efficient for standard languages.
 - Default output_mode is 'files_with_matches' — cheap path-only results. Use this first to decide whether to pay for content.
@@ -174,6 +175,11 @@ export const grepToolDefinition: ToolDefinition = {
         type: "boolean",
         description:
           "Allow . to match newlines and patterns to cross lines. Default false.",
+      },
+      fixed_strings: {
+        type: "boolean",
+        description:
+          "Treat pattern as an exact literal string, not a regex (ripgrep -F). Use to search strings with metacharacters like ( ) . * { } as plain text without escaping. Default false.",
       },
       context_before: {
         type: "integer",
