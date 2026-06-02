@@ -5,13 +5,18 @@ export function formatWriteSuccess(opts: {
   created: boolean;
   bytesBefore: number;
   bytesAfter: number;
+  warnings?: readonly string[];
 }): string {
   const { path, created, bytesBefore, bytesAfter } = opts;
   const header = `<path>${path}</path>`;
   const summary = created
     ? `Wrote ${bytesAfter} bytes to ${path}`
     : `Overwrote ${path} (was ${bytesBefore} bytes, now ${bytesAfter} bytes, ${deltaStr(bytesBefore, bytesAfter)})`;
-  return `${header}\n<result>\n${summary}\n</result>`;
+  const lines = [summary];
+  if (opts.warnings && opts.warnings.length > 0) {
+    for (const w of opts.warnings) lines.push(`Warning: ${w}`);
+  }
+  return `${header}\n<result>\n${lines.join("\n")}\n</result>`;
 }
 
 export function formatEditSuccess(opts: {

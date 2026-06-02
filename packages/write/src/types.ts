@@ -83,6 +83,7 @@ export interface WriteMeta {
   readonly mtime_ms: number;
   readonly created: boolean;
   readonly previous_sha256?: string;
+  readonly warnings?: readonly string[];
 }
 
 export interface EditMeta {

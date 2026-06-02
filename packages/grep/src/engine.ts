@@ -123,6 +123,7 @@ function buildArgs(input: GrepEngineInput, jsonMode: boolean): string[] {
   }
   if (input.caseInsensitive) args.push("-i");
   if (input.multiline) args.push("-U", "--multiline-dotall");
+  if (input.fixedStrings) args.push("-F");
   if (input.type) args.push(`--type=${input.type}`);
   if (input.glob) args.push(`--glob=${input.glob}`);
   if (!input.countOnly) {

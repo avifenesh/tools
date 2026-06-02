@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import path from "node:path";
 import {
   toolError,
   withFileLock,
@@ -65,6 +66,7 @@ async function executeWrite(
   const exists = stat !== undefined && stat.type === "file";
   let previousSha: string | undefined;
   let previousBytes = 0;
+  let gateWarning: string | undefined;
 
   if (stat !== undefined && stat.type === "directory") {
     return err(
@@ -90,17 +92,32 @@ async function executeWrite(
     previousBytes = existingBytes.length;
     previousSha = sha256Hex(existingBytes);
 
+    // Read-before-overwrite gate. Fail-open per Read spec D11: when the file
+    // has no ledger entry, don't hard-deny — ask the permission hook if one is
+    // wired, deny only on an explicit deny, otherwise overwrite with a
+    // warning. STALE_READ stays hard and only runs when a ledger entry exists.
     const ledgerEntry = session.ledger?.getLatest(resolvedPath);
     if (!ledgerEntry) {
-      return err(
-        toolError(
-          "NOT_READ_THIS_SESSION",
-          `Write refuses to overwrite a file that has not been Read in this session: ${resolvedPath}\n\nCall Read on this path first, then retry Write.`,
-          { meta: { path: resolvedPath } },
-        ),
-      );
-    }
-    if (ledgerEntry.sha256 !== previousSha) {
+      if (session.permissions.hook !== undefined) {
+        const decision = await session.permissions.hook({
+          tool: "write",
+          path: resolvedPath,
+          action: "write_unread",
+          always_patterns: [path.dirname(resolvedPath) + "/*"],
+          metadata: { reason: "not_read_this_session" },
+        });
+        if (decision === "deny") {
+          return err(
+            toolError(
+              "DENIED_BY_HOOK",
+              `Overwrite of an un-Read file denied by permission hook: ${resolvedPath}`,
+              { meta: { path: resolvedPath } },
+            ),
+          );
+        }
+      }
+      gateWarning = `File was not Read in this session before overwriting: ${resolvedPath}. Overwriting blind; prefer Read first so you don't discard unseen changes.`;
+    } else if (ledgerEntry.sha256 !== previousSha) {
       return err(
         toolError(
           "STALE_READ",
@@ -180,11 +197,13 @@ async function executeWrite(
     });
   }
 
+  const warnings = gateWarning !== undefined ? [gateWarning] : [];
   const output = formatWriteSuccess({
     path: resolvedPath,
     created: !exists,
     bytesBefore: previousBytes,
     bytesAfter: bytes.length,
+    warnings,
   });
 
   const result: TextWriteResult = {
@@ -197,6 +216,7 @@ async function executeWrite(
       mtime_ms: mtime,
       created: !exists,
       ...(previousSha !== undefined ? { previous_sha256: previousSha } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
     },
   };
   return result;

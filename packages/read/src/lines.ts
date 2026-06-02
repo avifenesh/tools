@@ -1,4 +1,6 @@
 import { Buffer } from "node:buffer";
+import readline from "node:readline";
+import { Readable } from "node:stream";
 import type { ReadOperations } from "@agent-sh/harness-core";
 import {
   MAX_BYTES,
@@ -27,6 +29,48 @@ export async function streamLines(
   path: string,
   opts: StreamLinesOptions,
 ): Promise<StreamLinesResult> {
+  const signalOpt: { signal?: AbortSignal } = {};
+  if (opts.signal !== undefined) signalOpt.signal = opts.signal;
+
+  const iter = ops.openLineStream(path, signalOpt);
+  return consumeLines(iter, opts);
+}
+
+/**
+ * Same line-oriented contract as {@link streamLines}, but sourced from bytes
+ * already held in memory instead of a fresh filesystem read. Lets a caller
+ * that has read the file once (e.g. for hashing) reuse those bytes for line
+ * content without a second OS read. Uses Node's own readline over an in-memory
+ * Readable so CRLF stripping, trailing-newline, and empty-file semantics match
+ * {@link ReadOperations.openLineStream} exactly.
+ */
+export async function streamLinesFromBytes(
+  bytes: Uint8Array,
+  opts: StreamLinesOptions,
+): Promise<StreamLinesResult> {
+  const str = Buffer.from(bytes).toString("utf8");
+  const rl = readline.createInterface({
+    input: Readable.from([str]),
+    crlfDelay: Infinity,
+  });
+  const signal = opts.signal;
+  const iter: AsyncIterableIterator<string> = (async function* () {
+    try {
+      for await (const line of rl) {
+        if (signal?.aborted) break;
+        yield line;
+      }
+    } finally {
+      rl.close();
+    }
+  })();
+  return consumeLines(iter, opts);
+}
+
+async function consumeLines(
+  iter: AsyncIterable<string>,
+  opts: StreamLinesOptions,
+): Promise<StreamLinesResult> {
   const maxBytes = opts.maxBytes ?? MAX_BYTES;
   const maxLineLen = opts.maxLineLength ?? MAX_LINE_LENGTH;
   const start = opts.offset - 1;
@@ -36,11 +80,6 @@ export async function streamLines(
   let totalLines = 0;
   let more = false;
   let byteCap = false;
-
-  const signalOpt: { signal?: AbortSignal } = {};
-  if (opts.signal !== undefined) signalOpt.signal = opts.signal;
-
-  const iter = ops.openLineStream(path, signalOpt);
 
   for await (const raw of iter) {
     totalLines += 1;

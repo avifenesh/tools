@@ -204,6 +204,30 @@ describe("grep — regex + error surfaces", () => {
     expect(r.error.message).toMatch(/escape literal regex|regex parse/i);
   });
 
+  it("fixed_strings: true searches a metacharacter pattern verbatim instead of raising INVALID_REGEX", async () => {
+    const dir = makeTempDir();
+    write(dir, "a.go", "type Foo interface{}\n");
+    const r = await grep(
+      { pattern: "interface{}", fixed_strings: true },
+      makeSession(dir),
+    );
+    assertKind(r, "files_with_matches");
+    expect(r.paths.some((p) => p.endsWith("/a.go"))).toBe(true);
+  });
+
+  it("fixed_strings: true treats '.' as a literal, not a wildcard", async () => {
+    const dir = makeTempDir();
+    write(dir, "a.ts", "aXb\na.b\n");
+    const r = await grep(
+      { pattern: "a.b", fixed_strings: true, output_mode: "content" },
+      makeSession(dir),
+    );
+    assertKind(r, "content");
+    expect(r.output).toContain("a.b");
+    expect(r.output).not.toContain("aXb");
+    expect(r.meta.totalMatches).toBe(1);
+  });
+
   it("returns NOT_FOUND for a missing path", async () => {
     const dir = makeTempDir();
     const r = await grep(

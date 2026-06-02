@@ -42,6 +42,7 @@ interface NormalizedParams {
   readonly outputMode: "files_with_matches" | "content" | "count";
   readonly caseInsensitive: boolean;
   readonly multiline: boolean;
+  readonly fixedStrings: boolean;
   readonly contextBefore: number;
   readonly contextAfter: number;
   readonly headLimit: number;
@@ -68,6 +69,7 @@ function normalizeParams(p: GrepParams): NormalizedParams | ToolError {
     outputMode,
     caseInsensitive: p.case_insensitive ?? false,
     multiline: p.multiline ?? false,
+    fixedStrings: p.fixed_strings ?? false,
     contextBefore,
     contextAfter,
     headLimit: p.head_limit ?? DEFAULT_HEAD_LIMIT,
@@ -91,6 +93,7 @@ function engineInput(
     ...(n.type !== undefined ? { type: n.type } : {}),
     ...(n.caseInsensitive ? { caseInsensitive: true } : {}),
     ...(n.multiline ? { multiline: true } : {}),
+    ...(n.fixedStrings ? { fixedStrings: true } : {}),
     ...(n.contextBefore > 0 ? { contextBefore: n.contextBefore } : {}),
     ...(n.contextAfter > 0 ? { contextAfter: n.contextAfter } : {}),
   };
@@ -160,15 +163,20 @@ export async function grep(
     );
   }
 
-  const compile = await compileProbe(normed.pattern);
-  if (!compile.ok) {
-    return err(
-      toolError(
-        "INVALID_REGEX",
-        `${compile.message}\n\nHint: escape literal regex metacharacters (e.g. 'interface\\{\\}' for 'interface{}'), or use a character class. '.' does not match newlines unless multiline: true.`,
-        { meta: { pattern: normed.pattern } },
-      ),
-    );
+  // A literal string (fixed_strings) cannot be invalid regex, so skip the
+  // probe; otherwise a pattern like 'interface{}' would be wrongly rejected
+  // as INVALID_REGEX even though -F searches it verbatim.
+  if (!normed.fixedStrings) {
+    const compile = await compileProbe(normed.pattern);
+    if (!compile.ok) {
+      return err(
+        toolError(
+          "INVALID_REGEX",
+          `${compile.message}\n\nHint: escape literal regex metacharacters (e.g. 'interface\\{\\}' for 'interface{}'), or use a character class. '.' does not match newlines unless multiline: true.`,
+          { meta: { pattern: normed.pattern } },
+        ),
+      );
+    }
   }
 
   const { signal, cancel, timedOut } = withTimeout(session);

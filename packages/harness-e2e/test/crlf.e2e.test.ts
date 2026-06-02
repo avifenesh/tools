@@ -68,15 +68,15 @@ describe(`CRLF e2e [${LABEL}]`, () => {
   });
 
   // CRLF fixture. Real-world scenario: a file authored on Windows lands in
-  // the tree and the model has to edit a line. The engine normalizes CRLF
-  // to LF on both sides (per spec §5.1). We assert:
+  // the tree and the model has to edit a line. The engine matches on
+  // LF-normalized text (per spec §5.1) but re-applies the file's original
+  // CRLF style on write, so a Windows file stays Windows. We assert:
   //   1. The model successfully edits despite CRLF line endings.
   //   2. The edit applied correctly at the targeted line.
-  //   3. Post-edit the file has no stray CR bytes (\r), because the spec
-  //      normalizes to LF. If the engine ever regresses and leaves mixed
-  //      endings, this test catches it.
+  //   3. Post-edit the file still uses CRLF (CR bytes preserved). If the
+  //      engine ever regresses and flattens to LF, this test catches it.
   it.runIf(() => available)(
-    "edits a CRLF file; output is LF-terminated and content is correct",
+    "edits a CRLF file; content is correct and CRLF endings are preserved",
     async () => {
       const root = mkRoot();
       const target = path.join(root, "win.txt");
@@ -131,10 +131,16 @@ describe(`CRLF e2e [${LABEL}]`, () => {
       // Correctness: the edit landed.
       expect(post).toContain("BRAVO");
       expect(post).not.toContain("bravo");
-      // Engine contract §5.1: no stray CR bytes after edit.
-      expect(postBytes.includes(0x0d)).toBe(false);
-      // Other lines are intact.
-      expect(post.split("\n")).toEqual(["alpha", "BRAVO", "charlie", "delta", ""]);
+      // Engine contract §5.1: CRLF style preserved — CR bytes survive.
+      expect(postBytes.includes(0x0d)).toBe(true);
+      // Other lines are intact, and the file splits cleanly on CRLF.
+      expect(post.split("\r\n")).toEqual([
+        "alpha",
+        "BRAVO",
+        "charlie",
+        "delta",
+        "",
+      ]);
     },
     300_000,
   );

@@ -66,17 +66,63 @@ describe("write — create new file", () => {
   });
 });
 
-describe("write — overwrite existing file", () => {
-  it("refuses to overwrite a file that has not been Read", async () => {
+describe("write — overwrite existing file (fail-open gate)", () => {
+  it("overwrites an un-Read file (no hook): succeeds with a warning", async () => {
     const dir = makeTempDir();
     const target = writeFixture(dir, "existing.txt", "old content\n");
     const r = await write(
       { path: target, content: "new content\n" },
       makeSession(dir),
     );
+    expect(r.kind).toBe("text");
+    if (r.kind !== "text") return;
+    expect(readFileUtf8(target)).toBe("new content\n");
+    expect(r.meta.created).toBe(false);
+    // Warning surfaces in output and meta.
+    expect(r.output).toContain("Warning:");
+    expect(r.output).toContain("not Read in this session");
+    expect(r.meta).toHaveProperty("warnings");
+    expect(r.meta.warnings?.[0]).toContain("not Read in this session");
+  });
+
+  it("overwrites an un-Read file when the permission hook allows", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "existing.txt", "old content\n");
+    const session = makeSession(dir, {
+      permissions: {
+        roots: [dir],
+        sensitivePatterns: [],
+        hook: async () => "allow",
+      },
+    });
+    const r = await write(
+      { path: target, content: "new content\n" },
+      session,
+    );
+    expect(r.kind).toBe("text");
+    if (r.kind !== "text") return;
+    expect(readFileUtf8(target)).toBe("new content\n");
+  });
+
+  it("refuses to overwrite an un-Read file when the permission hook denies", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "existing.txt", "old content\n");
+    const session = makeSession(dir, {
+      permissions: {
+        roots: [dir],
+        sensitivePatterns: [],
+        hook: async () => "deny",
+      },
+    });
+    const r = await write(
+      { path: target, content: "new content\n" },
+      session,
+    );
     expect(r.kind).toBe("error");
     if (r.kind !== "error") return;
-    expect(r.error.code).toBe("NOT_READ_THIS_SESSION");
+    expect(r.error.code).toBe("DENIED_BY_HOOK");
+    // File is untouched on a deny.
+    expect(readFileUtf8(target)).toBe("old content\n");
   });
 
   it("refuses when ledger sha is stale", async () => {

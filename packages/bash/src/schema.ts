@@ -159,7 +159,7 @@ export const BASH_TOOL_DESCRIPTION = `Run a single shell command in a bash subpr
 Usage:
 - 'cd' carries over to subsequent calls if it stays inside the workspace; otherwise the cwd is reset. Environment variables do NOT persist across calls — set them inline (FOO=bar some-cmd) or via 'env'.
 - For non-shell code, use language one-liners: 'python -c "print(2+2)"', 'node -e "console.log(2+2)"', 'deno eval "console.log(2+2)"'. For multi-line scripts, write a temp file with the write tool and invoke the interpreter on it.
-- Long-running processes (servers, watchers) MUST use background: true. The tool returns a job_id; poll output with bash_output(job_id). Do not leave a foreground command running past the 5-minute wall-clock backstop.
+- Long-running processes (servers, watchers) and network requests (curl/wget) that may stall MUST use background: true, OR pass an explicit client-side timeout (e.g. curl --max-time N). The tool returns a job_id; poll output with bash_output(job_id). Do not leave a foreground command running past the 5-minute wall-clock backstop.
 - No interactive commands. Anything that needs stdin (pagers, Y/n prompts, REPLs, 'git commit' without -m) will hang until the inactivity timeout. Use flags to make commands non-interactive (--yes, -y, --no-pager) or pipe 'echo "y" |' in front.
 - Inactivity timeout resets on any output; default 60000 ms. Override with timeout_ms. Wall-clock backstop is 5 minutes for foreground calls.
 - Prefer this tool over other ways of running shell commands. For filename search prefer 'glob'; for content search prefer 'grep'.`;

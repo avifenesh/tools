@@ -20,7 +20,7 @@
  */
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type, type Static, type TSchema } from "typebox";
-import { formatToolError, type PermissionPolicy, type ToolError } from "@agent-sh/harness-core";
+import { formatToolError, InMemoryLedger, type Ledger, type PermissionPolicy, type ToolError } from "@agent-sh/harness-core";
 
 // Tool functions + their definitions (for description text) + session types.
 import {
@@ -180,6 +180,12 @@ const GrepParams = Type.Object({
   ),
   case_insensitive: Type.Optional(Type.Boolean()),
   multiline: Type.Optional(Type.Boolean()),
+  fixed_strings: Type.Optional(
+    Type.Boolean({
+      description:
+        "Treat pattern as an exact literal string, not a regex (ripgrep -F). Use to search strings with metacharacters like ( ) . * { } as plain text without escaping. Default false.",
+    }),
+  ),
   context_before: Type.Optional(Type.Integer()),
   context_after: Type.Optional(Type.Integer()),
   context: Type.Optional(Type.Integer()),
@@ -287,11 +293,11 @@ function withSignal<T extends object>(base: T, signal?: AbortSignal): T {
   return signal ? { ...base, signal } : base;
 }
 
-function readSession(cwd: string, signal?: AbortSignal): ReadSessionConfig {
-  return withSignal({ cwd, permissions: fsPermissions(cwd) }, signal);
+function readSession(cwd: string, ledger: Ledger, signal?: AbortSignal): ReadSessionConfig {
+  return withSignal({ cwd, permissions: fsPermissions(cwd), ledger }, signal);
 }
-function writeSession(cwd: string, signal?: AbortSignal): WriteSessionConfig {
-  return withSignal({ cwd, permissions: fsPermissions(cwd) }, signal);
+function writeSession(cwd: string, ledger: Ledger, signal?: AbortSignal): WriteSessionConfig {
+  return withSignal({ cwd, permissions: fsPermissions(cwd), ledger }, signal);
 }
 function grepSession(cwd: string, signal?: AbortSignal): GrepSessionConfig {
   return withSignal({ cwd, permissions: fsPermissions(cwd) }, signal);
@@ -362,6 +368,12 @@ function websearchSession(signal?: AbortSignal): WebSearchSessionConfig {
 // ---------------------------------------------------------------------------
 
 export default function harnessToolsExtension(pi: ExtensionAPI): void {
+  // Single per-process ledger shared by read + write/edit/multiedit so the
+  // read-before-edit gate composes (Read records here; Edit/Write read it back).
+  // harnessToolsExtension runs once at module load; the register() closures
+  // capture this instance for the whole pi process.
+  const ledger = new InMemoryLedger();
+
   const register = <T extends TSchema>(
     name: string,
     label: string,
@@ -387,19 +399,19 @@ export default function harnessToolsExtension(pi: ExtensionAPI): void {
   };
 
   register("read", "Read", readToolDefinition.description, ReadParams, (p, cwd, signal) =>
-    read(p, readSession(cwd, signal)),
+    read(p, readSession(cwd, ledger, signal)),
   );
 
   register("write", "Write", writeToolDefinition.description, WriteParams, (p, cwd, signal) =>
-    write(p, writeSession(cwd, signal)),
+    write(p, writeSession(cwd, ledger, signal)),
   );
 
   register("edit", "Edit", editToolDefinition.description, EditParams, (p, cwd, signal) =>
-    edit(p, writeSession(cwd, signal)),
+    edit(p, writeSession(cwd, ledger, signal)),
   );
 
   register("multiedit", "MultiEdit", multieditToolDefinition.description, MultiEditParams, (p, cwd, signal) =>
-    multiEdit(p, writeSession(cwd, signal)),
+    multiEdit(p, writeSession(cwd, ledger, signal)),
   );
 
   register("grep", "Grep", grepToolDefinition.description, GrepParams, (p, cwd, signal) =>

@@ -29,17 +29,64 @@ describe("edit — golden path", () => {
   });
 });
 
-describe("edit — ledger gate", () => {
-  it("refuses without a Read", async () => {
+describe("edit — read-before-mutate gate (fail-open)", () => {
+  it("edits an un-Read file (no hook): succeeds with a warning, applies change", async () => {
     const dir = makeTempDir();
     const target = writeFixture(dir, "a.txt", "hi\n");
     const r = await edit(
       { path: target, old_string: "hi", new_string: "bye" },
       makeSession(dir),
     );
+    expect(r.kind).toBe("text");
+    if (r.kind !== "text") return;
+    // The change lands despite no prior Read.
+    expect(readFileUtf8(target)).toBe("bye\n");
+    // The warning surfaces in both output and meta (it's model-facing).
+    expect(r.output).toContain("Warning:");
+    expect(r.output).toContain("not Read in this session");
+    expect(r.meta).toHaveProperty("warnings");
+    if (!("warnings" in r.meta)) return;
+    expect(r.meta.warnings?.[0]).toContain("not Read in this session");
+  });
+
+  it("edits an un-Read file when the permission hook allows", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "a.txt", "hi\n");
+    const session = makeSession(dir, {
+      permissions: {
+        roots: [dir],
+        sensitivePatterns: [],
+        hook: async () => "allow",
+      },
+    });
+    const r = await edit(
+      { path: target, old_string: "hi", new_string: "bye" },
+      session,
+    );
+    expect(r.kind).toBe("text");
+    if (r.kind !== "text") return;
+    expect(readFileUtf8(target)).toBe("bye\n");
+  });
+
+  it("refuses an un-Read file when the permission hook denies", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "a.txt", "hi\n");
+    const session = makeSession(dir, {
+      permissions: {
+        roots: [dir],
+        sensitivePatterns: [],
+        hook: async () => "deny",
+      },
+    });
+    const r = await edit(
+      { path: target, old_string: "hi", new_string: "bye" },
+      session,
+    );
     expect(r.kind).toBe("error");
     if (r.kind !== "error") return;
-    expect(r.error.code).toBe("NOT_READ_THIS_SESSION");
+    expect(r.error.code).toBe("DENIED_BY_HOOK");
+    // File is untouched on a deny.
+    expect(readFileUtf8(target)).toBe("hi\n");
   });
 
   it("refuses stale reads", async () => {
@@ -170,7 +217,7 @@ describe("edit — dry_run", () => {
 });
 
 describe("edit — CRLF normalization", () => {
-  it("matches LF old_string against CRLF content and preserves LF in output", async () => {
+  it("matches LF old_string against CRLF content and preserves CRLF in output", async () => {
     const dir = makeTempDir();
     const target = writeFixture(dir, "win.txt", "a\r\nb\r\nc\r\n");
     const session = makeSession(dir);
@@ -180,7 +227,8 @@ describe("edit — CRLF normalization", () => {
       session,
     );
     expect(r.kind).toBe("text");
-    expect(readFileUtf8(target)).toBe("a\nB\nc\n");
+    // CRLF style survives: the on-disk file is still Windows-terminated.
+    expect(readFileUtf8(target)).toBe("a\r\nB\r\nc\r\n");
   });
 });
 

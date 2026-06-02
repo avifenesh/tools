@@ -69,6 +69,7 @@ async function executeMultiEdit(
   const preflight = await preflightMutation(ops, session, resolvedPath);
   if ("error" in preflight) return err(preflight.error);
   const { existingContent, existingBytes, previousSha } = preflight;
+  const gateWarnings = preflight.warnings ?? [];
 
   const edits: EditSpec[] = params.edits.map((e) => ({
     old_string: e.old_string,
@@ -152,6 +153,7 @@ async function executeMultiEdit(
     });
   }
 
+  const allWarnings = [...gateWarnings, ...pipelineResult.warnings];
   const result: TextWriteResult = {
     kind: "text",
     output: formatMultiEditSuccess({
@@ -160,7 +162,7 @@ async function executeMultiEdit(
       totalReplacements: pipelineResult.totalReplacements,
       bytesBefore: existingBytes.length,
       bytesAfter: newBytes.length,
-      warnings: pipelineResult.warnings,
+      warnings: allWarnings,
     }),
     meta: {
       path: resolvedPath,
@@ -170,9 +172,7 @@ async function executeMultiEdit(
       sha256: newSha,
       mtime_ms: mtime,
       previous_sha256: previousSha,
-      ...(pipelineResult.warnings.length > 0
-        ? { warnings: pipelineResult.warnings }
-        : {}),
+      ...(allWarnings.length > 0 ? { warnings: allWarnings } : {}),
     },
   };
   return result;

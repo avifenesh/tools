@@ -14,6 +14,7 @@ export interface GrepParams {
   readonly output_mode?: GrepOutputMode | undefined;
   readonly case_insensitive?: boolean | undefined;
   readonly multiline?: boolean | undefined;
+  readonly fixed_strings?: boolean | undefined;
   readonly context_before?: number | undefined;
   readonly context_after?: number | undefined;
   readonly context?: number | undefined;
@@ -32,6 +33,7 @@ export interface GrepEngineInput {
   readonly type?: string;
   readonly caseInsensitive?: boolean;
   readonly multiline?: boolean;
+  readonly fixedStrings?: boolean;
   readonly contextBefore?: number;
   readonly contextAfter?: number;
   readonly maxColumns: number;

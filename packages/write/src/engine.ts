@@ -5,7 +5,7 @@ import {
   findFuzzyCandidates,
   substringBoundaryCollisions,
 } from "./matching.js";
-import { normalizeLineEndings } from "./normalize.js";
+import { detectEol, normalizeLineEndings, restoreLineEndings } from "./normalize.js";
 import {
   formatFuzzyCandidates,
   formatMatchLocations,
@@ -24,11 +24,14 @@ export interface ApplyResult {
  * feeding the result into the next edit when in a MultiEdit pipeline.
  *
  * Matching algorithm is the spec's §5.1:
+ *   - detect the file's line-ending style (CRLF vs LF) on the raw content
  *   - normalize CRLF→LF on both haystack and needle
  *   - exact substring search
  *   - 0 matches + fuzzy candidates → OLD_STRING_NOT_FOUND
  *   - ≥2 matches + replace_all false → OLD_STRING_NOT_UNIQUE
  *   - apply; on replace_all, collect substring-boundary warnings
+ *   - re-apply the original line-ending style to the returned content so a
+ *     CRLF file stays CRLF on disk (matching still happens on LF text)
  */
 export function applyEdit(
   content: string,
@@ -44,6 +47,7 @@ export function applyEdit(
     );
   }
 
+  const originalEol = detectEol(content);
   const normalizedContent = normalizeLineEndings(content);
   const normalizedOld = normalizeLineEndings(oldRaw);
   const normalizedNew = normalizeLineEndings(newRaw);
@@ -108,7 +112,7 @@ export function applyEdit(
   );
 
   return {
-    content: newContent,
+    content: restoreLineEndings(newContent, originalEol),
     replacements: targetOffsets.length,
     warnings,
   };

@@ -79,13 +79,24 @@ describe("engine — applyEdit", () => {
     expect(r.code).toBe("EMPTY_FILE");
   });
 
-  it("normalizes CRLF on both needle and haystack", () => {
+  it("matches on LF but preserves CRLF line endings in the output", () => {
     const r = applyEdit("a\r\nb\r\nc\r\n", {
       old_string: "b\nc",
       new_string: "B\nC",
     });
     if ("code" in r) throw new Error(`unexpected error: ${r.code}`);
+    // Needle uses LF; haystack is CRLF; the file's CRLF style survives.
+    expect(r.content).toBe("a\r\nB\r\nC\r\n");
+  });
+
+  it("keeps LF files LF (no stray CR introduced)", () => {
+    const r = applyEdit("a\nb\nc\n", {
+      old_string: "b\nc",
+      new_string: "B\nC",
+    });
+    if ("code" in r) throw new Error(`unexpected error: ${r.code}`);
     expect(r.content).toBe("a\nB\nC\n");
+    expect(r.content).not.toContain("\r");
   });
 });
 

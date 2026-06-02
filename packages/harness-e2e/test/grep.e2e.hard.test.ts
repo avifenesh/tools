@@ -371,6 +371,70 @@ describe(`grep e2e hard [${LABEL}]`, () => {
     600_000,
   );
 
+  // G3b: fixed_strings — exact literal with parens. Model should set
+  // fixed_strings: true OR escape the parens (accept either, like G3 accepts
+  // escape-or-recover). Stochastic across small models, so wrapped in pass@k.
+  it.runIf(() => available)(
+    "G3b fixed-strings: finds literal 'format(msg)' via fixed_strings or escaped parens",
+    async () => {
+      const r = await passAtK({
+        n: 3,
+        k: 2,
+        label: "G3b",
+        run: async () => {
+          const root = mkRoot();
+          writeFile(
+            root,
+            "src/log.ts",
+            "export function info(msg) {\n  logger.info(format(msg));\n}\n",
+          );
+          writeFile(
+            root,
+            "src/other.ts",
+            "export function warn(msg) {\n  logger.info(msg);\n}\n",
+          );
+
+          const tools = [pickGrepExecutor(makeSession(root))];
+          const { trace, onTrace } = collectTrace();
+
+          const res = await runE2E(
+            runOpts(
+              SYSTEM_PROMPT,
+              `In ${root}, find the file containing the exact literal text 'format(msg)', including the parentheses. Tell me which file(s) contain it.`,
+              tools,
+              8,
+              onTrace,
+            ),
+          );
+
+          // Accept either approach: fixed_strings: true, or an escaped-parens
+          // regex pattern (\\( … \\)). Mirrors G3's escape-or-recover policy.
+          const usedFixedOrEscaped = someCall(trace, (a) => {
+            if (a.fixed_strings === true) return true;
+            const p = typeof a.pattern === "string" ? a.pattern : "";
+            return /\\\(/.test(p) || /\\\)/.test(p);
+          });
+          const mentionsLog = /log\.ts/.test(res.finalContent);
+          const skipsOther = !/other\.ts/.test(res.finalContent);
+          return {
+            ok: usedFixedOrEscaped && mentionsLog && skipsOther,
+            detail: {
+              turns: trace.turns,
+              seq: trace.toolSeq,
+              grepArgs: grepCallsIn(trace).map((a) => ({
+                pattern: a.pattern,
+                fixed_strings: a.fixed_strings,
+              })),
+              final: res.finalContent.slice(0, 200),
+            },
+          };
+        },
+      });
+      expect(r.successes).toBeGreaterThanOrEqual(2);
+    },
+    600_000,
+  );
+
   // G4: Bash-decoy — shell is available but grep is the correct tool.
   it.runIf(() => available)(
     "G4 bash-decoy: prefers grep over shell for content search",
