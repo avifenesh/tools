@@ -21,7 +21,7 @@ import {
   formatDirectory,
   formatText,
 } from "./format.js";
-import { streamLines } from "./lines.js";
+import { streamLinesFromBytes } from "./lines.js";
 import { safeParseReadParams } from "./schema.js";
 import { suggestSiblings } from "./suggest.js";
 import type {
@@ -102,12 +102,6 @@ async function fencePath(
     permissions.bypassWorkspaceGuard !== true &&
     permissions.hook === undefined
   ) {
-    if (process.env.E2E_DEBUG_PERMISSIONS) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `[read fencePath] OUTSIDE_WORKSPACE reject: resolvedPath=${JSON.stringify(resolvedPath)} roots=${JSON.stringify(permissions.roots)}`,
-      );
-    }
     return toolError(
       "OUTSIDE_WORKSPACE",
       `Path is outside all configured workspace roots: ${resolvedPath}`,
@@ -327,6 +321,9 @@ async function readText(
     }
   }
 
+  const bytes = await ops.readFile(resolvedPath);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+
   const lineStreamOpts: {
     offset: number;
     limit: number;
@@ -339,7 +336,7 @@ async function readText(
     lineStreamOpts.maxLineLength = session.maxLineLength;
   if (session.signal !== undefined) lineStreamOpts.signal = session.signal;
 
-  const result = await streamLines(ops, resolvedPath, lineStreamOpts);
+  const result = await streamLinesFromBytes(bytes, lineStreamOpts);
 
   if (result.totalLines > 0 && offset > result.totalLines) {
     return err(
@@ -350,9 +347,6 @@ async function readText(
       ),
     );
   }
-
-  const bytes = await ops.readFile(resolvedPath);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
 
   const output = formatText({
     path: resolvedPath,

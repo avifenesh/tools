@@ -14,7 +14,7 @@ export {
   isImageMime,
   isPdfMime,
 } from "./binary.js";
-export { streamLines } from "./lines.js";
+export { streamLines, streamLinesFromBytes } from "./lines.js";
 export { suggestSiblings } from "./suggest.js";
 export { formatText, formatDirectory, formatAttachment } from "./format.js";
 export {
