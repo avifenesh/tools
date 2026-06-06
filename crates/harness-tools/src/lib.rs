@@ -5,13 +5,14 @@
 //! and explicit:
 //!
 //! ```no_run
-//! use harness_tools::{read, bash, grep};
+//! use harness_tools::{read, bash, batch, grep};
 //! # fn main() {}
 //! ```
 //!
 //! If you only need one tool, depend on its individual crate directly
 //! (e.g. `harness-read`) to cut compile time.
 
+pub use harness_batch as batch;
 pub use harness_bash as bash;
 pub use harness_core as core;
 pub use harness_glob as glob;

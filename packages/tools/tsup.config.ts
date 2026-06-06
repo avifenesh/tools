@@ -9,6 +9,7 @@ export default defineConfig({
     grep: "src/grep.ts",
     glob: "src/glob.ts",
     bash: "src/bash.ts",
+    batch: "src/batch.ts",
     webfetch: "src/webfetch.ts",
     websearch: "src/websearch.ts",
     lsp: "src/lsp.ts",

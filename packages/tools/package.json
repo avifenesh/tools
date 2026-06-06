@@ -68,6 +68,11 @@
       "import": "./dist/bash.js",
       "require": "./dist/bash.cjs"
     },
+    "./batch": {
+      "types": "./dist/batch.d.ts",
+      "import": "./dist/batch.js",
+      "require": "./dist/batch.cjs"
+    },
     "./webfetch": {
       "types": "./dist/webfetch.d.ts",
       "import": "./dist/webfetch.js",
@@ -122,6 +127,7 @@
     "@agent-sh/harness-websearch": "workspace:*",
     "@agent-sh/harness-lsp": "workspace:*",
     "@agent-sh/harness-skill": "workspace:*",
+    "@agent-sh/harness-batch": "workspace:*",
     "typebox": "1.1.37"
   },
   "devDependencies": {
