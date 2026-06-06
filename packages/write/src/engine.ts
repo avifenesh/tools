@@ -3,6 +3,9 @@ import {
   buildMatchLocations,
   findAllOccurrences,
   findFuzzyCandidates,
+  lineOfOffset,
+  mapStrippedOffsetToOriginal,
+  stripLineWhitespace,
   substringBoundaryCollisions,
 } from "./matching.js";
 import { detectEol, normalizeLineEndings, restoreLineEndings } from "./normalize.js";
@@ -59,7 +62,18 @@ export function applyEdit(
     );
   }
 
-  const offsets = findAllOccurrences(normalizedContent, normalizedOld);
+  // When ignore_whitespace is true, strip leading/trailing whitespace from
+  // each line for matching, then map offsets back to the original content.
+  const ignoreWhitespace = edit.ignore_whitespace === true;
+  let searchHaystack = normalizedContent;
+  let searchNeedle = normalizedOld;
+
+  if (ignoreWhitespace) {
+    searchHaystack = stripLineWhitespace(normalizedContent);
+    searchNeedle = stripLineWhitespace(normalizedOld);
+  }
+
+  const offsets = findAllOccurrences(searchHaystack, searchNeedle);
 
   if (offsets.length === 0) {
     const candidates = findFuzzyCandidates(normalizedContent, normalizedOld);
@@ -87,15 +101,16 @@ export function applyEdit(
   }
 
   // Apply — all matches if replace_all, else the single match.
-  const targetOffsets =
+  let targetOffsets =
     edit.replace_all === true ? offsets : [offsets[0] as number];
+
   const warnings: string[] = [];
 
   if (edit.replace_all === true && offsets.length > 1) {
     const flaggedLines = substringBoundaryCollisions(
       normalizedContent,
       normalizedOld,
-      offsets,
+      targetOffsets,
     );
     if (flaggedLines.length > 0) {
       warnings.push(
@@ -104,12 +119,40 @@ export function applyEdit(
     }
   }
 
-  const newContent = replaceAtOffsets(
-    normalizedContent,
-    normalizedOld,
-    normalizedNew,
-    targetOffsets,
-  );
+  let newContent: string;
+  const needleLines = normalizedOld.split("\n").length;
+  if (ignoreWhitespace) {
+    const mappedOffsets = targetOffsets.map((off) =>
+      mapStrippedOffsetToOriginal(normalizedContent, searchHaystack, off),
+    );
+    if (needleLines > 1) {
+      // Multi-line: find actual match boundaries to preserve surrounding text.
+      newContent = replaceMultilineMatchesAtOffsets(
+        normalizedContent,
+        normalizedNew,
+        mappedOffsets,
+        normalizedOld,
+        needleLines,
+      );
+    } else {
+      // Single-line: find the actual span in the original content using
+      // the stripped needle to handle leading/trailing whitespace diffs.
+      newContent = replaceAtOffsetsWithSpans(
+        normalizedContent,
+        normalizedOld,
+        normalizedNew,
+        mappedOffsets,
+        normalizedOld.trim(),
+      );
+    }
+  } else {
+    newContent = replaceAtOffsets(
+      normalizedContent,
+      normalizedOld,
+      normalizedNew,
+      targetOffsets,
+    );
+  }
 
   return {
     content: restoreLineEndings(newContent, originalEol),
@@ -188,6 +231,115 @@ function replaceAtOffsets(
     cursor = off + needle.length;
   }
   parts.push(haystack.slice(cursor));
+  return parts.join("");
+}
+
+/// Like replaceAtOffsets but finds the actual matched span in the haystack
+/// at each offset (needed when ignore_whitespace makes span lengths differ).
+/// `strippedNeedle` is the leading+trailing whitespace-stripped version of
+/// `needle`, used to locate the match when the original line has different
+/// whitespace from the caller's old_string.
+function replaceAtOffsetsWithSpans(
+  haystack: string,
+  needle: string,
+  replacement: string,
+  offsets: readonly number[],
+  strippedNeedle: string,
+): string {
+  if (offsets.length === 0) return haystack;
+  const parts: string[] = [];
+  let cursor = 0;
+  const lines = haystack.split("\n");
+  for (const off of offsets) {
+    const lineIdx = lineOfOffset(haystack, off) - 1;
+    // Find the needle start within the line only (not the rest of the file).
+    const lineStart = lineIdx === 0 ? 0 : lines.slice(0, lineIdx).reduce((s, l) => s + l.length + 1, 0);
+    const lineEnd = lineIdx === lines.length - 1
+      ? haystack.length
+      : lines.slice(0, lineIdx + 1).reduce((s, l) => s + l.length + 1, 0);
+    const lineSlice = haystack.slice(lineStart, lineEnd);
+    const searchFrom = Math.max(0, cursor - lineStart);
+    const needleIdx = lineSlice.indexOf(strippedNeedle, searchFrom);
+    if (needleIdx >= 0) {
+      const actualStart = lineStart + needleIdx;
+      const spanEnd = actualStart + strippedNeedle.length;
+      parts.push(haystack.slice(cursor, actualStart));
+      parts.push(replacement);
+      cursor = spanEnd;
+    } else {
+      // Fallback: stripped needle not found at this line; use estimated span.
+      // (Shouldn't happen in normal flow but guards against corruption.)
+      const spanEnd = off + needle.length;
+      parts.push(haystack.slice(cursor, off));
+      parts.push(replacement);
+      cursor = spanEnd;
+    }
+  }
+  parts.push(haystack.slice(cursor));
+  return parts.join("");
+}
+
+/// Multi-line whitespace-tolerant replacement that preserves surrounding text
+/// on the first and last matched lines. For a needle like "old1\nold2" matching
+/// inside "prefix old1\nold2 suffix", this replaces only "old1\nold2" and
+/// preserves "prefix " and " suffix".
+/// `needleText` is the original (whitespace-normalized) needle to find boundaries.
+function replaceMultilineMatchesAtOffsets(
+  content: string,
+  replacement: string,
+  offsets: readonly number[],
+  needleText: string,
+  needleLines: number,
+): string {
+  if (offsets.length === 0) return content;
+  const lines = content.split("\n");
+  // Get the stripped first/last lines of the needle for boundary search.
+  const needleLinesArr = needleText.split("\n");
+  const firstLineTrimmed = needleLinesArr[0]?.trim() ?? "";
+  const lastLineTrimmed = needleLinesArr[needleLinesArr.length - 1]?.trim() ?? "";
+
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const off of offsets) {
+    const lineIdx = lineOfOffset(content, off) - 1;
+    const endLine = Math.min(lineIdx + needleLines, lines.length);
+
+    // Byte position of the start of the first affected line.
+    const lineStart = lineIdx === 0
+      ? 0
+      : lines.slice(0, lineIdx).reduce((s, l) => s + l.length + 1, 0);
+    // Byte position of the start of the line AFTER the last affected line.
+    const afterEnd = endLine === lines.length
+      ? content.length
+      : lines.slice(0, endLine).reduce((s, l) => s + l.length + 1, 0);
+
+    // Search for the actual match start within the first line,
+// starting from the cursor-relative position to find the correct occurrence.
+    const firstLineContent = lines[lineIdx] ?? "";
+    const searchFrom = Math.max(0, cursor - lineStart);
+    const matchStartInLine = firstLineContent.indexOf(firstLineTrimmed, searchFrom);
+    const actualStart = matchStartInLine >= 0
+      ? lineStart + matchStartInLine
+      : lineStart;
+
+    // Search for the actual match end within the last line.
+    const lastLineIdx = endLine - 1;
+    const lastLineStart = lastLineIdx === 0
+      ? 0
+      : lines.slice(0, lastLineIdx).reduce((s, l) => s + l.length + 1, 0);
+    const lastLineContent = lines[lastLineIdx] ?? "";
+    const matchEndInLine = lastLineContent.indexOf(lastLineTrimmed);
+    const actualEnd = matchEndInLine >= 0
+      ? lastLineStart + matchEndInLine + lastLineTrimmed.length
+      : afterEnd;
+
+    parts.push(content.slice(cursor, actualStart));
+    parts.push(replacement);
+    // actualEnd already points past the last matched content;
+    // content.slice(cursor) will capture the rest including any separator.
+    cursor = actualEnd;
+  }
+  parts.push(content.slice(cursor));
   return parts.join("");
 }
 

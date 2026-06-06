@@ -320,10 +320,11 @@ async fn execute_edit(
         Err(e) => return err_e(e),
     };
 
-    let edit_spec = EditSpec {
+   let edit_spec = EditSpec {
         old_string: params.old_string.clone(),
         new_string: params.new_string.clone(),
         replace_all: params.replace_all,
+        ignore_whitespace: params.ignore_whitespace,
     };
 
     let result = match apply_edit(&pre.existing_content, &edit_spec) {
@@ -440,6 +441,7 @@ async fn execute_multi_edit(
             old_string: e.old_string.clone(),
             new_string: e.new_string.clone(),
             replace_all: e.replace_all,
+            ignore_whitespace: e.ignore_whitespace,
         })
         .collect();
 

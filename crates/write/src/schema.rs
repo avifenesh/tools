@@ -18,6 +18,10 @@ pub struct EditParams {
     pub replace_all: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dry_run: Option<bool>,
+    /// When true, leading/trailing whitespace on each line is ignored
+    /// during matching. The replacement uses the exact new_string text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignore_whitespace: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +31,10 @@ pub struct EditSpec {
     pub new_string: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replace_all: Option<bool>,
+    /// When true, leading/trailing whitespace on each line is ignored
+    /// during matching.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignore_whitespace: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

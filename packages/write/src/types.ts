@@ -10,6 +10,7 @@ export interface EditSpec {
   readonly old_string: string;
   readonly new_string: string;
   readonly replace_all?: boolean | undefined;
+  readonly ignore_whitespace?: boolean | undefined;
 }
 
 export interface WriteParams {
@@ -23,6 +24,7 @@ export interface EditParams {
   readonly new_string: string;
   readonly replace_all?: boolean | undefined;
   readonly dry_run?: boolean | undefined;
+  readonly ignore_whitespace?: boolean | undefined;
 }
 
 export interface MultiEditParams {
