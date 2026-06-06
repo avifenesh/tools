@@ -8,7 +8,7 @@ use tokio::io::{AsyncReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
 
-use crate::constants::KILL_GRACE_MS;
+use crate::constants::{BACKGROUND_JOB_TTL_SECS, KILL_GRACE_MS};
 
 /// Everything the runtime needs to launch + wire up a subprocess. The
 /// `on_stdout`/`on_stderr` callbacks hand each chunk back to the
@@ -61,6 +61,20 @@ pub trait BashExecutor: Send + Sync {
     async fn close_session(&self);
 }
 
+/// Persistent metadata for a background job, serialized to disk so
+/// completed jobs survive executor recreation.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+struct JobMetadata {
+    out_path: String,
+    err_path: String,
+    running: bool,
+    exit_code: Option<i32>,
+    created_at: u64,
+    /// Workspace root for scoping; only jobs from the same workspace are
+    /// restored, preventing cross-workspace output leakage.
+    workspace_root: String,
+}
+
 /// Background job state kept in-process. Stdout/stderr go to temp files
 /// keyed by job_id; `read_background` reads a window into each by byte
 /// offset.
@@ -72,21 +86,98 @@ struct Job {
     /// Handle so `kill_background` can signal via tokio's process APIs
     /// rather than raw PIDs (the child stays attached until exit).
     child: Option<Arc<Mutex<Child>>>,
+    /// True if this job was restored from disk and has no child handle.
+    /// Restored jobs should refresh their metadata on each poll.
+    restored: bool,
 }
 
 pub struct LocalBashExecutor {
     log_dir: PathBuf,
-    jobs: Arc<tokio::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<Job>>>>>,
+    /// Workspace root used to scope job restoration. Only jobs whose
+    /// metadata workspace_root matches this are restored on startup.
+    workspace_root: String,
+    /// Outer std::sync::Mutex avoids tokio blocking_lock issues during
+    /// construction. The inner tokio::sync::Mutex<Job> handles async access.
+    jobs: Arc<std::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<Job>>>>>,
 }
 
 impl LocalBashExecutor {
     pub fn new() -> Self {
+        // Derive workspace root from current working directory for scoping.
+        let workspace_root = std::env::current_dir()
+            .ok()
+            .and_then(|p| p.canonicalize().ok())
+            .unwrap_or_else(|| PathBuf::from("unknown"));
+        let workspace_root = workspace_root.to_string_lossy().to_string();
         let log_dir = std::env::temp_dir().join("agent-sh-bash-logs");
         std::fs::create_dir_all(&log_dir).ok();
-        Self {
-            log_dir,
-            jobs: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+        let mut self_ = Self {
+            log_dir: log_dir.clone(),
+            workspace_root: workspace_root.clone(),
+            jobs: Arc::new(std::sync::Mutex::new(HashMap::new())),
+        };
+        // Load existing job metadata from disk (completed jobs from previous sessions).
+        self_.load_jobs_from_disk().ok();
+        self_
+    }
+
+    /// Restore completed jobs from disk so they remain queryable across
+    /// executor recreations. Prunes jobs older than the TTL.
+    /// Only restores jobs that match the current workspace_root to prevent
+    /// cross-workspace job leakage.
+    fn load_jobs_from_disk(&mut self) -> Result<(), String> {
+        let meta_dir = self.log_dir.join("job-meta");
+        if !meta_dir.exists() {
+            return Ok(());
         }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        for entry in std::fs::read_dir(&meta_dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if !path.extension().map_or(false, |e| e == "json") {
+                continue;
+            }
+            let meta: JobMetadata = match serde_json::from_slice(
+                &std::fs::read(&path).map_err(|e| e.to_string())?,
+            ) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            // Prune expired jobs.
+            if now.saturating_sub(meta.created_at) > BACKGROUND_JOB_TTL_SECS {
+                let _ = std::fs::remove_file(&path);
+                let _ = std::fs::remove_file(&PathBuf::from(&meta.out_path));
+                let _ = std::fs::remove_file(&PathBuf::from(&meta.err_path));
+                continue;
+            }
+            // Only restore jobs from the current workspace.
+            if meta.workspace_root != self.workspace_root {
+                continue;
+            }
+            // Restore job with its persisted running state. Running jobs won't have
+            // a child handle (old executor died), but callers can still poll
+            // log files; when the child exits, the waiter writes final metadata.
+            let job = Arc::new(tokio::sync::Mutex::new(Job {
+                out_path: PathBuf::from(meta.out_path),
+                err_path: PathBuf::from(meta.err_path),
+                running: meta.running,
+                exit_code: if meta.running { None } else { meta.exit_code },
+                child: None,
+                restored: true,
+            }));
+            let job_id = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            if !job_id.is_empty() {
+                self.jobs.lock().unwrap().insert(job_id, job);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -231,11 +322,21 @@ impl BashExecutor for LocalBashExecutor {
             running: true,
             exit_code: None,
             child: Some(Arc::new(Mutex::new(child))),
+            restored: false,
         }));
         {
-            let mut jobs = self.jobs.lock().await;
+            let mut jobs = self.jobs.lock().unwrap();
             jobs.insert(job_id.clone(), Arc::clone(&job));
         }
+        // Persist metadata immediately so in-flight jobs survive executor
+        // recreation. The waiter below will overwrite with final status.
+        // Canonicalize cwd before persisting so the workspace_root comparison
+        // at restore time matches the canonicalized self.workspace_root.
+        let g = job.lock().await;
+        let canonicalized_cwd = std::fs::canonicalize(&cwd)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| cwd.clone());
+        persist_job_metadata(&self.log_dir, &job_id, &*g, &canonicalized_cwd);
 
         // Pipe stdout → file
         let out_path_spawn = out_path.clone();
@@ -281,13 +382,18 @@ impl BashExecutor for LocalBashExecutor {
 
         // Wait for exit in the background and record it.
         let job_watch = Arc::clone(&job);
+        let log_dir = self.log_dir.clone();
+        let job_id_clone = job_id.clone();
+        let workspace_root = canonicalized_cwd.clone();
         tokio::spawn(async move {
             let child_arc = {
                 let j = job_watch.lock().await;
                 j.child.clone()
             };
             if let Some(child_arc) = child_arc {
-                // Take the child out of the Arc<Mutex> so we can .wait() on it.
+                // Take the child out of the Arc<Mutex<>> so we can .wait() on it.
+                // Use std::mem::replace with a placeholder — the sentinel is
+                // immediately replaced out so it never blocks.
                 let mut child_opt: Option<Child> = {
                     let mut guard = child_arc.lock().unwrap();
                     Some(std::mem::replace(&mut *guard, spawn_sentinel()))
@@ -301,6 +407,8 @@ impl BashExecutor for LocalBashExecutor {
                         Err(_) => None,
                     };
                     j.child = None;
+                    // Persist job metadata to disk for cross-session queries.
+                    let _ = persist_job_metadata(&log_dir, &job_id_clone, &j, &workspace_root);
                 }
             }
         });
@@ -315,21 +423,49 @@ impl BashExecutor for LocalBashExecutor {
         head_limit: usize,
     ) -> Result<BackgroundReadResult, String> {
         let job = {
-            let jobs = self.jobs.lock().await;
+            let jobs = self.jobs.lock().unwrap();
             jobs.get(job_id).cloned()
         };
         let job = match job {
             Some(j) => j,
             None => return Err(format!("Unknown job_id: {}", job_id)),
         };
-        let (out_path, err_path, running, exit_code) = {
+        let (out_path, err_path, running, exit_code, restored) = {
             let g = job.lock().await;
             (
                 g.out_path.clone(),
                 g.err_path.clone(),
                 g.running,
                 g.exit_code,
+                g.restored,
             )
+        };
+        // For restored jobs (no child handle), reload metadata from disk
+        // so that completed jobs are detected even if this executor
+        // didn't spawn the original child.
+        let (running, exit_code) = if restored && running {
+            let meta_path = self.log_dir.join("job-meta").join(format!("{}.json", job_id));
+            match std::fs::read_to_string(&meta_path) {
+                Ok(data) => {
+                    match serde_json::from_str::<JobMetadata>(&data) {
+                        Ok(meta) => {
+                            // Update in-memory state to match disk.
+                            {
+                                let mut g = job.lock().await;
+                                g.running = meta.running;
+                                if !meta.running {
+                                    g.exit_code = meta.exit_code;
+                                }
+                            }
+                            (meta.running, if meta.running { None } else { meta.exit_code })
+                        }
+                        Err(_) => (running, exit_code),
+                    }
+                }
+                Err(_) => (running, exit_code),
+            }
+        } else {
+            (running, exit_code)
         };
         let (out_text, out_total) = read_slice(&out_path, since_byte, head_limit);
         let (err_text, err_total) = read_slice(&err_path, since_byte, head_limit);
@@ -345,17 +481,25 @@ impl BashExecutor for LocalBashExecutor {
 
     async fn kill_background(&self, job_id: &str, _signal: &str) -> Result<(), String> {
         let job = {
-            let jobs = self.jobs.lock().await;
+            let jobs = self.jobs.lock().unwrap();
             jobs.get(job_id).cloned()
         };
         let job = match job {
             Some(j) => j,
             None => return Err(format!("Unknown job_id: {}", job_id)),
         };
-        let child_arc = {
+        let (child_arc, restored) = {
             let g = job.lock().await;
-            g.child.clone()
+            (g.child.clone(), g.restored)
         };
+        if restored && child_arc.is_none() {
+            return Err(
+                "Cannot kill restored background job: the original process handle \
+                 was lost when this executor session started. The job may have \
+                 already exited or may still be running with no way to signal it."
+                    .to_string(),
+            );
+        }
         if let Some(child_arc) = child_arc {
             let mut guard = child_arc.lock().unwrap();
             // start_kill sends SIGKILL on unix. SIGTERM vs SIGKILL
@@ -367,8 +511,14 @@ impl BashExecutor for LocalBashExecutor {
     }
 
     async fn close_session(&self) {
-        let mut jobs = self.jobs.lock().await;
-        for (_, job) in jobs.drain() {
+        // Collect job Arcs while holding the lock, then drop it before
+        // awaiting on each job to avoid holding std::sync::MutexGuard
+        // across an await point.
+        let jobs: Vec<_> = {
+            let mut guard = self.jobs.lock().unwrap();
+            guard.drain().map(|(_, job)| job).collect()
+        };
+        for job in jobs {
             let child_arc = {
                 let g = job.lock().await;
                 g.child.clone()
@@ -442,17 +592,43 @@ fn signal_name(status: &std::process::ExitStatus) -> Option<String> {
     }
 }
 
-/// Placeholder child for std::mem::replace. This panics on drop if
-/// actually used, which is fine because we only `std::mem::replace` it
-/// out during cleanup; it never gets .wait()'d.
+/// Placeholder child for std::mem::replace. Immediately killed on drop via
+/// `kill_on_drop(true)` so it never becomes a zombie. We never .wait() on
+/// this — it's only used as a temporary value during `std::mem::replace`.
 fn spawn_sentinel() -> Child {
-    // A lazily-failing child: immediately-failing shell invocation.
-    // We never .wait on this — it's only used as a placeholder value.
     let mut cmd = Command::new("/bin/true");
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::null());
     cmd.stderr(Stdio::null());
+    cmd.kill_on_drop(true);
     cmd.spawn().expect("/bin/true should always spawn")
+}
+
+/// Serialize job metadata to disk so completed jobs survive executor
+/// recreation. Idempotent — safe to call multiple times for the same job.
+fn persist_job_metadata(log_dir: &PathBuf, job_id: &str, job: &Job, workspace_root: &str) {
+    let meta_dir = log_dir.join("job-meta");
+    if std::fs::create_dir_all(&meta_dir).is_err() {
+        return;
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let meta = JobMetadata {
+        out_path: job.out_path.to_string_lossy().into_owned(),
+        err_path: job.err_path.to_string_lossy().into_owned(),
+        running: job.running,
+        exit_code: job.exit_code,
+        created_at: now,
+        workspace_root: workspace_root.to_string(),
+    };
+    let bytes = match serde_json::to_string(&meta) {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+    let path = meta_dir.join(format!("{}.json", job_id));
+    let _ = std::fs::write(&path, &bytes);
 }
 
 /// Minimal UUID-v4-ish generator to avoid pulling the `uuid` crate just

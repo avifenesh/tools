@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdirSync, createWriteStream, existsSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, createWriteStream, existsSync, readFileSync, statSync, readdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -10,6 +10,89 @@ import type {
   BashRunInput,
   BashRunResult,
 } from "./types.js";
+
+/** Job metadata persisted to disk for cross-session restoration. */
+interface JobMeta {
+  outPath: string;
+  errPath: string;
+  running: boolean;
+  exitCode: number | null;
+  createdAt: number; // epoch seconds
+  childPid: number | undefined; // PID for liveness check on restore
+}
+
+/** In-memory job state. */
+interface Job {
+  id: string;
+  outPath: string;
+  errPath: string;
+  running: boolean;
+  exitCode: number | null;
+  killed: boolean;
+  proc: ReturnType<typeof spawn> | null;
+}
+
+/** Write job metadata to disk. Idempotent — safe to call multiple times. */
+function persistJobMeta(logDir: string, jobId: string, meta: JobMeta): void {
+  const metaDir = path.join(logDir, "job-meta");
+  try {
+    mkdirSync(metaDir, { recursive: true });
+  } catch {
+    // real error (e.g. permission denied); mkdirSync({recursive:true})
+    // does NOT throw on EEXIST, so this only fires on genuine failures
+    return;
+  }
+  try {
+    writeFileSync(
+      path.join(metaDir, `${jobId}.json`),
+      JSON.stringify(meta),
+    );
+  } catch {
+    // ignore — non-fatal
+  }
+}
+
+/** Load completed jobs from disk and restore them into the jobs map. */
+function loadJobsFromDisk(
+  logDir: string,
+  jobs: Map<string, Job>,
+): void {
+  const metaDir = path.join(logDir, "job-meta");
+  if (!existsSync(metaDir)) return;
+  const now = Date.now() / 1000;
+  const TTL_SECS = 7 * 24 * 60 * 60; // 7 days
+  try {
+    for (const fname of readdirSync(metaDir)) {
+      if (!fname.endsWith(".json")) continue;
+      const metaPath = path.join(metaDir, fname);
+      try {
+        const data = JSON.parse(readFileSync(metaPath, "utf8")) as JobMeta;
+        // Prune expired jobs
+        if (now - data.createdAt > TTL_SECS) {
+          try { unlinkSync(metaPath); } catch {}
+          continue;
+        }
+        const jobId = fname.slice(0, -5); // strip .json
+        // Only restore jobs not already in memory
+        if (!jobs.has(jobId) && !data.running) {
+          jobs.set(jobId, {
+            id: jobId,
+            outPath: data.outPath,
+            errPath: data.errPath,
+            running: false,
+            exitCode: data.exitCode,
+            killed: false,
+            proc: null,
+          });
+        }
+      } catch {
+        // skip corrupt entries
+      }
+    }
+  } catch {
+    // meta dir doesn't exist or unreadable
+  }
+}
 
 /**
  * Default local-subprocess executor.
@@ -32,17 +115,10 @@ export function createLocalBashExecutor(opts?: {
   const logDir = opts?.logDir ?? path.join(tmpdir(), "agent-sh-bash-logs");
   mkdirSync(logDir, { recursive: true });
 
-  interface Job {
-    readonly id: string;
-    readonly outPath: string;
-    readonly errPath: string;
-    running: boolean;
-    exitCode: number | null;
-    killed: boolean;
-    proc: ReturnType<typeof spawn> | null;
-  }
-
   const jobs = new Map<string, Job>();
+
+  // Restore completed jobs from disk (persisted across executor restarts).
+  loadJobsFromDisk(logDir, jobs);
 
   async function runForeground(input: BashRunInput): Promise<BashRunResult> {
     const child = spawn(bashPath, ["-c", input.command], {
@@ -120,14 +196,42 @@ export function createLocalBashExecutor(opts?: {
     };
     jobs.set(jobId, job);
 
+    // Persist metadata immediately so in-flight jobs survive executor restart.
+    persistJobMeta(logDir, jobId, {
+      outPath,
+      errPath,
+      running: true,
+      exitCode: null,
+      createdAt: Math.floor(Date.now() / 1000),
+      childPid: child.pid,
+    });
+
     child.on("close", (code) => {
       job.running = false;
       job.exitCode = code;
       job.proc = null;
+      // Persist final state for cross-session queries.
+      persistJobMeta(logDir, jobId, {
+        outPath,
+        errPath,
+        running: false,
+        exitCode: code,
+        createdAt: Math.floor(Date.now() / 1000),
+        childPid: undefined,
+      });
     });
     child.on("error", () => {
       job.running = false;
       job.proc = null;
+      // Persist error state.
+      persistJobMeta(logDir, jobId, {
+        outPath,
+        errPath,
+        running: false,
+        exitCode: null,
+        createdAt: Math.floor(Date.now() / 1000),
+        childPid: undefined,
+      });
     });
 
     return { jobId };
@@ -137,9 +241,63 @@ export function createLocalBashExecutor(opts?: {
     jobId: string,
     opts: { since_byte?: number; head_limit?: number },
   ): Promise<BackgroundReadResult> {
-    const job = jobs.get(jobId);
+    let job = jobs.get(jobId);
+
+    // If the job isn't in memory, try to restore it from disk.
     if (!job) {
-      throw new Error(`Unknown job_id: ${jobId}`);
+      // Reject path separators in job IDs to prevent directory traversal.
+      if (jobId.includes("/") || jobId.includes("\\") || jobId.includes("\0")) {
+        throw new Error(`Invalid job_id: ${jobId}`);
+      }
+      const metaPath = path.join(logDir, "job-meta", `${jobId}.json`);
+      try {
+        const data = JSON.parse(readFileSync(metaPath, "utf8")) as JobMeta;
+        job = {
+          id: jobId,
+          outPath: data.outPath,
+          errPath: data.errPath,
+          running: data.running,
+          exitCode: data.exitCode,
+          killed: false,
+          proc: null,
+        };
+        jobs.set(jobId, job);
+      } catch {
+        throw new Error(`Unknown job_id: ${jobId}`);
+      }
+    }
+
+    // For restored jobs with no child handle, re-read metadata from disk
+    // and check liveness so we detect completion after the old executor died.
+    if (job.running && !job.proc) {
+      try {
+        const metaPath = path.join(logDir, "job-meta", `${jobId}.json`);
+        const data = JSON.parse(readFileSync(metaPath, "utf8")) as JobMeta;
+        if (!data.running) {
+          // Metadata was updated by the waiter — job is done.
+          job.running = false;
+          job.exitCode = data.exitCode;
+        } else if (data.childPid != null) {
+          // Metadata still says running — check if the PID is actually alive.
+          // process.kill(pid, 0) throws if the process doesn't exist.
+          let stillAlive = true;
+          try {
+            process.kill(data.childPid, 0);
+          } catch {
+            stillAlive = false;
+          }
+          if (!stillAlive) {
+            // Child is gone but metadata was never updated (executor died
+            // before the close handler fired). Mark as done with inferred exit.
+            job.running = false;
+            job.exitCode = 0; // best guess; output files still readable
+          }
+        }
+        // If no childPid and no metadata update, we can't determine liveness;
+        // fall through with cached state. The job may have already exited.
+      } catch {
+        // Metadata may not exist or may be stale; fall through with cached state.
+      }
     }
     const since = opts.since_byte ?? 0;
     const limit = opts.head_limit ?? 30_720;

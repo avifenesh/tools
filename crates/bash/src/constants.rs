@@ -5,6 +5,9 @@ pub const MAX_OUTPUT_BYTES_INLINE: usize = 30_720;
 pub const MAX_OUTPUT_BYTES_FILE: usize = 10 * 1024 * 1024;
 pub const BACKGROUND_MAX_JOBS: usize = 16;
 pub const KILL_GRACE_MS: u64 = 5_000;
+/// TTL for completed background jobs (7 days). After this, metadata is
+/// pruned on next executor creation or explicit cleanup.
+pub const BACKGROUND_JOB_TTL_SECS: u64 = 7 * 24 * 60 * 60;
 
 /// Env var prefixes the tool refuses to let the model set. Mirrors the
 /// TS `SENSITIVE_ENV_PREFIXES` list.
