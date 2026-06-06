@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "harness-bash"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "harness-tools"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "harness-bash",
  "harness-batch",
@@ -772,7 +772,7 @@ dependencies = [
 
 [[package]]
 name = "harness-write"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "harness-core",
