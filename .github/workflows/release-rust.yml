@@ -51,6 +51,7 @@ jobs:
             harness-grep
             harness-glob
             harness-bash
+            harness-batch
             harness-webfetch
             harness-websearch
             harness-lsp

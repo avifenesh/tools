@@ -17,6 +17,7 @@ path = "src/lib.rs"
 
 [dependencies]
 harness-core = { path = "../harness-core", version = "0.1.0" }
+harness-batch = { path = "../batch", version = "0.1.0" }
 harness-read = { path = "../read", version = "0.1.1" }
 harness-write = { path = "../write", version = "0.1.1" }
 harness-grep = { path = "../grep", version = "0.1.1" }

@@ -4,6 +4,7 @@ export * from "@agent-sh/harness-write";
 export * from "@agent-sh/harness-grep";
 export * from "@agent-sh/harness-glob";
 export * from "@agent-sh/harness-bash";
+export * from "@agent-sh/harness-batch";
 export * from "@agent-sh/harness-webfetch";
 // websearch shares SSRF/engine/session helper names with webfetch (classifyHost,
 // createDefaultEngine, newSessionId, …). Re-export only its tool-unique surface

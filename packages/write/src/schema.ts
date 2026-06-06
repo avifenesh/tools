@@ -15,12 +15,14 @@ export const EditParamsSchema = v.object({
   new_string: v.string(),
   replace_all: v.optional(v.boolean()),
   dry_run: v.optional(v.boolean()),
+  ignore_whitespace: v.optional(v.boolean()),
 });
 
 const EditSpecSchema = v.object({
   old_string: NonEmptyString,
   new_string: v.string(),
   replace_all: v.optional(v.boolean()),
+  ignore_whitespace: v.optional(v.boolean()),
 });
 
 export const MultiEditParamsSchema = v.object({
@@ -144,6 +146,11 @@ export const editToolDefinition: ToolDefinition = {
         description:
           "If true, return the unified diff without writing to disk.",
       },
+      ignore_whitespace: {
+        type: "boolean",
+        description:
+          "If true, ignore leading/trailing whitespace differences when matching old_string.",
+      },
     },
     required: ["path", "old_string", "new_string"],
     additionalProperties: false,
@@ -171,6 +178,7 @@ export const multieditToolDefinition: ToolDefinition = {
             old_string: { type: "string" },
             new_string: { type: "string" },
             replace_all: { type: "boolean" },
+            ignore_whitespace: { type: "boolean" },
           },
           required: ["old_string", "new_string"],
           additionalProperties: false,

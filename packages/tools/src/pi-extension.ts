@@ -18,6 +18,8 @@
  * fence would fail-closed (no hook supplied) and double-gate the call. Roots
  * are anchored at the execute ctx.cwd.
  */
+import fs from "node:fs";
+import path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type, type Static, type TSchema } from "typebox";
 import { formatToolError, InMemoryLedger, type Ledger, type PermissionPolicy, type ToolError } from "@agent-sh/harness-core";
@@ -78,6 +80,12 @@ import {
   FilesystemSkillRegistry,
   type SkillSessionConfig,
 } from "@agent-sh/harness-skill";
+import {
+  executeBatch,
+  batchToolDefinition,
+  safeParseBatchParams,
+  type BatchParams,
+} from "@agent-sh/harness-batch";
 
 // ---------------------------------------------------------------------------
 // Result mapping
@@ -151,6 +159,7 @@ const EditSpecSchema = Type.Object({
   old_string: Type.String(),
   new_string: Type.String(),
   replace_all: Type.Optional(Type.Boolean()),
+  ignore_whitespace: Type.Optional(Type.Boolean({ description: "Ignore leading/trailing whitespace differences when matching." })),
 });
 
 const EditParams = Type.Object({
@@ -159,6 +168,7 @@ const EditParams = Type.Object({
   new_string: Type.String({ description: "Replacement text." }),
   replace_all: Type.Optional(Type.Boolean({ description: "Replace every occurrence instead of requiring uniqueness." })),
   dry_run: Type.Optional(Type.Boolean({ description: "Preview the unified diff without writing." })),
+  ignore_whitespace: Type.Optional(Type.Boolean({ description: "Ignore leading/trailing whitespace differences when matching." })),
 });
 
 const MultiEditParams = Type.Object({
@@ -282,6 +292,35 @@ const SkillParams = Type.Object({
       description: "Positional string or named-argument object for the skill.",
     }),
   ),
+});
+
+// Batch target schemas (union of subdirs, glob, explicit)
+const BatchTargetSubdirs = Type.Object({
+  kind: Type.Literal("subdirs"),
+  path: Type.String({ description: "Root directory to scan for subdirectories." }),
+  name_filter: Type.Optional(Type.String({ description: "Optional name filter for subdirectory names." })),
+});
+const BatchTargetGlob = Type.Object({
+  kind: Type.Literal("glob"),
+  pattern: Type.String({ description: "Glob pattern for target directories." }),
+});
+const BatchTargetExplicit = Type.Object({
+  kind: Type.Literal("explicit"),
+  paths: Type.Array(Type.String(), { description: "Explicit list of directory paths." }),
+});
+
+const BatchParams = Type.Object({
+  command: Type.String({ description: "Shell command to run in each target. Use $TARGET for the current directory." }),
+  targets: Type.Union([BatchTargetSubdirs, BatchTargetGlob, BatchTargetExplicit], {
+    description: "Target selection: subdirs, glob, or explicit.",
+  }),
+  mode: Type.Optional(Type.Union([Type.Literal("sequential"), Type.Literal("parallel")], {
+    description: "Execution mode. Default: sequential.",
+  })),
+  max_concurrent: Type.Optional(Type.Integer({ minimum: 1, description: "Max concurrent commands for parallel mode (default 4)." })),
+  timeout_secs: Type.Optional(Type.Integer({ minimum: 1, maximum: 3600, description: "Timeout per command in seconds (default 120)." })),
+  fail_fast: Type.Optional(Type.Boolean({ description: "Stop on first failure (default false)." })),
+  summary_only: Type.Optional(Type.Boolean({ description: "Return only summary counts (default false)." })),
 });
 
 // ---------------------------------------------------------------------------
@@ -449,4 +488,60 @@ export default function harnessToolsExtension(pi: ExtensionAPI): void {
   register("skill", "Skill", skillToolDefinition.description, SkillParams, (p, cwd, signal) =>
     skill(p, skillSession(cwd, signal)),
   );
+
+  // Batch: parse params with valibot, then execute with workspace fence.
+  register("batch", "Batch", batchToolDefinition.description, BatchParams, async (p, cwd, _signal) => {
+    const parsed = safeParseBatchParams(p);
+    if (!parsed.ok) {
+      return { kind: "error", error: { code: "INVALID_PARAM" as const, message: parsed.issues.map(i => i.message).join("; ") } };
+    }
+    // Resolve targets against cwd, canonicalize to real paths, and fence inside workspace.
+    const realCwd = await fs.promises.realpath(cwd);
+    const isInside = (real: string) => {
+      const rel = path.relative(realCwd, real);
+      // rel === "" means exactly the workspace root; startsWith("..") means escape.
+      return !rel.startsWith("..");
+    };
+
+    const targets = parsed.value.targets;
+    if (targets.kind === "subdirs") {
+      const resolved = path.isAbsolute(targets.path) ? targets.path : path.resolve(cwd, targets.path);
+      const real = await fs.promises.realpath(resolved);
+      if (!isInside(real)) {
+        return { kind: "error", error: { code: "INVALID_PARAM" as const, message: `subdirs path "${targets.path}" resolves outside workspace` } };
+      }
+      parsed.value.targets = { ...targets, path: real };
+    } else if (targets.kind === "glob") {
+      const resolved = path.isAbsolute(targets.pattern) ? targets.pattern : path.resolve(cwd, targets.pattern);
+      // Walk up from the pattern until we find an existing directory to check.
+      let checkPath = resolved;
+      while (checkPath && checkPath !== path.parse(checkPath).root) {
+        try {
+          await fs.promises.access(checkPath);
+          break;
+        } catch {
+          checkPath = path.dirname(checkPath);
+        }
+      }
+      if (checkPath && !isInside(checkPath)) {
+        return { kind: "error", error: { code: "INVALID_PARAM" as const, message: `glob pattern "${targets.pattern}" resolves outside workspace` } };
+      }
+      parsed.value.targets = { ...targets, pattern: resolved };
+    } else if (targets.kind === "explicit") {
+      const resolvedPaths: string[] = [];
+      for (const tp of targets.paths) {
+        const resolved = path.isAbsolute(tp) ? tp : path.resolve(cwd, tp);
+        // Canonicalize first via realpath, then check workspace containment.
+        // This prevents symlink-based bypass of the lexical check.
+        const realPath = await fs.promises.realpath(resolved).catch(() => resolved);
+        if (!isInside(realPath)) {
+          return { kind: "error", error: { code: "INVALID_PARAM" as const, message: `explicit path "${tp}" resolves outside workspace` } };
+        }
+        resolvedPaths.push(realPath);
+      }
+      parsed.value.targets = { ...targets, paths: resolvedPaths };
+    }
+    const result = await executeBatch(parsed.value, cwd);
+    return { kind: "ok", output: result.message + (Object.keys(result.meta).length ? `\n${JSON.stringify(result.meta, null, 2)}` : "") };
+  });
 }

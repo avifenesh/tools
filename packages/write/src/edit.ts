@@ -73,6 +73,7 @@ async function executeEdit(
     old_string: params.old_string,
     new_string: params.new_string,
     replace_all: params.replace_all === true,
+    ignore_whitespace: params.ignore_whitespace === true,
   });
   if ("code" in editResult) return err(editResult);
 

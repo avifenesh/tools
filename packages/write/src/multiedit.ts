@@ -75,6 +75,7 @@ async function executeMultiEdit(
     old_string: e.old_string,
     new_string: e.new_string,
     replace_all: e.replace_all === true,
+    ignore_whitespace: e.ignore_whitespace === true,
   }));
 
   const pipelineResult = applyPipeline(existingContent, edits);

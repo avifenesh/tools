@@ -5,6 +5,7 @@ members = [
     "crates/grep",
     "crates/glob",
     "crates/bash",
+    "crates/batch",
     "crates/webfetch",
     "crates/websearch",
     "crates/read",
@@ -40,3 +41,9 @@ globset = "0.4"
 
 # Test deps
 tempfile = "3"
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+lto = "fat"
+

@@ -7,6 +7,51 @@ import {
 import { similarity } from "./levenshtein.js";
 import type { FuzzyCandidate, MatchLocation } from "./types.js";
 
+/**
+ * Strip leading/trailing whitespace from each line of the text.
+ * Line boundaries ('\n') are preserved.
+ */
+export function stripLineWhitespace(text: string): string {
+  return text.split("\n").map((line) => line.trim()).join("\n");
+}
+
+/**
+ * Given a byte offset in a whitespace-stripped version of a text,
+ * return the corresponding byte offset in the original text.
+ * The stripped text has the same line count; each line's content
+ * starts at the leading whitespace length.
+ */
+export function mapStrippedOffsetToOriginal(
+  original: string,
+  stripped: string,
+  strippedOffset: number,
+): number {
+  // Find the line index and offset within the stripped line.
+  const origLines = original.split("\n");
+  const stripLines = stripped.split("\n");
+  let bytePos = 0;
+  for (let i = 0; i < stripLines.length; i++) {
+    const stripLine = stripLines[i] ?? "";
+    const lineLen = stripLine.length;
+    if (strippedOffset >= bytePos && strippedOffset < bytePos + lineLen) {
+      // Found the line. Map offset within stripped line to original line.
+      const offsetInStripLine = strippedOffset - bytePos;
+      const origLine = origLines[i] ?? "";
+      const leadWs = origLine.length - origLine.trimStart().length;
+      return (
+        // Sum of bytes before this line in original text.
+        origLines.slice(0, i).reduce((sum, l) => sum + l.length + 1, 0) +
+        leadWs +
+        offsetInStripLine
+      );
+    }
+    // Always advance past this line (including its newline), even for blank lines.
+    bytePos += lineLen + 1;
+  }
+  // Fallback: return stripped offset as-is.
+  return strippedOffset;
+}
+
 /** 1-based line of the offset in the given string. Assumes LF-normalized. */
 export function lineOfOffset(text: string, offset: number): number {
   if (offset <= 0) return 1;
