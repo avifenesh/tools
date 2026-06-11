@@ -47,10 +47,12 @@ Rationale: This is the Claude Code shape. Qwen and Claude are both trained on th
 
 Registered tool names are snake_case: `write`, `edit`, `multi_edit`. The
 MultiEdit name was `multiedit` before harness-write 0.6.0 (TS) / 0.3.0 (Rust);
-that spelling remains a deprecated alias — dispatch points accept both
-(`isMultiEditToolName` / `is_multi_edit_tool_name`, and the
-`harness-write-cli` JSON-RPC methods) and emit a one-time deprecation warning
-on the legacy spelling. The alias will be removed in a future major release.
+that spelling remains a deprecated alias. `isMultiEditToolName` /
+`is_multi_edit_tool_name` are pure matchers that accept both spellings;
+`normalizeMultiEditToolName` / `normalize_multi_edit_tool_name` map both to
+the canonical name and emit a one-time deprecation warning on the legacy
+spelling — use the normalizer at dispatch points (the `harness-write-cli`
+JSON-RPC dispatch does). The alias will be removed in a future major release.
 
 ### 2.1 Tool descriptions (LLM-facing)
 
@@ -288,6 +290,12 @@ async ask(req: {
   },
 }) → "allow" | "deny"
 ```
+
+The fail-open read-before-mutate gate (D11, `read.md` §5) issues an additional
+hook query with `action: "write_unread"` when the target has no ledger entry.
+That query carries the same `tool` label as the invoking tool (`write`,
+`edit`, or `multi_edit`), so a single tool call never reports two different
+tool names to the hook.
 
 ---
 

@@ -11,6 +11,7 @@ export {
   MULTIEDIT_TOOL_NAME,
   MULTIEDIT_TOOL_NAME_LEGACY,
   isMultiEditToolName,
+  normalizeMultiEditToolName,
   warnLegacyMultiEditToolName,
   WRITE_TOOL_DESCRIPTION,
   EDIT_TOOL_DESCRIPTION,

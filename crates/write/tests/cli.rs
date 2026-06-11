@@ -12,6 +12,7 @@ struct Cli {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<std::process::ChildStdout>,
+    stderr_reader: std::thread::JoinHandle<String>,
 }
 
 impl Cli {
@@ -24,7 +25,23 @@ impl Cli {
             .expect("spawn harness-write-cli");
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
-        Cli { child, stdin, stdout }
+        // Drain stderr on a dedicated thread so the child can never block on
+        // a full stderr pipe buffer while we block on stdout (deadlock).
+        let mut child_stderr = child.stderr.take().unwrap();
+        let stderr_reader = std::thread::spawn(move || {
+            use std::io::Read;
+            let mut stderr = String::new();
+            child_stderr
+                .read_to_string(&mut stderr)
+                .expect("read child stderr");
+            stderr
+        });
+        Cli {
+            child,
+            stdin,
+            stdout,
+            stderr_reader,
+        }
     }
 
     fn call(&mut self, id: u64, method: &str, params: Value) -> Value {
@@ -41,16 +58,8 @@ impl Cli {
     /// Close stdin, wait for exit, and return captured stderr.
     fn finish(mut self) -> String {
         drop(self.stdin);
-        let mut stderr = String::new();
-        use std::io::Read;
-        self.child
-            .stderr
-            .take()
-            .unwrap()
-            .read_to_string(&mut stderr)
-            .unwrap();
         let _ = self.child.wait();
-        stderr
+        self.stderr_reader.join().expect("stderr reader thread")
     }
 }
 

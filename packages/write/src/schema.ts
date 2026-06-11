@@ -103,18 +103,35 @@ export function warnLegacyMultiEditToolName(): void {
  * Returns `true` if `name` names the MultiEdit tool — either the canonical
  * `"multi_edit"` or the deprecated legacy `"multiedit"` spelling.
  *
- * When the legacy spelling is seen, a one-time process-wide deprecation
- * warning is emitted (see {@link warnLegacyMultiEditToolName}). Use this
- * helper at dispatch points so both spellings keep working during the
- * migration window.
+ * Pure predicate — no side effects, so it is safe for filtering,
+ * configuration validation, or UI rendering. At dispatch points that accept
+ * external input, use {@link normalizeMultiEditToolName} instead: it maps
+ * both spellings to the canonical name and emits the one-time deprecation
+ * warning when the legacy spelling is seen.
  */
 export function isMultiEditToolName(name: string): boolean {
-  if (name === MULTIEDIT_TOOL_NAME) return true;
+  return name === MULTIEDIT_TOOL_NAME || name === MULTIEDIT_TOOL_NAME_LEGACY;
+}
+
+/**
+ * Resolves `name` to the canonical MultiEdit tool name (`"multi_edit"`), or
+ * `undefined` when `name` is not a MultiEdit spelling.
+ *
+ * When the deprecated legacy `"multiedit"` spelling is seen, the one-time
+ * process-wide deprecation warning fires (see
+ * {@link warnLegacyMultiEditToolName}). Use this helper at dispatch points so
+ * both spellings keep working during the migration window; use
+ * {@link isMultiEditToolName} for side-effect-free queries.
+ */
+export function normalizeMultiEditToolName(
+  name: string,
+): typeof MULTIEDIT_TOOL_NAME | undefined {
+  if (name === MULTIEDIT_TOOL_NAME) return MULTIEDIT_TOOL_NAME;
   if (name === MULTIEDIT_TOOL_NAME_LEGACY) {
     warnLegacyMultiEditToolName();
-    return true;
+    return MULTIEDIT_TOOL_NAME;
   }
-  return false;
+  return undefined;
 }
 
 export const WRITE_TOOL_DESCRIPTION = `Create a new file, or overwrite an existing file.

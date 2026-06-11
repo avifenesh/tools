@@ -178,19 +178,29 @@ describe("multiEdit — tool name: canonical + deprecated legacy alias", () => {
     expect(schema.multieditToolDefinition.name).toBe("multi_edit");
   });
 
-  it("matches both spellings, warns once for the legacy one only", async () => {
-    const { isMultiEditToolName } = await import("../src/schema.js");
+  it("isMultiEditToolName is a pure matcher; normalize warns once for the legacy spelling only", async () => {
+    const { isMultiEditToolName, normalizeMultiEditToolName } = await import(
+      "../src/schema.js"
+    );
     const { vi } = await import("vitest");
     const warnSpy = vi
       .spyOn(process, "emitWarning")
       .mockImplementation(() => undefined);
     try {
-      // Canonical name never warns.
+      // Pure predicate: matches both spellings, never emits the warning.
       expect(isMultiEditToolName("multi_edit")).toBe(true);
+      expect(isMultiEditToolName("multiedit")).toBe(true);
+      expect(isMultiEditToolName("multi-edit")).toBe(false);
+      expect(isMultiEditToolName("MultiEdit")).toBe(false);
+      expect(isMultiEditToolName("edit")).toBe(false);
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // Legacy alias matches and warns exactly once per process.
-      expect(isMultiEditToolName("multiedit")).toBe(true);
+      // Canonical name normalizes silently.
+      expect(normalizeMultiEditToolName("multi_edit")).toBe("multi_edit");
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // Legacy alias normalizes to canonical and warns exactly once per process.
+      expect(normalizeMultiEditToolName("multiedit")).toBe("multi_edit");
       expect(warnSpy).toHaveBeenCalledTimes(1);
       const [message, type] = warnSpy.mock.calls[0] ?? [];
       expect(String(message)).toContain('"multiedit" is deprecated');
@@ -198,14 +208,14 @@ describe("multiEdit — tool name: canonical + deprecated legacy alias", () => {
       expect(String(message)).toContain("removed in a future major");
       expect(type).toBe("DeprecationWarning");
 
-      // Repeat legacy use: still matches, no log spam.
-      expect(isMultiEditToolName("multiedit")).toBe(true);
+      // Repeat legacy use: still normalizes, no log spam.
+      expect(normalizeMultiEditToolName("multiedit")).toBe("multi_edit");
       expect(warnSpy).toHaveBeenCalledTimes(1);
 
-      // Non-names never match.
-      expect(isMultiEditToolName("multi-edit")).toBe(false);
-      expect(isMultiEditToolName("MultiEdit")).toBe(false);
-      expect(isMultiEditToolName("edit")).toBe(false);
+      // Non-names never normalize.
+      expect(normalizeMultiEditToolName("multi-edit")).toBeUndefined();
+      expect(normalizeMultiEditToolName("MultiEdit")).toBeUndefined();
+      expect(normalizeMultiEditToolName("edit")).toBeUndefined();
     } finally {
       warnSpy.mockRestore();
     }
@@ -234,5 +244,34 @@ describe("multiEdit — tool name: canonical + deprecated legacy alias", () => {
     );
     expect(r.kind).toBe("text");
     expect(seen).toEqual(["multi_edit"]);
+  });
+
+  it("reports multi_edit on the read-before-mutate hook query too (un-Read file)", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "unread.txt", "x\n");
+    const base = makeSession(dir);
+    // No recordRead: the file has no ledger entry, so the fail-open gate in
+    // preflightMutation issues a second hook query (action "write_unread").
+    const seen: { tool: string; action: string }[] = [];
+    const session = {
+      ...base,
+      permissions: {
+        ...base.permissions,
+        hook: async (req: { tool: string; action: string }) => {
+          seen.push({ tool: req.tool, action: req.action });
+          return "allow" as const;
+        },
+      },
+    };
+    const r = await multiEdit(
+      { path: target, edits: [{ old_string: "x", new_string: "X" }] },
+      session,
+    );
+    expect(r.kind).toBe("text");
+    // Every hook query a MultiEdit call makes carries the same tool label.
+    expect(seen).toEqual([
+      { tool: "multi_edit", action: "edit" },
+      { tool: "multi_edit", action: "write_unread" },
+    ]);
   });
 });

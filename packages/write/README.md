@@ -31,11 +31,13 @@ The MultiEdit tool's canonical name is `multi_edit` (exported as
 `MULTIEDIT_TOOL_NAME`), matching the `multiEdit` entry point and the snake_case
 convention of the other multi-word tool names (`bash_output`, `bash_kill`).
 The pre-0.6.0 spelling `multiedit` is still exported as
-`MULTIEDIT_TOOL_NAME_LEGACY` and accepted by the `isMultiEditToolName()`
-dispatch helper, which emits a one-time `DeprecationWarning` when it sees the
-legacy spelling. The `multiedit` alias will be removed in a future major
-release — migrate registrations and any hardcoded name matching to
-`multi_edit`.
+`MULTIEDIT_TOOL_NAME_LEGACY`. `isMultiEditToolName()` is a pure matcher that
+accepts both spellings; `normalizeMultiEditToolName()` maps both to the
+canonical name and emits a one-time `DeprecationWarning` when it sees the
+legacy spelling — use it at dispatch points. Permission hooks receive
+`tool: "multi_edit"` on every query a MultiEdit call makes. The `multiedit`
+alias will be removed in a future major release — migrate registrations and
+any hardcoded name matching to `multi_edit`.
 
 ## Contract
 

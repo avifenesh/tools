@@ -31,11 +31,13 @@ let r = edit(json!({ "path": "...", "old_string": "foo", "new_string": "bar" }),
 The MultiEdit tool's canonical name is `multi_edit` (`MULTIEDIT_TOOL_NAME`),
 matching `fn multi_edit` and the snake_case convention of the other multi-word
 tool names. The pre-0.3.0 spelling `multiedit` remains available as the
-deprecated `MULTIEDIT_TOOL_NAME_LEGACY`, and `is_multi_edit_tool_name()`
-accepts both at dispatch points (emitting a one-time stderr deprecation
-warning for the legacy spelling). `harness-write-cli` likewise accepts both
-`multi_edit` and the deprecated `multiedit` JSON-RPC methods. The `multiedit`
-alias will be removed in a future major release — migrate to `multi_edit`.
+deprecated `MULTIEDIT_TOOL_NAME_LEGACY`. `is_multi_edit_tool_name()` is a
+pure matcher that accepts both spellings; `normalize_multi_edit_tool_name()`
+maps both to the canonical name and emits a one-time stderr deprecation
+warning for the legacy spelling — use it at dispatch points.
+`harness-write-cli` likewise accepts both `multi_edit` and the deprecated
+`multiedit` JSON-RPC methods. The `multiedit` alias will be removed in a
+future major release — migrate to `multi_edit`.
 
 ## Contract
 

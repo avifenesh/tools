@@ -114,20 +114,36 @@ pub const MULTIEDIT_TOOL_NAME_LEGACY: &str = "multiedit";
 /// Returns `true` if `name` names the MultiEdit tool — either the canonical
 /// `"multi_edit"` or the deprecated legacy `"multiedit"` spelling.
 ///
-/// When the legacy spelling is seen, a one-time process-wide deprecation
-/// warning is emitted on stderr (see [`warn_legacy_multi_edit_tool_name`]).
-/// Use this helper at dispatch points so both spellings keep working during
-/// the migration window.
+/// Pure predicate — no side effects, so it is safe for filtering,
+/// configuration validation, or UI rendering. At dispatch points that accept
+/// external input, use [`normalize_multi_edit_tool_name`] instead: it maps
+/// both spellings to the canonical name and emits the one-time deprecation
+/// warning when the legacy spelling is seen.
 pub fn is_multi_edit_tool_name(name: &str) -> bool {
+    #[allow(deprecated)]
+    {
+        name == MULTIEDIT_TOOL_NAME || name == MULTIEDIT_TOOL_NAME_LEGACY
+    }
+}
+
+/// Resolves `name` to the canonical MultiEdit tool name (`"multi_edit"`), or
+/// `None` when `name` is not a MultiEdit spelling.
+///
+/// When the deprecated legacy `"multiedit"` spelling is seen, the one-time
+/// process-wide stderr deprecation warning fires (see
+/// [`warn_legacy_multi_edit_tool_name`]). Use this helper at dispatch points
+/// so both spellings keep working during the migration window; use
+/// [`is_multi_edit_tool_name`] for side-effect-free queries.
+pub fn normalize_multi_edit_tool_name(name: &str) -> Option<&'static str> {
     if name == MULTIEDIT_TOOL_NAME {
-        return true;
+        return Some(MULTIEDIT_TOOL_NAME);
     }
     #[allow(deprecated)]
     if name == MULTIEDIT_TOOL_NAME_LEGACY {
         warn_legacy_multi_edit_tool_name();
-        return true;
+        return Some(MULTIEDIT_TOOL_NAME);
     }
-    false
+    None
 }
 
 /// Emits a one-time (per process) deprecation warning on stderr telling the

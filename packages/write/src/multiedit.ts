@@ -66,7 +66,12 @@ async function executeMultiEdit(
   resolvedPath: string,
   params: MultiEditParams,
 ): Promise<MultiEditResult> {
-  const preflight = await preflightMutation(ops, session, resolvedPath);
+  const preflight = await preflightMutation(
+    ops,
+    session,
+    resolvedPath,
+    "multi_edit",
+  );
   if ("error" in preflight) return err(preflight.error);
   const { existingContent, existingBytes, previousSha } = preflight;
   const gateWarnings = preflight.warnings ?? [];

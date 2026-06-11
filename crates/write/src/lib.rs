@@ -32,10 +32,11 @@ pub use matching::{
 pub use normalize::normalize_line_endings;
 pub use run::{edit, multi_edit, write};
 pub use schema::{
-    is_multi_edit_tool_name, safe_parse_edit_params, safe_parse_multi_edit_params,
-    safe_parse_write_params, warn_legacy_multi_edit_tool_name, EDIT_TOOL_DESCRIPTION,
-    EDIT_TOOL_NAME, EditParams, EditSpec, MULTIEDIT_TOOL_DESCRIPTION, MULTIEDIT_TOOL_NAME,
-    MultiEditParams, WRITE_TOOL_DESCRIPTION, WRITE_TOOL_NAME, WriteParams, WriteParseError,
+    is_multi_edit_tool_name, normalize_multi_edit_tool_name, safe_parse_edit_params,
+    safe_parse_multi_edit_params, safe_parse_write_params, warn_legacy_multi_edit_tool_name,
+    EDIT_TOOL_DESCRIPTION, EDIT_TOOL_NAME, EditParams, EditSpec, MULTIEDIT_TOOL_DESCRIPTION,
+    MULTIEDIT_TOOL_NAME, MultiEditParams, WRITE_TOOL_DESCRIPTION, WRITE_TOOL_NAME, WriteParams,
+    WriteParseError,
 };
 #[allow(deprecated)]
 pub use schema::MULTIEDIT_TOOL_NAME_LEGACY;
