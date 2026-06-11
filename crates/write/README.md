@@ -26,6 +26,17 @@ let session = WriteSessionConfig::new("/workspace", perms, ledger);
 let r = edit(json!({ "path": "...", "old_string": "foo", "new_string": "bar" }), &session).await;
 ```
 
+## Tool naming
+
+The MultiEdit tool's canonical name is `multi_edit` (`MULTIEDIT_TOOL_NAME`),
+matching `fn multi_edit` and the snake_case convention of the other multi-word
+tool names. The pre-0.3.0 spelling `multiedit` remains available as the
+deprecated `MULTIEDIT_TOOL_NAME_LEGACY`, and `is_multi_edit_tool_name()`
+accepts both at dispatch points (emitting a one-time stderr deprecation
+warning for the legacy spelling). `harness-write-cli` likewise accepts both
+`multi_edit` and the deprecated `multiedit` JSON-RPC methods. The `multiedit`
+alias will be removed in a future major release — migrate to `multi_edit`.
+
 ## Contract
 
 The full contract lives in [`agent-knowledge/design/write.md`](https://github.com/avifenesh/tools/blob/main/agent-knowledge/design/write.md). Changes to this crate must stay in sync with that spec, and with the TypeScript sibling at [`@agent-sh/harness-write`](https://www.npmjs.com/package/@agent-sh/harness-write).

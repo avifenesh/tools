@@ -63,7 +63,59 @@ export function safeParseMultiEditParams(
 
 export const WRITE_TOOL_NAME = "write";
 export const EDIT_TOOL_NAME = "edit";
-export const MULTIEDIT_TOOL_NAME = "multiedit";
+/**
+ * Canonical MultiEdit tool name. Matches the `multiEdit` entry point and the
+ * snake_case convention used by every other multi-word tool name in the
+ * workspace (`bash_output`, `bash_kill`).
+ */
+export const MULTIEDIT_TOOL_NAME = "multi_edit";
+/**
+ * Legacy MultiEdit tool name (pre-0.6.0 spelling). Still accepted as an alias
+ * anywhere tool names are matched/dispatched, but deprecated.
+ *
+ * @deprecated Use {@link MULTIEDIT_TOOL_NAME} (`"multi_edit"`). The
+ * `"multiedit"` spelling will be removed in a future major release.
+ */
+export const MULTIEDIT_TOOL_NAME_LEGACY = "multiedit";
+
+let warnedLegacyMultiEditToolName = false;
+
+/**
+ * Emits a one-time (per process) deprecation warning telling the caller to
+ * migrate from `"multiedit"` to `"multi_edit"`. Subsequent calls are no-ops,
+ * so dispatch loops do not spam logs.
+ */
+export function warnLegacyMultiEditToolName(): void {
+  if (warnedLegacyMultiEditToolName) return;
+  warnedLegacyMultiEditToolName = true;
+  const message =
+    '[harness-write] DEPRECATION: tool name "multiedit" is deprecated; use "multi_edit". ' +
+    'The "multiedit" spelling will be removed in a future major release.';
+  if (typeof process !== "undefined" && typeof process.emitWarning === "function") {
+    process.emitWarning(message, "DeprecationWarning");
+  } else {
+    // eslint-disable-next-line no-console
+    console.warn(message);
+  }
+}
+
+/**
+ * Returns `true` if `name` names the MultiEdit tool — either the canonical
+ * `"multi_edit"` or the deprecated legacy `"multiedit"` spelling.
+ *
+ * When the legacy spelling is seen, a one-time process-wide deprecation
+ * warning is emitted (see {@link warnLegacyMultiEditToolName}). Use this
+ * helper at dispatch points so both spellings keep working during the
+ * migration window.
+ */
+export function isMultiEditToolName(name: string): boolean {
+  if (name === MULTIEDIT_TOOL_NAME) return true;
+  if (name === MULTIEDIT_TOOL_NAME_LEGACY) {
+    warnLegacyMultiEditToolName();
+    return true;
+  }
+  return false;
+}
 
 export const WRITE_TOOL_DESCRIPTION = `Create a new file, or overwrite an existing file.
 

@@ -104,9 +104,9 @@ const LABEL = modelLabel(MODEL);
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 
 const SYSTEM_PROMPT = [
-  "You are a coding agent with four tools: `read`, `write`, `edit`, `multiedit`.",
-  "You MUST call `read` on any existing file before you `write`, `edit`, or `multiedit` it.",
-  "Prefer `edit` (single targeted change) or `multiedit` (several changes to one file in one shot) over `write` for existing files.",
+  "You are a coding agent with four tools: `read`, `write`, `edit`, `multi_edit`.",
+  "You MUST call `read` on any existing file before you `write`, `edit`, or `multi_edit` it.",
+  "Prefer `edit` (single targeted change) or `multi_edit` (several changes to one file in one shot) over `write` for existing files.",
   "Use `write` only when creating a new file, or when you genuinely need to replace the whole file.",
   "If `edit` returns OLD_STRING_NOT_UNIQUE, widen old_string with surrounding context. If it returns OLD_STRING_NOT_FOUND, read the returned candidates and correct the string, then retry.",
   "If a `write`/`edit` returns NOT_READ_THIS_SESSION, call `read` on the path first and retry.",
@@ -499,7 +499,7 @@ describe(`write e2e hard [${LABEL}]`, () => {
       const res = await runE2E(
         runOpts(
           SYSTEM_PROMPT,
-          `In ${target}: rename every occurrence of 'handleRequest' to 'serve' AND change the body 'return process(req)' to 'return process(req, {})'. Use multiedit in a single call.`,
+          `In ${target}: rename every occurrence of 'handleRequest' to 'serve' AND change the body 'return process(req)' to 'return process(req, {})'. Use multi_edit in a single call.`,
           tools,
           6,
           onTrace,

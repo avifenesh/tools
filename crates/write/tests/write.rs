@@ -404,3 +404,27 @@ async fn error_result_serializes_with_kind_tag() {
     let v: Value = serde_json::to_value(&r).unwrap();
     assert_eq!(v.get("kind").and_then(|x| x.as_str()), Some("error"));
 }
+
+// ---- Tool name: canonical + deprecated legacy alias ----
+
+#[test]
+fn multiedit_tool_name_is_canonical_snake_case() {
+    assert_eq!(harness_write::MULTIEDIT_TOOL_NAME, "multi_edit");
+    #[allow(deprecated)]
+    {
+        assert_eq!(harness_write::MULTIEDIT_TOOL_NAME_LEGACY, "multiedit");
+    }
+}
+
+#[test]
+fn is_multi_edit_tool_name_accepts_canonical_and_legacy() {
+    use harness_write::is_multi_edit_tool_name;
+    assert!(is_multi_edit_tool_name("multi_edit"));
+    assert!(is_multi_edit_tool_name("multiedit"));
+    // Repeated legacy matches stay accepted (warning is once-per-process).
+    assert!(is_multi_edit_tool_name("multiedit"));
+    assert!(!is_multi_edit_tool_name("multi-edit"));
+    assert!(!is_multi_edit_tool_name("MultiEdit"));
+    assert!(!is_multi_edit_tool_name("edit"));
+    assert!(!is_multi_edit_tool_name(""));
+}

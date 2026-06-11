@@ -43,7 +43,7 @@ export async function multiEdit(
   const { ops, writeOps } = resolveSession(session);
   const resolvedPath = await resolvePath(ops, session.cwd, params.path);
 
-  const fence = await fencePath(session, resolvedPath, "multiedit", {
+  const fence = await fencePath(session, resolvedPath, "multi_edit", {
     edit_count: params.edits.length,
     dry_run: params.dry_run === true,
     edit_previews: params.edits.slice(0, 3).map((e) => ({

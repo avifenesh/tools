@@ -99,7 +99,49 @@ pub fn safe_parse_multi_edit_params(input: &Value) -> Result<MultiEditParams, Wr
 
 pub const WRITE_TOOL_NAME: &str = "write";
 pub const EDIT_TOOL_NAME: &str = "edit";
-pub const MULTIEDIT_TOOL_NAME: &str = "multiedit";
+/// Canonical MultiEdit tool name. Matches `fn multi_edit` and the snake_case
+/// convention used by every other multi-word tool name in the workspace
+/// (`bash_output`, `bash_kill`).
+pub const MULTIEDIT_TOOL_NAME: &str = "multi_edit";
+/// Legacy MultiEdit tool name (pre-0.3.0 spelling). Still accepted as an
+/// alias anywhere tool names are matched/dispatched, but deprecated.
+#[deprecated(
+    since = "0.3.0",
+    note = "use MULTIEDIT_TOOL_NAME (\"multi_edit\"); the \"multiedit\" spelling will be removed in a future major release"
+)]
+pub const MULTIEDIT_TOOL_NAME_LEGACY: &str = "multiedit";
+
+/// Returns `true` if `name` names the MultiEdit tool — either the canonical
+/// `"multi_edit"` or the deprecated legacy `"multiedit"` spelling.
+///
+/// When the legacy spelling is seen, a one-time process-wide deprecation
+/// warning is emitted on stderr (see [`warn_legacy_multi_edit_tool_name`]).
+/// Use this helper at dispatch points so both spellings keep working during
+/// the migration window.
+pub fn is_multi_edit_tool_name(name: &str) -> bool {
+    if name == MULTIEDIT_TOOL_NAME {
+        return true;
+    }
+    #[allow(deprecated)]
+    if name == MULTIEDIT_TOOL_NAME_LEGACY {
+        warn_legacy_multi_edit_tool_name();
+        return true;
+    }
+    false
+}
+
+/// Emits a one-time (per process) deprecation warning on stderr telling the
+/// caller to migrate from `"multiedit"` to `"multi_edit"`. Subsequent calls
+/// are no-ops, so dispatch loops do not spam logs.
+pub fn warn_legacy_multi_edit_tool_name() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        eprintln!(
+            "[harness-write] DEPRECATION: tool name \"multiedit\" is deprecated; use \"multi_edit\". \
+             The \"multiedit\" spelling will be removed in a future major release."
+        );
+    });
+}
 
 pub const WRITE_TOOL_DESCRIPTION: &str = "Create a new file, or overwrite an existing file.\n\nUsage:\n- New file (path does not exist): call Write directly. No prior Read is required.\n- Existing file: you must Read it first in this session, or Write fails with NOT_READ_THIS_SESSION.\n- Prefer Edit or MultiEdit for targeted changes to existing files.\n- Write is atomic: bytes land via a temporary file + rename.\n- Path must be absolute. If relative, it resolves against the session cwd.";
 

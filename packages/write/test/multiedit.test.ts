@@ -169,3 +169,70 @@ describe("multiEdit — rejects empty edits array", () => {
     expect(r.error.code).toBe("INVALID_PARAM");
   });
 });
+
+describe("multiEdit — tool name: canonical + deprecated legacy alias", () => {
+  it("exports multi_edit as canonical and multiedit as the legacy alias", async () => {
+    const schema = await import("../src/schema.js");
+    expect(schema.MULTIEDIT_TOOL_NAME).toBe("multi_edit");
+    expect(schema.MULTIEDIT_TOOL_NAME_LEGACY).toBe("multiedit");
+    expect(schema.multieditToolDefinition.name).toBe("multi_edit");
+  });
+
+  it("matches both spellings, warns once for the legacy one only", async () => {
+    const { isMultiEditToolName } = await import("../src/schema.js");
+    const { vi } = await import("vitest");
+    const warnSpy = vi
+      .spyOn(process, "emitWarning")
+      .mockImplementation(() => undefined);
+    try {
+      // Canonical name never warns.
+      expect(isMultiEditToolName("multi_edit")).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // Legacy alias matches and warns exactly once per process.
+      expect(isMultiEditToolName("multiedit")).toBe(true);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const [message, type] = warnSpy.mock.calls[0] ?? [];
+      expect(String(message)).toContain('"multiedit" is deprecated');
+      expect(String(message)).toContain('"multi_edit"');
+      expect(String(message)).toContain("removed in a future major");
+      expect(type).toBe("DeprecationWarning");
+
+      // Repeat legacy use: still matches, no log spam.
+      expect(isMultiEditToolName("multiedit")).toBe(true);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      // Non-names never match.
+      expect(isMultiEditToolName("multi-edit")).toBe(false);
+      expect(isMultiEditToolName("MultiEdit")).toBe(false);
+      expect(isMultiEditToolName("edit")).toBe(false);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("reports multi_edit as the tool label to permission hooks", async () => {
+    const dir = makeTempDir();
+    const target = writeFixture(dir, "hooked.txt", "x\n");
+    const base = makeSession(dir);
+    recordRead(base, target);
+    const seen: string[] = [];
+    const session = {
+      ...base,
+      permissions: {
+        ...base.permissions,
+        sensitivePatterns: ["**/hooked.txt"],
+        hook: async (req: { tool: string }) => {
+          seen.push(req.tool);
+          return "allow" as const;
+        },
+      },
+    };
+    const r = await multiEdit(
+      { path: target, edits: [{ old_string: "x", new_string: "X" }] },
+      session,
+    );
+    expect(r.kind).toBe("text");
+    expect(seen).toEqual(["multi_edit"]);
+  });
+});
