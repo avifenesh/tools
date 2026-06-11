@@ -1,4 +1,7 @@
-//! `harness-write-cli` — JSON-RPC bridge. Methods: write, edit, multiedit, read_record.
+//! `harness-write-cli` — JSON-RPC bridge. Methods: write, edit, multi_edit, read_record.
+//! The legacy method name `multiedit` is still accepted as a deprecated alias
+//! for `multi_edit` (a one-time warning is emitted on stderr; it will be
+//! removed in a future major release).
 //!
 //! The harness is expected to wire its own Read ledger. For the
 //! engine-swap shim we include a `read_record` RPC that lets the TS
@@ -8,7 +11,8 @@
 
 use harness_core::{PermissionPolicy, ToolError, ToolErrorCode};
 use harness_write::{
-    edit, multi_edit, write, InMemoryLedger, LedgerEntry, WriteSessionConfig,
+    edit, multi_edit, normalize_multi_edit_tool_name, write, InMemoryLedger, LedgerEntry,
+    WriteSessionConfig, MULTIEDIT_TOOL_NAME,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -169,10 +173,17 @@ async fn handle_line(line: &str) -> Response {
 
     let session = call.session.into_session();
 
-    let result = match req.method.as_str() {
+    // Normalize the MultiEdit method name at the dispatch point: the legacy
+    // "multiedit" alias maps to canonical "multi_edit" and emits the one-time
+    // stderr deprecation warning (removal in a future major).
+    let method = normalize_multi_edit_tool_name(&req.method).unwrap_or(req.method.as_str());
+
+    let result = match method {
         "write" => serde_json::to_value(write(call.params, &session).await).ok(),
         "edit" => serde_json::to_value(edit(call.params, &session).await).ok(),
-        "multiedit" => serde_json::to_value(multi_edit(call.params, &session).await).ok(),
+        MULTIEDIT_TOOL_NAME => {
+            serde_json::to_value(multi_edit(call.params, &session).await).ok()
+        }
         other => {
             return Response {
                 id: req.id,

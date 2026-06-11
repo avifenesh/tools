@@ -12,7 +12,7 @@ The tools are meant to be consumed by autonomous agents (Claude, GPT, Qwen, Gemi
 |---|---|
 | [`@agent-sh/harness-core`](./packages/core) | Shared types: discriminated results, `ToolError`, `PermissionPolicy`, ledger, operation adapters. Every tool builds on this. |
 | [`@agent-sh/harness-read`](./packages/read) | File read with pagination, binary refusal, directory listing, image/PDF attachment shape, fuzzy-sibling `NOT_FOUND`. |
-| [`@agent-sh/harness-write`](./packages/write) | Atomic file write + targeted `edit` + `multiedit` pipeline with read-before-edit ledger, `OLD_STRING_NOT_UNIQUE` match locations, fuzzy candidate suggestions. |
+| [`@agent-sh/harness-write`](./packages/write) | Atomic file write + targeted `edit` + `multi_edit` pipeline with read-before-edit ledger, `OLD_STRING_NOT_UNIQUE` match locations, fuzzy candidate suggestions. |
 | [`@agent-sh/harness-grep`](./packages/grep) | ripgrep-backed search with discriminated `output_mode`, regex hints on `INVALID_REGEX`, pagination. |
 | [`@agent-sh/harness-glob`](./packages/glob) | File discovery by pattern with ignore-awareness, mtime-sorted results, workspace fence. |
 | [`@agent-sh/harness-bash`](./packages/bash) | Shell with tokio-style cwd-carry, inactivity + wall-clock timeouts, head+tail spill-to-file on overflow, background jobs (`bash_output` / `bash_kill`). |

@@ -206,7 +206,7 @@ export function makeWriteExecutorsRust(
     },
     multiEdit: {
       tool: toOllamaTool(multieditToolDefinition),
-      execute: (args: unknown) => runRpc("multiedit", args),
+      execute: (args: unknown) => runRpc("multi_edit", args),
     },
     registerRead,
     close,

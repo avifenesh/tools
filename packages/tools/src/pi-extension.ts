@@ -449,7 +449,7 @@ export default function harnessToolsExtension(pi: ExtensionAPI): void {
     edit(p, writeSession(cwd, ledger, signal)),
   );
 
-  register("multiedit", "MultiEdit", multieditToolDefinition.description, MultiEditParams, (p, cwd, signal) =>
+  register("multi_edit", "MultiEdit", multieditToolDefinition.description, MultiEditParams, (p, cwd, signal) =>
     multiEdit(p, writeSession(cwd, ledger, signal)),
   );
 

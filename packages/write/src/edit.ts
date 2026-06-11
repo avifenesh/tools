@@ -64,7 +64,7 @@ async function executeEdit(
   resolvedPath: string,
   params: EditParams,
 ): Promise<EditResult> {
-  const preflight = await preflightMutation(ops, session, resolvedPath);
+  const preflight = await preflightMutation(ops, session, resolvedPath, "edit");
   if ("error" in preflight) return err(preflight.error);
   const { existingContent, existingBytes, previousSha } = preflight;
   const gateWarnings = preflight.warnings ?? [];
@@ -188,11 +188,16 @@ export interface PreflightErr {
 /**
  * Shared pre-edit checks for Edit and MultiEdit: file exists, not binary,
  * not too large, has a fresh ledger entry, sha matches.
+ *
+ * `tool` is the invoking tool's canonical name; it is reported as the `tool`
+ * label on the read-before-mutate permission-hook query so hooks see the
+ * same name for every query a single tool call makes.
  */
 export async function preflightMutation(
   ops: ReadOperations,
   session: WriteSessionConfig,
   resolvedPath: string,
+  tool: "edit" | "multi_edit",
 ): Promise<PreflightOk | PreflightErr> {
   let stat;
   try {
@@ -273,7 +278,7 @@ export async function preflightMutation(
   if (!ledgerEntry) {
     if (session.permissions.hook !== undefined) {
       const decision = await session.permissions.hook({
-        tool: "edit",
+        tool,
         path: resolvedPath,
         action: "write_unread",
         always_patterns: [path.dirname(resolvedPath) + "/*"],
@@ -283,7 +288,7 @@ export async function preflightMutation(
         return {
           error: toolError(
             "DENIED_BY_HOOK",
-            `Edit of an un-Read file denied by permission hook: ${resolvedPath}`,
+            `${tool} of an un-Read file denied by permission hook: ${resolvedPath}`,
             { meta: { path: resolvedPath } },
           ),
         };

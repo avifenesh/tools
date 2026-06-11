@@ -40,7 +40,7 @@ export async function resolvePath(
 export async function fencePath(
   session: WriteSessionConfig,
   resolvedPath: string,
-  tool: "write" | "edit" | "multiedit",
+  tool: "write" | "edit" | "multi_edit",
   metadata: Readonly<Record<string, unknown>>,
 ): Promise<ToolError | undefined> {
   const { permissions } = session;

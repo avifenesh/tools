@@ -404,3 +404,47 @@ async fn error_result_serializes_with_kind_tag() {
     let v: Value = serde_json::to_value(&r).unwrap();
     assert_eq!(v.get("kind").and_then(|x| x.as_str()), Some("error"));
 }
+
+// ---- Tool name: canonical + deprecated legacy alias ----
+
+#[test]
+fn multiedit_tool_name_is_canonical_snake_case() {
+    assert_eq!(harness_write::MULTIEDIT_TOOL_NAME, "multi_edit");
+    #[allow(deprecated)]
+    {
+        assert_eq!(harness_write::MULTIEDIT_TOOL_NAME_LEGACY, "multiedit");
+    }
+}
+
+#[test]
+fn is_multi_edit_tool_name_accepts_canonical_and_legacy() {
+    use harness_write::is_multi_edit_tool_name;
+    // Pure predicate: matches both spellings, never warns (the deprecation
+    // warning lives in normalize_multi_edit_tool_name at dispatch points).
+    assert!(is_multi_edit_tool_name("multi_edit"));
+    assert!(is_multi_edit_tool_name("multiedit"));
+    assert!(is_multi_edit_tool_name("multiedit"));
+    assert!(!is_multi_edit_tool_name("multi-edit"));
+    assert!(!is_multi_edit_tool_name("MultiEdit"));
+    assert!(!is_multi_edit_tool_name("edit"));
+    assert!(!is_multi_edit_tool_name(""));
+}
+
+#[test]
+fn normalize_multi_edit_tool_name_maps_both_spellings_to_canonical() {
+    use harness_write::normalize_multi_edit_tool_name;
+    assert_eq!(
+        normalize_multi_edit_tool_name("multi_edit"),
+        Some("multi_edit")
+    );
+    // Legacy spelling normalizes to canonical (and emits the once-per-process
+    // stderr warning — asserted end-to-end in tests/cli.rs).
+    assert_eq!(
+        normalize_multi_edit_tool_name("multiedit"),
+        Some("multi_edit")
+    );
+    assert_eq!(normalize_multi_edit_tool_name("multi-edit"), None);
+    assert_eq!(normalize_multi_edit_tool_name("MultiEdit"), None);
+    assert_eq!(normalize_multi_edit_tool_name("edit"), None);
+    assert_eq!(normalize_multi_edit_tool_name(""), None);
+}

@@ -45,6 +45,15 @@ MultiEdit(path, edits[], dry_run?)
 
 Rationale: This is the Claude Code shape. Qwen and Claude are both trained on this vocabulary; it's the highest-coverage surface in public SFT data. See Decision D1.
 
+Registered tool names are snake_case: `write`, `edit`, `multi_edit`. The
+MultiEdit name was `multiedit` before harness-write 0.6.0 (TS) / 0.3.0 (Rust);
+that spelling remains a deprecated alias. `isMultiEditToolName` /
+`is_multi_edit_tool_name` are pure matchers that accept both spellings;
+`normalizeMultiEditToolName` / `normalize_multi_edit_tool_name` map both to
+the canonical name and emit a one-time deprecation warning on the legacy
+spelling — use the normalizer at dispatch points (the `harness-write-cli`
+JSON-RPC dispatch does). The alias will be removed in a future major release.
+
 ### 2.1 Tool descriptions (LLM-facing)
 
 The exact description text shipped with the tool schema matters as much as the code. These are the contract with the model.
@@ -263,24 +272,30 @@ Identical to Read (`read.md` §5):
 
 - **Workspace roots** — resolved path must fall under one.
 - **Sensitive patterns** — `.env`, `.ssh/**`, `*.pem`, `credentials.json`, etc. (same list as Read).
-- **Permission hook** — same signature, with `tool: "write" | "edit" | "multiedit"`. Hook is called for out-of-workspace and sensitive-path cases. No hook wired → `OUTSIDE_WORKSPACE` / `SENSITIVE_PATH` error.
+- **Permission hook** — same signature, with `tool: "write" | "edit" | "multi_edit"`. Hook is called for out-of-workspace and sensitive-path cases. No hook wired → `OUTSIDE_WORKSPACE` / `SENSITIVE_PATH` error.
 
 The hook receives the full intended mutation:
 
 ```text
 async ask(req: {
-  tool: "write" | "edit" | "multiedit",
+  tool: "write" | "edit" | "multi_edit",
   path: string,
   action: "write" | "edit",
   always_patterns: string[],
   metadata: {
-    old_string_preview?: string,      // first 200 chars, edit/multiedit
+    old_string_preview?: string,      // first 200 chars, edit/multi_edit
     new_string_preview?: string,
-    edit_count?: int,                 // multiedit
+    edit_count?: int,                 // multi_edit
     write_bytes?: int,                // write
   },
 }) → "allow" | "deny"
 ```
+
+The fail-open read-before-mutate gate (D11, `read.md` §5) issues an additional
+hook query with `action: "write_unread"` when the target has no ledger entry.
+That query carries the same `tool` label as the invoking tool (`write`,
+`edit`, or `multi_edit`), so a single tool call never reports two different
+tool names to the hook.
 
 ---
 
