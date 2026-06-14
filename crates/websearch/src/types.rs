@@ -103,6 +103,8 @@ pub struct WebSearchSessionConfig {
     pub tavily_api_key: Option<String>,
     /// Drop the Mojeek scrape engine from the keyless chain (ToS gray area).
     pub disable_mojeek: bool,
+    /// Per-result snippet character cap (default 240; clamped 80–600).
+    pub snippet_cap: Option<usize>,
     /// When an explicit backend is configured, also fall back to the keyless
     /// chain if it returns nothing/errors. Default false (explicit is exclusive).
     pub fallback_to_keyless: bool,
@@ -131,6 +133,7 @@ impl WebSearchSessionConfig {
             brave_api_key: None,
             tavily_api_key: None,
             disable_mojeek: false,
+            snippet_cap: None,
             fallback_to_keyless: false,
             engine_base_urls: None,
             default_headers: None,
@@ -179,6 +182,16 @@ pub struct WebSearchResultItem {
     pub title: String,
     pub url: String,
     pub snippet: String,
+    /// Backend-provided freshness when available (Brave `age` / Wikipedia
+    /// last-edit `timestamp`), normalized to YYYY-MM-DD. Usually None for the
+    /// keyless scrape engines; never fabricated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age: Option<String>,
+    /// Backend-native relevance/quality score when available (Marginalia
+    /// `quality`, Tavily `score`). Opaque scale; surfaced verbatim, never
+    /// synthesized.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +204,13 @@ pub struct SearchMetadata {
     /// Which engine served the results (provenance), e.g. "mojeek".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
+    /// Coverage class of the serving engine, for a model-readable label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine_class: Option<crate::engine::EngineClass>,
+    /// Whether the serving engine applied the requested time_range. None when
+    /// no time filter was requested (time_range=all).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_range_applied: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

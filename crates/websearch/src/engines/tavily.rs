@@ -110,6 +110,13 @@ impl WebSearchEngine for TavilyEngine {
             backend_host: host,
             elapsed_ms: started.elapsed().as_millis() as u64,
             engine: Some(ENGINE_NAME.to_string()),
+            engine_class: None,
+            // Tavily honors time_range when one was requested.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(true)
+            },
         })
     }
 }
@@ -131,10 +138,24 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             .and_then(|v| v.as_str())
             .map(strip_tags)
             .unwrap_or_default();
+        let score = entry.get("score").and_then(|v| v.as_f64());
+        let age = entry
+            .get("published_date")
+            .and_then(|v| v.as_str())
+            .and_then(|d| {
+                let t = d.trim();
+                if t.len() >= 10 {
+                    Some(t[0..10].to_string())
+                } else {
+                    None
+                }
+            });
         out.push(WebSearchResultItem {
             title: title.to_string(),
             url: url.to_string(),
             snippet,
+            age,
+            score,
         });
     }
     out

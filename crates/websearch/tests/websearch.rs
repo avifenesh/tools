@@ -313,8 +313,8 @@ async fn happy_path_returns_ok_ranked_list() {
     let ok = expect_ok(&r);
     assert_eq!(ok.results.len(), 5);
     assert_eq!(ok.results[0].title, "Result 1");
-    assert!(ok.output.contains("<search>"));
-    assert!(ok.output.contains("<results>"));
+    assert!(ok.output.starts_with("WEB \"rust async runtime\""));
+    assert!(ok.output.contains("searxng (general web)"));
     assert!(ok.output.contains("Fetch a URL with webfetch"));
 }
 
@@ -361,7 +361,7 @@ async fn empty_results_returns_empty_kind() {
     let r = websearch(json!({"query": "asdkjhaskdjhqweqlkj"}), &s).await;
     let e = expect_empty(&r);
     assert_eq!(e.meta.count, 0);
-    assert!(e.output.contains("No results for"));
+    assert!(e.output.contains("No results"));
 }
 
 #[tokio::test]

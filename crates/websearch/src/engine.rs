@@ -37,6 +37,11 @@ pub struct WebSearchEngineResult {
     /// Which engine served this result (provenance). None until set by an
     /// engine or the fallback layer.
     pub engine: Option<String>,
+    /// Coverage class of the serving engine (set by the fallback layer).
+    pub engine_class: Option<EngineClass>,
+    /// Whether the serving engine applied the requested time_range. None when
+    /// time_range=all (nothing to apply).
+    pub time_range_applied: Option<bool>,
 }
 
 #[async_trait]
@@ -63,11 +68,23 @@ pub trait WebSearchEngine: Send + Sync {
 /// had nothing" signal; a niche/vertical empty says far less, so the fallback
 /// chain treats a niche/vertical-only empty while a general engine ERRORED as
 /// a degraded failure rather than a clean empty. Mirrors TS `EngineClass`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EngineClass {
     General,
     Niche,
     Vertical,
+}
+
+impl EngineClass {
+    /// Human/model-readable coverage label used in the output header.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::General => "general web",
+            Self::Niche => "indie/small-web index",
+            Self::Vertical => "encyclopedic",
+        }
+    }
 }
 
 /// Engine-local error code, distinct from `harness_core::ToolErrorCode`. The
@@ -194,6 +211,13 @@ impl WebSearchEngine for ReqwestEngine {
             backend_host: host,
             elapsed_ms: started.elapsed().as_millis() as u64,
             engine: Some("searxng".to_string()),
+            engine_class: None,
+            // SearXNG applies the time_range param when one is requested.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(true)
+            },
         })
     }
 }
@@ -243,6 +267,8 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             title: title.to_string(),
             url: url.to_string(),
             snippet: snippet.to_string(),
+            age: None,
+            score: None,
         });
     }
     out

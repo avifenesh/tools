@@ -39,6 +39,10 @@ pub struct ResolvedEngine {
     pub engine: Arc<dyn WebSearchEngine>,
     pub chain: Vec<String>,
     pub keyless_default: bool,
+    /// When exactly one engine was resolved (no fallback wrapper), its class —
+    /// so the orchestrator can label results. None for a fallback chain (the
+    /// FallbackEngine sets engine_class on the result it returns).
+    pub sole_engine_class: Option<crate::engine::EngineClass>,
 }
 
 /// Build the engine to run for this session — the Rust twin of TS
@@ -56,6 +60,7 @@ pub fn resolve_engine(session: &WebSearchSessionConfig) -> ResolvedEngine {
             engine: engine.clone(),
             chain: vec![engine.name().to_string()],
             keyless_default: false,
+            sole_engine_class: Some(engine.engine_class()),
         };
     }
 
@@ -105,16 +110,20 @@ pub fn resolve_engine(session: &WebSearchSessionConfig) -> ResolvedEngine {
     };
 
     let chain: Vec<String> = engines.iter().map(|e| e.name().to_string()).collect();
-    let engine: Arc<dyn WebSearchEngine> = if engines.len() == 1 {
-        engines.into_iter().next().unwrap()
-    } else {
-        Arc::new(FallbackEngine::new(engines))
-    };
+    let (engine, sole_engine_class): (Arc<dyn WebSearchEngine>, Option<crate::engine::EngineClass>) =
+        if engines.len() == 1 {
+            let only = engines.into_iter().next().unwrap();
+            let class = only.engine_class();
+            (only, Some(class))
+        } else {
+            (Arc::new(FallbackEngine::new(engines)), None)
+        };
 
     ResolvedEngine {
         engine,
         chain,
         keyless_default: !has_explicit,
+        sole_engine_class,
     }
 }
 

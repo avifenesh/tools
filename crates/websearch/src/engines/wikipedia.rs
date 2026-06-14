@@ -9,7 +9,7 @@ use crate::engine::{
     shared_client, SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput,
     WebSearchEngineResult,
 };
-use crate::types::WebSearchResultItem;
+use crate::types::{WebSearchResultItem, WebSearchTimeRange};
 
 const ENGINE_NAME: &str = "wikipedia";
 
@@ -96,6 +96,13 @@ impl WebSearchEngine for WikipediaEngine {
             backend_host: res.host,
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
+            engine_class: None,
+            // Wikipedia search ignores recency filtering.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(false)
+            },
         })
     }
 }
@@ -125,10 +132,18 @@ fn map_results(parsed: &serde_json::Value, origin: &str) -> Vec<WebSearchResultI
             .and_then(|v| v.as_str())
             .map(strip_tags)
             .unwrap_or_default();
+        // `timestamp` is the article's last-edit time; surface the date
+        // portion as `age` (NB: last-edit, not first-publication).
+        let age = entry
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .and_then(iso_date);
         out.push(WebSearchResultItem {
             title: title.to_string(),
             url,
             snippet,
+            age,
+            score: None,
         });
     }
     out
@@ -148,5 +163,23 @@ fn normalize_lang(language: &str) -> String {
         primary
     } else {
         "en".to_string()
+    }
+}
+
+/// Extract the YYYY-MM-DD date portion from an ISO timestamp; None if it
+/// doesn't start with a date.
+fn iso_date(ts: &str) -> Option<String> {
+    let t = ts.trim();
+    let bytes = t.as_bytes();
+    if bytes.len() >= 10
+        && bytes[0..4].iter().all(u8::is_ascii_digit)
+        && bytes[4] == b'-'
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[7] == b'-'
+        && bytes[8..10].iter().all(u8::is_ascii_digit)
+    {
+        Some(t[0..10].to_string())
+    } else {
+        None
     }
 }

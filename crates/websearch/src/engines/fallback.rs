@@ -84,6 +84,7 @@ impl WebSearchEngine for FallbackEngine {
                         if out.engine.is_none() {
                             out.engine = Some(name);
                         }
+                        out.engine_class = Some(class);
                         return Ok(out);
                     }
                     summary.push(format!("{}: empty", name));
@@ -91,6 +92,7 @@ impl WebSearchEngine for FallbackEngine {
                     if e.engine.is_none() {
                         e.engine = Some(name);
                     }
+                    e.engine_class = Some(class);
                     if class == EngineClass::General {
                         if general_empty.is_none() {
                             general_empty = Some(e);

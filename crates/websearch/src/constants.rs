@@ -10,7 +10,9 @@ pub const DEFAULT_LANGUAGE: &str = "auto";
 pub const DEFAULT_CATEGORIES: &[&str] = &["general"];
 
 pub const MAX_QUERY_LENGTH: usize = 512;
-pub const SNIPPET_CAP: usize = 300; // per-result snippet trim
+pub const SNIPPET_CAP: usize = 240; // per-result snippet trim (default; session-tunable)
+pub const MIN_SNIPPET_CAP: usize = 80;
+pub const MAX_SNIPPET_CAP: usize = 600;
 
 /// Default User-Agent. Harnesses can override via session.default_headers.
 /// Identifies as an agent tool with a contact URL — verified accepted (no

@@ -1,87 +1,123 @@
 use crate::constants::SNIPPET_CAP;
-use crate::types::{SearchMetadata, WebSearchResultItem};
+use crate::types::{SearchMetadata, WebSearchResultItem, WebSearchTimeRange};
 
-/// Render the <search>...</search> block that opens the ok results. Uniform
-/// shape so the model parses the same surface.
-pub fn render_search_block(meta: &SearchMetadata) -> String {
-    let engine_line = match &meta.engine {
-        Some(e) if !e.is_empty() => format!("\n  <engine>{}</engine>", e),
-        _ => String::new(),
+// Output format (v0.5) — compact ranked plain text, the shape LLM-facing
+// search APIs (Tavily/Brave/Anthropic/Exa) converge on. One short header
+// line + 3-line entries; per-result `age` only when the backend provides it;
+// honest time-range note when the serving engine ignored the filter; an
+// engine-class label so the model can judge source breadth. Mirrors the TS
+// `format.ts`.
+
+/// The single compact header line, shared by ok/empty. Example:
+///   WEB "rust async" · mojeek (general web) · 5 results
+fn header_line(meta: &SearchMetadata, n: usize) -> String {
+    let mut parts: Vec<String> = vec![format!("WEB \"{}\"", meta.query)];
+    let via = match &meta.engine {
+        Some(e) if !e.is_empty() => {
+            let label = meta
+                .engine_class
+                .map(|c| c.label())
+                .unwrap_or("web");
+            format!("{} ({})", e, label)
+        }
+        _ => meta.backend_host.clone(),
     };
-    format!(
-        "<search>\n  <query>{}</query>\n  <backend>{}</backend>{}\n  <count>{}</count>\n  <time_range>{}</time_range>\n</search>",
-        meta.query,
-        meta.backend_host,
-        engine_line,
-        meta.count,
-        meta.time_range.as_str(),
-    )
+    parts.push(via);
+    parts.push(format!("{} result{}", n, if n == 1 { "" } else { "s" }));
+    // Honest recency: only mention time filtering when one was requested.
+    if meta.time_range != WebSearchTimeRange::All {
+        match meta.time_range_applied {
+            Some(true) => parts.push(format!("time:{}", meta.time_range.as_str())),
+            Some(false) => parts.push(format!(
+                "time:{} NOT applied (this engine ignores it; results are all-time)",
+                meta.time_range.as_str()
+            )),
+            None => {}
+        }
+    }
+    parts.join(" · ")
 }
 
 pub struct FormatOkArgs<'a> {
     pub meta: &'a SearchMetadata,
     pub results: &'a [WebSearchResultItem],
     pub requested: usize,
+    pub snippet_cap: usize,
 }
 
 pub fn format_ok_text(args: FormatOkArgs<'_>) -> String {
-    let header = render_search_block(args.meta);
+    let header = header_line(args.meta, args.results.len());
     let numbered = args
         .results
         .iter()
         .enumerate()
         .map(|(i, r)| {
-            let snippet = trim_snippet(&r.snippet);
+            let age_part = match &r.age {
+                Some(a) if !a.is_empty() => format!(" · {}", a),
+                _ => String::new(),
+            };
+            let snippet = trim_snippet(&r.snippet, args.snippet_cap);
             let snippet_line = if snippet.is_empty() {
                 String::new()
             } else {
                 format!("\n   {}", snippet)
             };
-            format!("{}. {}\n   {}{}", i + 1, r.title, r.url, snippet_line)
+            format!("{}. {}\n   {}{}{}", i + 1, r.title, r.url, age_part, snippet_line)
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let results_block = format!("<results>\n{}\n</results>", numbered);
     let n = args.results.len();
-    let via = match &args.meta.engine {
-        Some(e) if !e.is_empty() => format!("{} ({})", e, args.meta.backend_host),
-        _ => args.meta.backend_host.clone(),
-    };
     let hint = if n < args.requested {
         format!(
-            "(Only {} results — fewer than the {} requested. Try broader terms or a wider time_range.)",
+            "(Only {} of {} requested. Broaden the query or widen time_range; or fetch a URL with webfetch to read it.)",
             n, args.requested
         )
     } else {
-        format!(
-            "(Found {} results for \"{}\" via {} in {}ms. Fetch a URL with webfetch to read it.)",
-            n, args.meta.query, via, args.meta.elapsed_ms
-        )
+        "(Fetch a URL with webfetch to read the page.)".to_string()
     };
-    format!("{}\n{}\n{}", header, results_block, hint)
+    format!("{}\n{}\n{}", header, numbered, hint)
 }
 
 pub fn format_empty_text(meta: &SearchMetadata) -> String {
-    let header = format!(
-        "<search><query>{}</query><backend>{}</backend><count>0</count></search>",
-        meta.query, meta.backend_host
-    );
+    let header = header_line(meta, 0);
+    let widen = if meta.time_range != WebSearchTimeRange::All {
+        ", a wider time_range,"
+    } else {
+        ""
+    };
     let hint = format!(
-        "(No results for \"{}\". Try different/broader keywords, a wider time_range, or check that the search backend has engines enabled.)",
-        meta.query
+        "(No results. Try different/broader keywords{} or fetch a known URL with webfetch.)",
+        widen
     );
     format!("{}\n{}", header, hint)
 }
 
-fn trim_snippet(snippet: &str) -> String {
+/// Back-compat: the old `<search>…</search>` block renderer now returns the
+/// compact header line (kept as a public export).
+pub fn render_search_block(meta: &SearchMetadata) -> String {
+    header_line(meta, meta.count)
+}
+
+fn trim_snippet(snippet: &str, cap: usize) -> String {
     let collapsed = collapse_whitespace(snippet);
-    if collapsed.chars().count() <= SNIPPET_CAP {
+    if collapsed.chars().count() <= cap {
         return collapsed;
     }
-    let truncated: String = collapsed.chars().take(SNIPPET_CAP).collect();
+    let truncated: String = collapsed.chars().take(cap).collect();
     format!("{}…", truncated)
 }
 
 fn collapse_whitespace(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Clamp a session-provided snippet cap to the sane [MIN, MAX] window.
+pub fn clamp_snippet_cap(n: Option<usize>) -> usize {
+    use crate::constants::{MAX_SNIPPET_CAP, MIN_SNIPPET_CAP};
+    match n {
+        None => SNIPPET_CAP,
+        Some(v) if v < MIN_SNIPPET_CAP => MIN_SNIPPET_CAP,
+        Some(v) if v > MAX_SNIPPET_CAP => MAX_SNIPPET_CAP,
+        Some(v) => v,
+    }
 }

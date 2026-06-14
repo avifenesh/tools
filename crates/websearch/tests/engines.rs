@@ -309,12 +309,16 @@ impl WebSearchEngine for FakeEngine {
                 backend_host: format!("{}.example", self.name),
                 elapsed_ms: 1,
                 engine: None,
+                engine_class: None,
+                time_range_applied: None,
             }),
             FakeBehavior::Empty => Ok(WebSearchEngineResult {
                 results: vec![],
                 backend_host: format!("{}.example", self.name),
                 elapsed_ms: 1,
                 engine: None,
+                engine_class: None,
+                time_range_applied: None,
             }),
             FakeBehavior::Error(code) => Err(SearchError::new(*code, "fake error")),
         }
@@ -326,6 +330,8 @@ fn item(u: &str) -> WebSearchResultItem {
         title: format!("t-{}", u),
         url: format!("https://{}", u),
         snippet: "s".to_string(),
+        age: None,
+        score: None,
     }
 }
 
@@ -499,7 +505,68 @@ async fn zero_config_uses_keyless_and_reports_provenance() {
     match r {
         WebSearchResult::Ok(ok) => {
             assert_eq!(ok.meta.engine.as_deref(), Some("mojeek"));
-            assert!(ok.output.contains("<engine>mojeek</engine>"));
+            assert_eq!(
+                ok.meta.engine_class,
+                Some(harness_websearch::EngineClass::General)
+            );
+            // New compact format labels the engine class in the header.
+            assert!(ok.output.contains("mojeek (general web)"));
+            assert!(ok.output.starts_with("WEB \"x\""));
+        }
+        other => panic!("expected ok, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn wikipedia_surfaces_age_and_marginalia_surfaces_score() {
+    // Wikipedia: timestamp → age (YYYY-MM-DD).
+    let wbody = Bytes::from(fixture("wikipedia.json"));
+    let wh: H = Arc::new(move |_req| json_resp(wbody.clone()));
+    let (waddr, _wj) = serve(wh).await;
+    let wr = WikipediaEngine::new()
+        .with_base_url(format!("http://{}", waddr))
+        .search(engine_input())
+        .await
+        .unwrap();
+    assert!(wr.results[0].age.as_deref().is_some_and(|a| a.len() == 10));
+    assert_eq!(wr.time_range_applied, None); // no time_range requested
+
+    // Marginalia: quality → score.
+    let mbody = Bytes::from(fixture("marginalia.json"));
+    let mh: H = Arc::new(move |_req| json_resp(mbody.clone()));
+    let (maddr, _mj) = serve(mh).await;
+    let mr = MarginaliaEngine::new()
+        .with_base_url(format!("http://{}", maddr))
+        .search(engine_input())
+        .await
+        .unwrap();
+    assert!(mr.results[0].score.is_some());
+}
+
+#[tokio::test]
+async fn honest_recency_note_when_engine_ignores_time_range() {
+    // Mojeek ignores time_range; the header must say so, not mislabel.
+    let handler: H = Arc::new(|_req| Resp {
+        status: StatusCode::OK,
+        content_type: "text/html",
+        body: Bytes::from_static(
+            br#"<ul class="results-standard"><!--rs--><li><a class="title" href="https://ex.com/a">A</a><p class="s">snip</p></li><!--re--></ul>"#,
+        ),
+    });
+    let (addr, _jh) = serve(handler).await;
+    let perms = PermissionPolicy::new(Vec::<String>::new());
+    let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
+    let mut s = WebSearchSessionConfig::auto(ws_perms);
+    s.allow_loopback = true;
+    s.engine_base_urls = Some(EngineBaseUrls {
+        mojeek: Some(format!("http://{}", addr)),
+        ..Default::default()
+    });
+    let r = websearch(json!({"query": "x", "time_range": "week"}), &s).await;
+    match r {
+        WebSearchResult::Ok(ok) => {
+            assert_eq!(ok.meta.time_range_applied, Some(false));
+            assert!(ok.output.contains("time:week NOT applied"));
         }
         other => panic!("expected ok, got {:?}", other),
     }

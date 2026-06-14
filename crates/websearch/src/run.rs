@@ -172,6 +172,12 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         .engine
         .clone()
         .or_else(|| resolved.chain.first().cloned());
+    // engine_class comes from the fallback layer; for a single resolved engine
+    // fall back to the resolver's known class.
+    let engine_class = engine_result
+        .engine_class
+        .or(resolved.sole_engine_class);
+    let time_range_applied = engine_result.time_range_applied;
 
     let mut results = engine_result.results;
     results.truncate(count);
@@ -183,7 +189,11 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         time_range,
         elapsed_ms: engine_result.elapsed_ms,
         engine: served_by,
+        engine_class,
+        time_range_applied,
     };
+
+    let snippet_cap = crate::format::clamp_snippet_cap(session.snippet_cap);
 
     if results.is_empty() {
         return WebSearchResult::Empty(WebSearchEmpty {
@@ -196,6 +206,7 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         meta: &meta,
         results: &results,
         requested: count,
+        snippet_cap,
     });
     WebSearchResult::Ok(WebSearchOk {
         output,

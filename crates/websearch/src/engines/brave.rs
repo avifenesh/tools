@@ -83,6 +83,13 @@ impl WebSearchEngine for BraveEngine {
             backend_host: res.host,
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
+            engine_class: None,
+            // Brave honors freshness when a time_range was requested.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(true)
+            },
         })
     }
 }
@@ -122,11 +129,45 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             .and_then(|v| v.as_str())
             .map(strip_tags)
             .unwrap_or_default();
+        // Brave exposes page freshness as `age` (or `page_age`); pass through
+        // the date portion / short relative string when present.
+        let age = entry
+            .get("age")
+            .and_then(|v| v.as_str())
+            .or_else(|| entry.get("page_age").and_then(|v| v.as_str()))
+            .and_then(normalize_age);
         out.push(WebSearchResultItem {
             title,
             url: url.to_string(),
             snippet,
+            age,
+            score: None,
         });
     }
     out
+}
+
+/// Brave's `age` is sometimes an ISO date ("2025-06-10") and sometimes a short
+/// relative string ("3 days ago"). Keep an ISO date's date portion; otherwise
+/// pass a short relative string through verbatim.
+fn normalize_age(raw: &str) -> Option<String> {
+    let t = raw.trim();
+    if t.is_empty() {
+        return None;
+    }
+    let bytes = t.as_bytes();
+    if bytes.len() >= 10
+        && bytes[0..4].iter().all(u8::is_ascii_digit)
+        && bytes[4] == b'-'
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[7] == b'-'
+        && bytes[8..10].iter().all(u8::is_ascii_digit)
+    {
+        return Some(t[0..10].to_string());
+    }
+    if t.len() <= 24 {
+        Some(t.to_string())
+    } else {
+        None
+    }
 }

@@ -56,6 +56,8 @@ struct SessionSpec {
     #[serde(default)]
     disable_mojeek: bool,
     #[serde(default)]
+    snippet_cap: Option<usize>,
+    #[serde(default)]
     fallback_to_keyless: bool,
     #[serde(default)]
     default_headers: Option<HashMap<String, String>>,
@@ -89,6 +91,7 @@ impl SessionSpec {
         cfg.brave_api_key = self.brave_api_key;
         cfg.tavily_api_key = self.tavily_api_key;
         cfg.disable_mojeek = self.disable_mojeek;
+        cfg.snippet_cap = self.snippet_cap;
         cfg.fallback_to_keyless = self.fallback_to_keyless;
         cfg.default_headers = self.default_headers;
         cfg.allow_loopback = self.allow_loopback;

@@ -11,7 +11,7 @@ use crate::engine::{
     shared_client, SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput,
     WebSearchEngineResult,
 };
-use crate::types::WebSearchResultItem;
+use crate::types::{WebSearchResultItem, WebSearchTimeRange};
 
 const DEFAULT_BASE: &str = "https://www.mojeek.com";
 const ENGINE_NAME: &str = "mojeek";
@@ -90,6 +90,13 @@ impl WebSearchEngine for MojeekEngine {
             backend_host: res.host,
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
+            engine_class: None,
+            // Mojeek's SERP scrape has no recency filter.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(false)
+            },
         })
     }
 }
@@ -121,6 +128,8 @@ pub(crate) fn parse_mojeek(html: &str) -> Vec<WebSearchResultItem> {
             title,
             url,
             snippet,
+            age: None,
+            score: None,
         });
     }
     out

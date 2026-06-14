@@ -9,7 +9,7 @@ use crate::engine::{
     shared_client, SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput,
     WebSearchEngineResult,
 };
-use crate::types::WebSearchResultItem;
+use crate::types::{WebSearchResultItem, WebSearchTimeRange};
 
 const DEFAULT_BASE: &str = "https://api.marginalia.nu";
 const ENGINE_NAME: &str = "marginalia";
@@ -87,6 +87,13 @@ impl WebSearchEngine for MarginaliaEngine {
             backend_host: res.host,
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
+            engine_class: None,
+            // Marginalia's public API has no recency filter.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(false)
+            },
         })
     }
 }
@@ -108,10 +115,14 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             .and_then(|v| v.as_str())
             .map(strip_tags)
             .unwrap_or_default();
+        // `quality` is Marginalia's relevance/quality score; surface it.
+        let score = entry.get("quality").and_then(|v| v.as_f64());
         out.push(WebSearchResultItem {
             title: title.to_string(),
             url: url.to_string(),
             snippet,
+            age: None,
+            score,
         });
     }
     out
