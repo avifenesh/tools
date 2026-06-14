@@ -359,15 +359,28 @@ configured, the chain is the keyless tail, so search **just works**.
   longer ends the search — later engines top up the quota.
 - **Fast path**: if the FIRST engine alone returns ≥ `count`, it is returned
   immediately — no added latency, no mixing (single-engine provenance).
+- **Merge ranking (RRF + engine weights)**: when more than one engine
+  contributes, results are fused with Reciprocal Rank Fusion rather than
+  chain-concatenated: `fused(url) = Σ over engines e returning url:
+  weight(e) / (K + rank_e(url))` (K=10; weights general 1.0 > niche 0.8 >
+  vertical 0.6; keyed brave/tavily 1.2). The engines' native scores aren't
+  comparable, so fusion is on **rank** (the SearXNG/`ddgs` approach). Effects:
+  a URL two engines return **sums** both terms (a **consensus boost** — the
+  strongest cheap relevance signal), and engine weights stop a niche/
+  encyclopedic backstop outranking broad web when the leader was short. For a
+  single contributor RRF is a stable no-op reorder. Deterministic (score, then
+  #agreeing-engines, then insertion order).
 - **Dedup**: results are keyed on a normalized URL (lowercase scheme/host, drop
   `www.`/default port/fragment/trailing slash, strip `utm_*`/`gclid`/… tracking
-  params, sort query). The first engine to surface a URL owns the entry and its
-  rank; the *original* URL is always kept in output. Conservative — meaningful
-  params (`?id=`, `?curid=`, `?q=`) are preserved so distinct pages don't merge.
+  params, sort query). The first engine to surface a URL owns the emitted item
+  fields, but **every** engine's rank for it feeds the fused score; the
+  *original* URL is kept in output. Conservative — meaningful params (`?id=`,
+  `?curid=`, `?q=`) are preserved so distinct pages don't merge.
 - **Provenance when merged**: the header lists contributors
   (`mojeek+marginalia (general web)`) and each result row carries a `· source`
-  tag. `timeRangeApplied` across contributors is `false` if **any** contributor
-  ignored the filter.
+  tag — a consensus row names all agreeing engines, best-rank-first.
+  `timeRangeApplied` across contributors is `false` if **any** ignored the
+  filter.
 - A per-engine **failure** (transport / SSRF / parse / per-engine-timeout) is
   recorded and the chain **continues** — one dead host can't sink the search.
 - **Timeout fairness**: `timeoutMs` is the overall budget; each engine gets a
@@ -491,4 +504,6 @@ The **one breaking change**: the `no search backend configured` `INVALID_PARAM` 
 
 **WS-D17** (honest recency, never fabricated): per-result `age` is rendered only when the backend actually provides it — Brave/Tavily dates, Wikipedia last-edit `timestamp`; Mojeek/Marginalia supply none and we show nothing (no `age: unknown` noise). Marginalia's `quality` is surfaced as `score`. Critically, when a `time_range` was requested but the serving engine ignores it (Mojeek/Marginalia/Wikipedia), the header says `time:week NOT applied (this engine ignores it)` instead of silently mislabeling all-time results as filtered — fixing a real "the model trusts a freshness guarantee that wasn't honored" bug.
 
-**WS-D18** (gather + merge, not first-non-empty): the FallbackEngine accumulates and de-duplicates results across engines until `count` is met, rather than returning the first engine that has *any* result (the reviewer's "first-non-empty is too weak" point — a 1-hit leader for a 5-result request was a bad answer). A sufficient first engine still short-circuits (fast path, no mixing). Dedup is on a normalized URL (www/port/fragment/trailing-slash/tracking-param-insensitive, but preserving meaningful query params) so the same page from two backends collapses to one; the original URL is kept. Merged results expose contributors in the header and a per-row `source`. This is the SearXNG/`ddgs` merge model adapted to the keyless chain. (A relevance *rerank* across heterogeneous backends — Marginalia `quality` vs Mojeek rank vs Tavily `score` — is still deferred; rank-by-chain-order is the v1 merge policy.)
+**WS-D18** (gather + merge, not first-non-empty): the FallbackEngine accumulates and de-duplicates results across engines until `count` is met, rather than returning the first engine that has *any* result (the reviewer's "first-non-empty is too weak" point — a 1-hit leader for a 5-result request was a bad answer). A sufficient first engine still short-circuits (fast path, no mixing). Dedup is on a normalized URL (www/port/fragment/trailing-slash/tracking-param-insensitive, but preserving meaningful query params) so the same page from two backends collapses to one; the original URL is kept. Merged results expose contributors in the header and a per-row `source`.
+
+**WS-D19** (RRF + engine weights for merge ranking; A/B-validated): when the chain merges, results are ordered by Reciprocal Rank Fusion with engine weights, not chain concatenation. The engines' native scores are not comparable (Marginalia `quality` ~0–4.5, Tavily 0–1 `score`, Mojeek bare rank), so fusion is on **rank**: `fused(d)=Σ weight(e)/(K+rank_e(d))`, K=10, weights general 1.0 / niche 0.8 / vertical 0.6 / keyed 1.2. A URL multiple engines return sums its terms (consensus boost); weights demote a backstop below broad web. An **A/B** (`packages/websearch/scripts/ab-rank*.mjs`) drove the decision and set honest expectations: in the zero-config keyless case the fast path usually skips merging and the keyless backends rarely overlap, so day-to-day reordering is small — the real value is **robust weighting now** + **consensus ranking for keyed/multi-engine setups**. Score normalization and home-grown lexical/BM25 rescoring were rejected (incomparable scales; would re-do the engines' job worse); **semantic/LLM rerank stays a deferred opt-in hook**, not a core default.
