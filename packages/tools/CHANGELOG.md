@@ -1,5 +1,12 @@
 # @agent-sh/harness-tools
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [8158441]
+  - @agent-sh/harness-websearch@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
