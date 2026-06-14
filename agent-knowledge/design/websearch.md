@@ -131,39 +131,46 @@ Output is a discriminated union by `kind`.
 
 ### 3.1 kind: "ok"
 
+Compact ranked plain text — the shape LLM-facing search APIs (Tavily/Brave/
+Anthropic/Exa) converge on, chosen for token efficiency and for the model
+making good next moves. One header line, then a numbered best-first list;
+per-result `age` appears **only** when the backend provides it.
+
 ```text
-<search>
-  <query>{query}</query>
-  <backend>{searxng host}</backend>
-  <count>{N returned}</count>
-  <time_range>{range}</time_range>
-</search>
-<results>
+WEB "{query}" · {engine} ({class}) · {N} results[ · time:{range}[ NOT applied (this engine ignores it; results are all-time)]]
 1. {title}
-   {url}
+   {url}[ · {age}]
    {snippet}
 2. {title}
    {url}
    {snippet}
 ...
-</results>
 {continuation_hint}
 ```
 
-- Results are rendered as a numbered list, best-first (the backend's ranking is preserved).
-- Each result is title line, URL line, then snippet (snippet trimmed to a per-result cap, default 300 chars, to keep the list compact).
+- The header is one line: query, the serving engine + its **coverage class**
+  (`general web` / `indie/small-web index` / `encyclopedic`), the count, and —
+  only when a `time_range` was requested — whether it was applied.
+- Results are numbered best-first (backend ranking preserved); rank IS the
+  relevance signal. `age` (a `YYYY-MM-DD` date or short relative string) is
+  rendered on the URL line only when the backend supplies it (Brave/Tavily
+  dates, Wikipedia last-edit) — never fabricated.
+- Snippet trimmed to a per-result cap (default 240 chars, session-tunable via
+  `snippetCap`, clamped 80–600).
 - Continuation hint:
-  - Results returned: `(Found {N} results for "{query}" via {backend} in {T}ms. Fetch a URL with webfetch to read it.)`
-  - Fewer than requested: `(Only {N} results — fewer than the {count} requested. Try broader terms or a wider time_range.)`
+  - Full results: `(Fetch a URL with webfetch to read the page.)`
+  - Fewer than requested: `(Only {N} of {count} requested. Broaden the query or widen time_range; or fetch a URL with webfetch to read it.)`
 
 ### 3.2 kind: "empty"
 
 ```text
-<search><query>{query}</query><backend>{host}</backend><count>0</count></search>
-(No results for "{query}". Try different/broader keywords, a wider time_range, or check that the search backend has engines enabled.)
+WEB "{query}" · {engine} ({class}) · 0 results[ · time:{range} NOT applied ...]
+(No results. Try different/broader keywords[, a wider time_range,] or fetch a known URL with webfetch.)
 ```
 
-`empty` is a distinct, non-error kind: the search succeeded, the web just had nothing. The model should re-query, not treat it as a failure.
+`empty` is a distinct, non-error kind: the search succeeded, the web just had
+nothing. The model should re-query, not treat it as a failure. (See §10.3 on
+when a niche/vertical-only empty is escalated to an error instead.)
 
 ### 3.3 kind: "error"
 
@@ -396,7 +403,7 @@ Search results are non-deterministic (the live web changes, engines reorder). Th
 
 ## 13. Stability
 
-Semver per package/crate. Public contract (breaking changes need a major bump): the tool name `"websearch"`, the input param names + types, the `kind` values (`ok`/`empty`/`error`), the result rendering shape, and the `code` values. The exact wording of snippets, hints, and the continuation line is NOT contract.
+Semver per package/crate. Public contract (breaking changes need a major bump): the tool name `"websearch"`, the input param names + types, the `kind` values (`ok`/`empty`/`error`), and the `code` values. The **exact text rendering is NOT contract** (the v0.5 compact format replaced v1's `<search>` XML block — D15) — consumers should parse the structured `meta`/`results` fields, not scrape the `output` string. The exact wording of the header, snippets, hints, and the continuation line is NOT contract.
 
 ---
 
@@ -462,3 +469,9 @@ The **one breaking change**: the `no search backend configured` `INVALID_PARAM` 
 **WS-D13** (engine-class-aware empty): each engine declares a class — `general` (broad web: Mojeek/Brave/Tavily/SearXNG), `niche` (Marginalia), `vertical` (Wikipedia). A *general* engine's empty is authoritative ("the web had nothing"). A niche/vertical-**only** empty while a general engine **errored** is *degraded* — the chain throws instead of returning empty, so the model retries rather than trusting e.g. a Wikipedia-empty as proof no web results exist. (If no general engine errored — e.g. Mojeek disabled — a niche/vertical empty is the best signal and is returned.) From the v2 cross-vendor review.
 
 **WS-D14** (rate-limit ≠ malformed query): HTTP `401/403/429` from any engine map to `SERVER_NOT_AVAILABLE` (a per-engine failure the chain skips), never `INVALID_PARAM`. Mojeek returns `403` when it bot-blocks/throttles; surfacing that as `INVALID_PARAM` would wrongly tell the model its *query* was malformed and send it down a dead-end of rewording. Only a genuine malformed-query 4xx stays `INVALID_PARAM`. Caught by live rapid-fire testing.
+
+**WS-D15** (compact result format): the model-facing output (§3) is compact ranked plain text — one header line + 3-line entries — not the v1 multi-line `<search>` XML block. LLM-facing search APIs (Tavily/Brave/Anthropic/Exa) all converge on this shape; it cut a count=5 response from ~410 to ~335 tokens (~18%) with no loss of signal. The discriminated `kind` (ok/empty/error) is unchanged. Snippet cap lowered 300→240 and made session-tunable (`snippetCap`). *Breaking* for anything that parsed the `<search>`/`<results>` text (not contract per §13, but flagged).
+
+**WS-D16** (engine-class label = quality signal): the header labels the serving engine's coverage class — `general web` / `indie/small-web index` / `encyclopedic`. The reviewer's "first-non-empty is too weak" concern is real: a Wikipedia (vertical) result for a broad query is weak, and the model previously couldn't tell. It now sees `wikipedia (encyclopedic)` and can judge sufficiency / re-query. (Cheap, honest signal; a full cross-engine rerank/merge is still deferred.)
+
+**WS-D17** (honest recency, never fabricated): per-result `age` is rendered only when the backend actually provides it — Brave/Tavily dates, Wikipedia last-edit `timestamp`; Mojeek/Marginalia supply none and we show nothing (no `age: unknown` noise). Marginalia's `quality` is surfaced as `score`. Critically, when a `time_range` was requested but the serving engine ignores it (Mojeek/Marginalia/Wikipedia), the header says `time:week NOT applied (this engine ignores it)` instead of silently mislabeling all-time results as filtered — fixing a real "the model trusts a freshness guarantee that wasn't honored" bug.
