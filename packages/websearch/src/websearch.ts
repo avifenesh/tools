@@ -180,6 +180,9 @@ export async function websearch(
       : resolved.soleEngineClass !== undefined
         ? { engineClass: resolved.soleEngineClass }
         : {}),
+    ...(engineResult.engines !== undefined
+      ? { engines: engineResult.engines }
+      : {}),
     ...(engineResult.timeRangeApplied !== undefined
       ? { timeRangeApplied: engineResult.timeRangeApplied }
       : {}),

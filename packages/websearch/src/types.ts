@@ -32,6 +32,13 @@ export interface WebSearchResultItem {
    * verbatim, never synthesized. Usually undefined (rank is the signal).
    */
   readonly score?: number;
+  /**
+   * Which engine contributed this specific result, set by the fallback layer
+   * when results were MERGED across engines (so the model can see, per row,
+   * whether a hit came from the broad-web engine or the encyclopedic backstop).
+   * Undefined for a single-engine result (the header already names the engine).
+   */
+  readonly source?: string;
 }
 
 /**
@@ -62,6 +69,12 @@ export interface WebSearchEngineResult {
   readonly engine?: string;
   /** Coverage class of the serving engine (set by the fallback layer). */
   readonly engineClass?: EngineClass;
+  /**
+   * When the fallback chain MERGED results from more than one engine, the list
+   * of contributing engine names in chain order (e.g. ["mojeek","marginalia"]).
+   * Undefined/single-element for a single-engine result.
+   */
+  readonly engines?: readonly string[];
   /**
    * Whether the serving engine actually applied the requested time_range.
    * Only searxng/brave/tavily honor it; mojeek/marginalia/wikipedia ignore it.
@@ -181,6 +194,11 @@ export interface SearchMetadata {
   readonly engine?: string;
   /** Coverage class of the serving engine, for a human/model-readable label. */
   readonly engineClass?: EngineClass;
+  /**
+   * When results were merged across engines, the contributing engine names in
+   * chain order. Undefined/single for a single-engine result.
+   */
+  readonly engines?: readonly string[];
   /**
    * Whether the serving engine applied the requested time_range. Undefined
    * when no time filter was requested (timeRange=all).

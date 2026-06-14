@@ -136,6 +136,45 @@ describe("format — honest recency", () => {
   });
 });
 
+describe("format — merged provenance (cross-engine)", () => {
+  it("header joins contributing engines with + and shows per-result source", () => {
+    const out = formatOkText({
+      meta: baseMeta({
+        engine: "mojeek",
+        engineClass: "general",
+        engines: ["mojeek", "marginalia"],
+      }),
+      results: [
+        { title: "A", url: "https://a.com", snippet: "sa", source: "mojeek" },
+        { title: "B", url: "https://b.com", snippet: "sb", source: "marginalia" },
+      ],
+      requested: 5,
+    });
+    expect(out).toContain("mojeek+marginalia (general web)");
+    expect(out).toContain("https://a.com · mojeek");
+    expect(out).toContain("https://b.com · marginalia");
+  });
+
+  it("renders source and age together on the url line when both present", () => {
+    const out = formatOkText({
+      meta: baseMeta({ engine: "brave", engines: ["brave", "wikipedia"] }),
+      results: [
+        {
+          title: "W",
+          url: "https://en.wikipedia.org/?curid=1",
+          snippet: "s",
+          source: "wikipedia",
+          age: "2025-06-10",
+        },
+      ],
+      requested: 5,
+    });
+    expect(out).toContain(
+      "https://en.wikipedia.org/?curid=1 · wikipedia · 2025-06-10",
+    );
+  });
+});
+
 describe("format — empty", () => {
   it("uses the compact header and a re-query hint", () => {
     const out = formatEmptyText(baseMeta({ count: 0 }));

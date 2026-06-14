@@ -42,8 +42,23 @@ const item = (u: string): WebSearchResultItem => ({
   snippet: "s",
 });
 
-describe("FallbackEngine — order & first-non-empty-wins", () => {
-  it("returns the first engine that has results, skipping earlier empties", async () => {
+describe("FallbackEngine — gather, merge & dedupe", () => {
+  it("fast path: a first engine that meets count returns alone (no mixing)", async () => {
+    const spy = { calls: [] as string[] };
+    const five = Array.from({ length: 5 }, (_, i) => item(`a${i}`));
+    const engine = createFallbackEngine([
+      fakeEngine("a", { kind: "results", items: five }, spy),
+      fakeEngine("b", { kind: "results", items: [item("b1")] }, spy),
+    ]);
+    const r = (await engine.search(engineInput())) as FallbackEngineResult;
+    expect(r.results.length).toBe(5);
+    expect(r.engine).toBe("a");
+    expect(r.engines).toBeUndefined(); // single-engine, not mixed
+    expect(spy.calls).toEqual(["a"]); // b never tried (sufficiency)
+    expect(r.results.every((x) => x.source === undefined)).toBe(true);
+  });
+
+  it("merges across engines when the leader is short of count, skipping empties", async () => {
     const spy = { calls: [] as string[] };
     const engine = createFallbackEngine([
       fakeEngine("a", { kind: "empty" }, spy),
@@ -51,13 +66,53 @@ describe("FallbackEngine — order & first-non-empty-wins", () => {
       fakeEngine("c", { kind: "results", items: [item("c1")] }, spy),
     ]);
     const r = (await engine.search(engineInput())) as FallbackEngineResult;
-    expect(r.results.map((x) => x.url)).toEqual(["https://b1"]);
-    expect(r.engine).toBe("b");
-    expect(spy.calls).toEqual(["a", "b"]); // c never tried
-    expect(r.attempts).toEqual([
-      { engine: "a", outcome: "empty" },
-      { engine: "b", outcome: "results" },
+    // count=5, b and c each give 1 → merged to fill the quota.
+    expect(r.results.map((x) => x.url)).toEqual(["https://b1", "https://c1"]);
+    expect(r.engine).toBe("b"); // first contributor leads
+    expect(r.engines).toEqual(["b", "c"]); // merged provenance
+    expect(spy.calls).toEqual(["a", "b", "c"]);
+    // per-result source surfaced because the set is mixed
+    expect(r.results[0]?.source).toBe("b");
+    expect(r.results[1]?.source).toBe("c");
+  });
+
+  it("stops gathering once count is met (sufficiency)", async () => {
+    const spy = { calls: [] as string[] };
+    const engine = createFallbackEngine([
+      fakeEngine("a", { kind: "results", items: [item("a1"), item("a2")] }, spy),
+      fakeEngine("b", { kind: "results", items: [item("b1")] }, spy),
+      fakeEngine("c", { kind: "results", items: [item("c1")] }, spy),
     ]);
+    const r = (await engine.search(engineInput({ count: 3 }))) as FallbackEngineResult;
+    expect(r.results.map((x) => x.url)).toEqual([
+      "https://a1",
+      "https://a2",
+      "https://b1",
+    ]);
+    expect(spy.calls).toEqual(["a", "b"]); // c not needed
+  });
+
+  it("de-duplicates the same URL surfaced by multiple engines", async () => {
+    const engine = createFallbackEngine([
+      fakeEngine("a", { kind: "empty" }),
+      fakeEngine("b", {
+        kind: "results",
+        items: [
+          { title: "Tokio", url: "https://tokio.rs/", snippet: "s" },
+        ],
+      }),
+      fakeEngine("c", {
+        kind: "results",
+        items: [
+          // same page, www + trailing slash + tracking param → dedup key match
+          { title: "Tokio dup", url: "https://www.tokio.rs?utm_source=x", snippet: "s2" },
+          { title: "Other", url: "https://other.example/p", snippet: "s3" },
+        ],
+      }),
+    ]);
+    const r = (await engine.search(engineInput())) as FallbackEngineResult;
+    const urls = r.results.map((x) => x.url);
+    expect(urls).toEqual(["https://tokio.rs/", "https://other.example/p"]);
   });
 
   it("skips an erroring engine and continues to the next", async () => {
@@ -152,9 +207,10 @@ describe("FallbackEngine — empty vs error semantics", () => {
         "niche",
       ),
     ]);
-    const r = await engine.search(engineInput());
+    const r = (await engine.search(engineInput())) as FallbackEngineResult;
     expect(r.results).toEqual([]); // trusted empty from the general engine
-    expect(r.engine).toBe("mojeek");
+    // The empty is attributed via the attempts trace (no per-result engine).
+    expect(r.attempts.find((a) => a.engine === "mojeek")?.outcome).toBe("empty");
   });
 
   it("degraded: general engine ERRORED and only a vertical engine returned empty → throws (not a misleading empty)", async () => {

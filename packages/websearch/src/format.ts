@@ -37,14 +37,20 @@ export function engineClassLabel(c: EngineClass | undefined): string {
 /**
  * The single compact header line, shared by ok/empty. Example:
  *   WEB "rust async" · mojeek (general web) · 5 results
+ * Merged across engines:
+ *   WEB "rust async" · mojeek+marginalia (general web) · 5 results
  * With an ignored time filter:
  *   WEB "ai news" · marginalia (indie/small-web index) · 3 results · time:week NOT applied (this engine ignores it)
  */
 function headerLine(meta: SearchMetadata, n: number): string {
   const parts: string[] = [`WEB "${meta.query}"`];
+  const engineName =
+    meta.engines !== undefined && meta.engines.length > 1
+      ? meta.engines.join("+")
+      : meta.engine;
   const via =
-    meta.engine !== undefined && meta.engine.length > 0
-      ? `${meta.engine} (${engineClassLabel(meta.engineClass)})`
+    engineName !== undefined && engineName.length > 0
+      ? `${engineName} (${engineClassLabel(meta.engineClass)})`
       : meta.backendHost;
   parts.push(via);
   parts.push(`${n} result${n === 1 ? "" : "s"}`);
@@ -71,8 +77,12 @@ export function formatOkText(args: {
   const header = headerLine(args.meta, args.results.length);
   const numbered = args.results
     .map((r, i) => {
-      // Line 2: url, plus age only when the backend provided it.
-      const meta = r.age !== undefined && r.age.length > 0 ? ` · ${r.age}` : "";
+      // Line 2: url, then optional source (when results were merged across
+      // engines) and age (when the backend provided it).
+      const tags: string[] = [];
+      if (r.source !== undefined && r.source.length > 0) tags.push(r.source);
+      if (r.age !== undefined && r.age.length > 0) tags.push(r.age);
+      const meta = tags.length > 0 ? ` · ${tags.join(" · ")}` : "";
       const snippet = trimSnippet(r.snippet, cap);
       const snippetLine = snippet.length > 0 ? `\n   ${snippet}` : "";
       return `${i + 1}. ${r.title}\n   ${r.url}${meta}${snippetLine}`;

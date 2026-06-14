@@ -21,6 +21,7 @@ export { createWikipediaEngine } from "./engines/wikipedia.js";
 export { createBraveEngine } from "./engines/brave.js";
 export { createTavilyEngine } from "./engines/tavily.js";
 export { stripTags, decodeEntities } from "./engines/html.js";
+export { normalizeUrlForDedup } from "./engines/dedupe.js";
 export { classifyHost, classifyIp, resolveHost } from "./ssrf.js";
 export {
   formatOkText,
