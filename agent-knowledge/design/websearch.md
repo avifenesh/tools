@@ -350,19 +350,34 @@ SearXNG hiccup must not silently leak the query to public scrape engines. Set
 `fallbackToKeyless: true` to append the keyless tail as a backstop. With nothing
 configured, the chain is the keyless tail, so search **just works**.
 
-### 10.3 FallbackEngine semantics (mirrors `ddgs backend="auto"`)
+### 10.3 FallbackEngine semantics (gather + merge — `ddgs backend="auto"` / SearXNG)
 
-- Try engines in order; the **first engine that returns a non-empty result list
-  wins**, and its provenance (`engine` + `backendHost`) is carried out.
+- Engines are tried in chain order (general-first); their results are
+  **accumulated and de-duplicated by normalized URL** until the requested
+  `count` is met (**sufficiency**) or engines/budget run out. "Non-empty" is
+  not "enough": a leading engine that returns 1 hit when 5 were asked for no
+  longer ends the search — later engines top up the quota.
+- **Fast path**: if the FIRST engine alone returns ≥ `count`, it is returned
+  immediately — no added latency, no mixing (single-engine provenance).
+- **Dedup**: results are keyed on a normalized URL (lowercase scheme/host, drop
+  `www.`/default port/fragment/trailing slash, strip `utm_*`/`gclid`/… tracking
+  params, sort query). The first engine to surface a URL owns the entry and its
+  rank; the *original* URL is always kept in output. Conservative — meaningful
+  params (`?id=`, `?curid=`, `?q=`) are preserved so distinct pages don't merge.
+- **Provenance when merged**: the header lists contributors
+  (`mojeek+marginalia (general web)`) and each result row carries a `· source`
+  tag. `timeRangeApplied` across contributors is `false` if **any** contributor
+  ignored the filter.
 - A per-engine **failure** (transport / SSRF / parse / per-engine-timeout) is
   recorded and the chain **continues** — one dead host can't sink the search.
 - **Timeout fairness**: `timeoutMs` is the overall budget; each engine gets a
   slice (≈ overall / engineCount, floored/capped and bounded by the remaining
   budget) so a slow engine can't starve the next.
-- **Empty vs error**: if any engine cleanly returned zero hits, the whole call
-  is `empty` (a real "no hits" beats a pile of transport errors). If *every*
-  engine errored, throw a chain-summary error the orchestrator renders with an
-  actionable hint (nudging a Brave/Tavily key or local SearXNG).
+- **Empty vs error** (engine-class aware): a *general* engine's empty is
+  authoritative → `empty`. A niche/vertical-only empty while a *general* engine
+  errored is degraded → throw (don't let a Wikipedia-empty masquerade as "no
+  web results"). Every engine errored → chain-summary error with an actionable
+  hint (nudging a Brave/Tavily key or local SearXNG).
 
 Adapter packages may still substitute their own engine behind the same
 interface; core never depends on adapters. The engine throws an engine-local
@@ -475,3 +490,5 @@ The **one breaking change**: the `no search backend configured` `INVALID_PARAM` 
 **WS-D16** (engine-class label = quality signal): the header labels the serving engine's coverage class — `general web` / `indie/small-web index` / `encyclopedic`. The reviewer's "first-non-empty is too weak" concern is real: a Wikipedia (vertical) result for a broad query is weak, and the model previously couldn't tell. It now sees `wikipedia (encyclopedic)` and can judge sufficiency / re-query. (Cheap, honest signal; a full cross-engine rerank/merge is still deferred.)
 
 **WS-D17** (honest recency, never fabricated): per-result `age` is rendered only when the backend actually provides it — Brave/Tavily dates, Wikipedia last-edit `timestamp`; Mojeek/Marginalia supply none and we show nothing (no `age: unknown` noise). Marginalia's `quality` is surfaced as `score`. Critically, when a `time_range` was requested but the serving engine ignores it (Mojeek/Marginalia/Wikipedia), the header says `time:week NOT applied (this engine ignores it)` instead of silently mislabeling all-time results as filtered — fixing a real "the model trusts a freshness guarantee that wasn't honored" bug.
+
+**WS-D18** (gather + merge, not first-non-empty): the FallbackEngine accumulates and de-duplicates results across engines until `count` is met, rather than returning the first engine that has *any* result (the reviewer's "first-non-empty is too weak" point — a 1-hit leader for a 5-result request was a bad answer). A sufficient first engine still short-circuits (fast path, no mixing). Dedup is on a normalized URL (www/port/fragment/trailing-slash/tracking-param-insensitive, but preserving meaningful query params) so the same page from two backends collapses to one; the original URL is kept. Merged results expose contributors in the header and a per-row `source`. This is the SearXNG/`ddgs` merge model adapted to the keyless chain. (A relevance *rerank* across heterogeneous backends — Marginalia `quality` vs Mojeek rank vs Tavily `score` — is still deferred; rank-by-chain-order is the v1 merge policy.)

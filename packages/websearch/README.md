@@ -43,6 +43,7 @@ const withFallback = { ...braveSession, fallbackToKeyless: true };
 Notes:
 - `disableMojeek: true` drops the Mojeek scrape engine (its robots.txt disallows `/search`; the documented Marginalia/Wikipedia APIs remain).
 - `snippetCap` tunes the per-result snippet length (default 240 chars; clamped 80–600) to trade detail for tokens.
+- When the leading backend returns fewer than `count`, the tool **gathers and merges** results across the chain (de-duplicating the same page by normalized URL) until the quota is met; a backend that already satisfies `count` short-circuits. Merged responses name the contributing engines in the header and tag each result with its `source`.
 - Output is compact ranked text: a `WEB "query" · engine (class) · N results` header then numbered entries; the engine's coverage class (`general web` / `indie/small-web index` / `encyclopedic`) and per-result `age` (when the backend provides it) are shown so the model can judge source quality and freshness. Parse `meta`/`results`, not the `output` string.
 - Zero hits is a normal `kind: "empty"` result, not an error.
 
