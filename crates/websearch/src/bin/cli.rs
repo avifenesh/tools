@@ -1,7 +1,9 @@
 //! `harness-websearch-cli` — JSON-RPC bridge. Method: websearch.
 
 use harness_core::{PermissionPolicy, ToolError, ToolErrorCode};
-use harness_websearch::{websearch, WebSearchPermissionPolicy, WebSearchSessionConfig};
+use harness_websearch::{
+    websearch, EngineBaseUrls, WebSearchPermissionPolicy, WebSearchSessionConfig,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -60,6 +62,8 @@ struct SessionSpec {
     #[serde(default)]
     fallback_to_keyless: bool,
     #[serde(default)]
+    engine_base_urls: Option<EngineBaseUrlsSpec>,
+    #[serde(default)]
     default_headers: Option<HashMap<String, String>>,
     #[serde(default)]
     allow_loopback: bool,
@@ -75,6 +79,32 @@ struct SessionSpec {
     redact_query_in_hook: bool,
     #[serde(default)]
     session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct EngineBaseUrlsSpec {
+    #[serde(default)]
+    mojeek: Option<String>,
+    #[serde(default)]
+    marginalia: Option<String>,
+    #[serde(default)]
+    wikipedia: Option<String>,
+    #[serde(default)]
+    brave: Option<String>,
+    #[serde(default)]
+    tavily: Option<String>,
+}
+
+impl From<EngineBaseUrlsSpec> for EngineBaseUrls {
+    fn from(s: EngineBaseUrlsSpec) -> Self {
+        EngineBaseUrls {
+            mojeek: s.mojeek,
+            marginalia: s.marginalia,
+            wikipedia: s.wikipedia,
+            brave: s.brave,
+            tavily: s.tavily,
+        }
+    }
 }
 
 impl SessionSpec {
@@ -93,6 +123,7 @@ impl SessionSpec {
         cfg.disable_mojeek = self.disable_mojeek;
         cfg.snippet_cap = self.snippet_cap;
         cfg.fallback_to_keyless = self.fallback_to_keyless;
+        cfg.engine_base_urls = self.engine_base_urls.map(Into::into);
         cfg.default_headers = self.default_headers;
         cfg.allow_loopback = self.allow_loopback;
         cfg.allow_private_networks = self.allow_private_networks;
