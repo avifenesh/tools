@@ -1,5 +1,5 @@
 import type {
-  WebSearchEngine,
+  NamedWebSearchEngine,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,
@@ -28,9 +28,10 @@ const ENGINE_NAME = "wikipedia";
  */
 export function createWikipediaEngine(
   opts: { baseUrl?: string } = {},
-): WebSearchEngine & { readonly name: string } {
+): NamedWebSearchEngine {
   return {
     name: ENGINE_NAME,
+    engineClass: "vertical",
     async search(
       input: WebSearchEngineInput,
     ): Promise<WebSearchEngineResult> {

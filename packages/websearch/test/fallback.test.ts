@@ -19,9 +19,11 @@ function fakeEngine(
     | { kind: "empty" }
     | { kind: "error"; error: SearchError },
   spy?: { calls: string[] },
+  engineClass: "general" | "niche" | "vertical" = "general",
 ): NamedWebSearchEngine {
   return {
     name,
+    engineClass,
     async search(): Promise<WebSearchEngineResult> {
       spy?.calls.push(name);
       if (behavior.kind === "error") throw behavior.error;
@@ -140,12 +142,61 @@ describe("FallbackEngine — empty vs error semantics", () => {
     });
   });
 
+  it("a general engine's empty is authoritative even if a niche engine errored after", async () => {
+    const engine = createFallbackEngine([
+      fakeEngine("mojeek", { kind: "empty" }, undefined, "general"),
+      fakeEngine(
+        "marginalia",
+        { kind: "error", error: new SearchError("SERVER_NOT_AVAILABLE", "429") },
+        undefined,
+        "niche",
+      ),
+    ]);
+    const r = await engine.search(engineInput());
+    expect(r.results).toEqual([]); // trusted empty from the general engine
+    expect(r.engine).toBe("mojeek");
+  });
+
+  it("degraded: general engine ERRORED and only a vertical engine returned empty → throws (not a misleading empty)", async () => {
+    // The reviewer's scenario: Mojeek challenged, Marginalia 429, Wikipedia
+    // (vertical) legitimately empty. Returning empty would tell the model
+    // "no web results exist" — wrong. It must surface as an error so it retries.
+    const engine = createFallbackEngine([
+      fakeEngine(
+        "mojeek",
+        { kind: "error", error: new SearchError("SERVER_NOT_AVAILABLE", "challenge") },
+        undefined,
+        "general",
+      ),
+      fakeEngine(
+        "marginalia",
+        { kind: "error", error: new SearchError("SERVER_NOT_AVAILABLE", "429") },
+        undefined,
+        "niche",
+      ),
+      fakeEngine("wikipedia", { kind: "empty" }, undefined, "vertical"),
+    ]);
+    await expect(engine.search(engineInput())).rejects.toBeInstanceOf(
+      SearchError,
+    );
+  });
+
+  it("niche/vertical empty is returned when NO general engine errored (e.g. mojeek disabled)", async () => {
+    const engine = createFallbackEngine([
+      fakeEngine("marginalia", { kind: "empty" }, undefined, "niche"),
+      fakeEngine("wikipedia", { kind: "empty" }, undefined, "vertical"),
+    ]);
+    const r = await engine.search(engineInput());
+    expect(r.results).toEqual([]); // best signal we have; not a failure
+  });
+
   it("stops trying engines once the signal aborts", async () => {
     const spy = { calls: [] as string[] };
     const ac = new AbortController();
     const engine = createFallbackEngine([
       {
         name: "a",
+        engineClass: "general",
         async search() {
           spy.calls.push("a");
           ac.abort();
@@ -165,6 +216,7 @@ describe("FallbackEngine — empty vs error semantics", () => {
     const engine = createFallbackEngine([
       {
         name: "slow",
+        engineClass: "general",
         async search({ signal }) {
           spy.calls.push("slow");
           // Hang until this engine's per-engine slice aborts the signal.

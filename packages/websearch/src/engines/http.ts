@@ -57,10 +57,14 @@ export async function httpGet(
 
   if (status >= 400) {
     await res.body.dump();
-    if (status >= 500 || status === 429) {
+    // 5xx + 429 (throttle) + 401/403 (auth/bot-block) → the backend is
+    // unavailable to us, a per-engine failure the chain should skip. Only a
+    // genuine "your query was malformed" 4xx is INVALID_PARAM — surfacing a
+    // rate-limit as INVALID_PARAM would wrongly tell the model its query was bad.
+    if (status >= 500 || status === 429 || status === 401 || status === 403) {
       throw new SearchError(
         "SERVER_NOT_AVAILABLE",
-        `${opts.engine} returned HTTP ${status}`,
+        `${opts.engine} is unavailable (HTTP ${status}${status === 429 || status === 403 ? "; rate-limited or bot-blocked" : ""})`,
         { status, engine: opts.engine },
       );
     }

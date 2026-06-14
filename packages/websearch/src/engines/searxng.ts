@@ -1,5 +1,5 @@
 import type {
-  WebSearchEngine,
+  NamedWebSearchEngine,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,
@@ -21,9 +21,10 @@ const ENGINE_NAME = "searxng";
  */
 export function createSearxngEngine(
   backendUrl: string,
-): WebSearchEngine & { readonly name: string } {
+): NamedWebSearchEngine {
   return {
     name: ENGINE_NAME,
+    engineClass: "general",
     async search(
       input: WebSearchEngineInput,
     ): Promise<WebSearchEngineResult> {

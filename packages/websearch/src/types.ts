@@ -53,9 +53,23 @@ export interface WebSearchEngine {
   search(input: WebSearchEngineInput): Promise<WebSearchEngineResult>;
 }
 
-/** An engine that knows its own name, for provenance in the fallback chain. */
+/**
+ * Engine coverage class, used by the fallback chain to decide whether an
+ * `empty` result is authoritative:
+ * - "general": broad web index (Mojeek, Brave, Tavily, SearXNG). An empty
+ *   from one of these is a trustworthy "the web had nothing" signal.
+ * - "niche": small/indie index (Marginalia) — an empty here says little.
+ * - "vertical": single-domain index (Wikipedia) — empty says even less.
+ * A niche/vertical-only empty while a general engine ERRORED is treated as a
+ * degraded failure (search broke), not a clean empty, so the model retries
+ * instead of concluding nothing exists.
+ */
+export type EngineClass = "general" | "niche" | "vertical";
+
+/** An engine that knows its own name + class, for the fallback chain. */
 export interface NamedWebSearchEngine extends WebSearchEngine {
   readonly name: string;
+  readonly engineClass: EngineClass;
 }
 
 /**

@@ -52,6 +52,7 @@ export type {
   WebSearchSessionConfig,
   WebSearchEngine,
   NamedWebSearchEngine,
+  EngineClass,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,

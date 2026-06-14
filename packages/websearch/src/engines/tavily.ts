@@ -1,6 +1,6 @@
 import { request } from "undici";
 import type {
-  WebSearchEngine,
+  NamedWebSearchEngine,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,
@@ -32,10 +32,11 @@ const ENGINE_NAME = "tavily";
 export function createTavilyEngine(
   apiKey: string,
   opts: { baseUrl?: string } = {},
-): WebSearchEngine & { readonly name: string } {
+): NamedWebSearchEngine {
   const base = opts.baseUrl ?? DEFAULT_BASE;
   return {
     name: ENGINE_NAME,
+    engineClass: "general",
     async search(
       input: WebSearchEngineInput,
     ): Promise<WebSearchEngineResult> {

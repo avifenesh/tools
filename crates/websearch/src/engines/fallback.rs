@@ -13,7 +13,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::engine::{
-    SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput, WebSearchEngineResult,
+    EngineClass, SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput,
+    WebSearchEngineResult,
 };
 
 const PER_ENGINE_FLOOR_MS: u64 = 3_000;
@@ -53,7 +54,9 @@ impl WebSearchEngine for FallbackEngine {
 
         let mut errors: Vec<SearchError> = Vec::new();
         let mut summary: Vec<String> = Vec::new();
-        let mut last_empty: Option<WebSearchEngineResult> = None;
+        let mut general_empty: Option<WebSearchEngineResult> = None;
+        let mut fallback_empty: Option<WebSearchEngineResult> = None;
+        let mut general_errored = false;
 
         for engine in &self.engines {
             let remaining = deadline
@@ -71,6 +74,7 @@ impl WebSearchEngine for FallbackEngine {
             per_input.timeout_ms = budget;
 
             let name = engine.name().to_string();
+            let class = engine.engine_class();
             let fut = engine.search(per_input);
             match tokio::time::timeout(Duration::from_millis(budget), fut).await {
                 Ok(Ok(r)) => {
@@ -87,14 +91,26 @@ impl WebSearchEngine for FallbackEngine {
                     if e.engine.is_none() {
                         e.engine = Some(name);
                     }
-                    last_empty = Some(e);
+                    if class == EngineClass::General {
+                        if general_empty.is_none() {
+                            general_empty = Some(e);
+                        }
+                    } else if fallback_empty.is_none() {
+                        fallback_empty = Some(e);
+                    }
                 }
                 Ok(Err(e)) => {
                     summary.push(format!("{}: {:?}", name, e.code));
+                    if class == EngineClass::General {
+                        general_errored = true;
+                    }
                     errors.push(e);
                 }
                 Err(_) => {
                     summary.push(format!("{}: Timeout", name));
+                    if class == EngineClass::General {
+                        general_errored = true;
+                    }
                     errors.push(SearchError::new(
                         SearchErrorCode::Timeout,
                         format!("{} exceeded its per-engine time slice", name),
@@ -103,9 +119,17 @@ impl WebSearchEngine for FallbackEngine {
             }
         }
 
-        // A clean "no hits" from any reachable engine beats a pile of errors.
-        if let Some(empty) = last_empty {
+        // A general (broad-web) engine's empty is authoritative: the web had
+        // nothing. Otherwise, a niche/vertical-only empty is trustworthy only
+        // if no general engine errored; if one did, search is degraded → error
+        // so the model retries rather than trusting e.g. a Wikipedia-empty.
+        if let Some(empty) = general_empty {
             return Ok(empty);
+        }
+        if let Some(empty) = fallback_empty {
+            if !general_errored {
+                return Ok(empty);
+            }
         }
 
         Err(synthesize_chain_error(&errors, &summary))

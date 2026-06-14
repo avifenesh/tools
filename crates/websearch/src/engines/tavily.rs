@@ -84,10 +84,11 @@ impl WebSearchEngine for TavilyEngine {
 
         let status = res.status().as_u16();
         if status >= 400 {
-            if status >= 500 || status == 429 {
+            drop(res);
+            if status >= 500 || status == 429 || status == 401 || status == 403 {
                 return Err(SearchError::new(
                     SearchErrorCode::ServerNotAvailable,
-                    format!("tavily returned HTTP {}", status),
+                    format!("tavily is unavailable (HTTP {})", status),
                 ));
             }
             return Err(SearchError::new(

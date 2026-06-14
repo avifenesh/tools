@@ -1,5 +1,5 @@
 import type {
-  WebSearchEngine,
+  NamedWebSearchEngine,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,
@@ -31,10 +31,11 @@ const ENGINE_NAME = "mojeek";
  */
 export function createMojeekEngine(
   opts: { baseUrl?: string } = {},
-): WebSearchEngine & { readonly name: string } {
+): NamedWebSearchEngine {
   const base = opts.baseUrl ?? DEFAULT_BASE;
   return {
     name: ENGINE_NAME,
+    engineClass: "general",
     async search(
       input: WebSearchEngineInput,
     ): Promise<WebSearchEngineResult> {

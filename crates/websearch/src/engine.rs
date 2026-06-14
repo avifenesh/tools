@@ -51,6 +51,23 @@ pub trait WebSearchEngine: Send + Sync {
     fn name(&self) -> &str {
         "searxng"
     }
+
+    /// Coverage class, used by the fallback chain to decide whether an `empty`
+    /// result is authoritative. Defaults to General (SearXNG is broad web).
+    fn engine_class(&self) -> EngineClass {
+        EngineClass::General
+    }
+}
+
+/// Engine coverage class. A "general" engine's empty is a trustworthy "the web
+/// had nothing" signal; a niche/vertical empty says far less, so the fallback
+/// chain treats a niche/vertical-only empty while a general engine ERRORED as
+/// a degraded failure rather than a clean empty. Mirrors TS `EngineClass`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EngineClass {
+    General,
+    Niche,
+    Vertical,
 }
 
 /// Engine-local error code, distinct from `harness_core::ToolErrorCode`. The

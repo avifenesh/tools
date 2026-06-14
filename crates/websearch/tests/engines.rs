@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use harness_core::PermissionPolicy;
 use harness_websearch::{
-    websearch, BraveEngine, EngineBaseUrls, MarginaliaEngine, MojeekEngine, SearchError,
-    SearchErrorCode, TavilyEngine, WebSearchEngine, WebSearchEngineInput, WebSearchEngineResult,
-    WebSearchPermissionPolicy, WebSearchResult, WebSearchResultItem, WebSearchSessionConfig,
-    WebSearchTimeRange, WikipediaEngine,
+    websearch, BraveEngine, EngineBaseUrls, EngineClass, MarginaliaEngine, MojeekEngine,
+    SearchError, SearchErrorCode, TavilyEngine, WebSearchEngine, WebSearchEngineInput,
+    WebSearchEngineResult, WebSearchPermissionPolicy, WebSearchResult, WebSearchResultItem,
+    WebSearchSessionConfig, WebSearchTimeRange, WikipediaEngine,
 };
 use http_body_util::Full;
 use hyper::body::Incoming;
@@ -170,6 +170,35 @@ async fn marginalia_maps_real_fixture() {
 }
 
 #[tokio::test]
+async fn mojeek_403_is_server_not_available_not_invalid_param() {
+    // Mojeek rate-limits/bot-blocks with 403; that must be a per-engine
+    // unavailability the chain skips, NOT InvalidParam (which would wrongly
+    // tell the model its query was malformed).
+    let handler: H = Arc::new(|_req| Resp {
+        status: StatusCode::FORBIDDEN,
+        content_type: "text/plain",
+        body: Bytes::from_static(b"forbidden"),
+    });
+    let (addr, _jh) = serve(handler).await;
+    let engine = MojeekEngine::new().with_base_url(format!("http://{}", addr));
+    let e = expect_err(engine.search(engine_input()).await);
+    assert_eq!(e.code, SearchErrorCode::ServerNotAvailable);
+}
+
+#[tokio::test]
+async fn marginalia_429_is_server_not_available() {
+    let handler: H = Arc::new(|_req| Resp {
+        status: StatusCode::TOO_MANY_REQUESTS,
+        content_type: "application/json",
+        body: Bytes::from_static(b"slow down"),
+    });
+    let (addr, _jh) = serve(handler).await;
+    let engine = MarginaliaEngine::new().with_base_url(format!("http://{}", addr));
+    let e = expect_err(engine.search(engine_input()).await);
+    assert_eq!(e.code, SearchErrorCode::ServerNotAvailable);
+}
+
+#[tokio::test]
 async fn marginalia_builds_public_search_path() {
     let seen: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
     let seen2 = seen.clone();
@@ -251,6 +280,7 @@ struct FakeEngine {
     name: String,
     behavior: FakeBehavior,
     calls: Arc<Mutex<Vec<String>>>,
+    class: EngineClass,
 }
 
 #[derive(Clone)]
@@ -264,6 +294,9 @@ enum FakeBehavior {
 impl WebSearchEngine for FakeEngine {
     fn name(&self) -> &str {
         &self.name
+    }
+    fn engine_class(&self) -> EngineClass {
+        self.class
     }
     async fn search(
         &self,
@@ -301,10 +334,20 @@ fn fake(
     behavior: FakeBehavior,
     calls: Arc<Mutex<Vec<String>>>,
 ) -> Arc<dyn WebSearchEngine> {
+    fake_classed(name, behavior, calls, EngineClass::General)
+}
+
+fn fake_classed(
+    name: &str,
+    behavior: FakeBehavior,
+    calls: Arc<Mutex<Vec<String>>>,
+    class: EngineClass,
+) -> Arc<dyn WebSearchEngine> {
     Arc::new(FakeEngine {
         name: name.to_string(),
         behavior,
         calls,
+        class,
     })
 }
 
@@ -355,6 +398,58 @@ async fn fallback_clean_empty_beats_later_error() {
     ]);
     let r = engine.search(engine_input()).await.unwrap();
     assert!(r.results.is_empty()); // empty, not Err
+}
+
+#[tokio::test]
+async fn fallback_degraded_empty_when_general_errored_and_only_vertical_empty() {
+    // Mojeek (general) errors, Marginalia (niche) errors, Wikipedia (vertical)
+    // returns empty. Returning empty would mislead ("no web results"); must err.
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let engine = FallbackEngine::new(vec![
+        fake_classed(
+            "mojeek",
+            FakeBehavior::Error(SearchErrorCode::ServerNotAvailable),
+            calls.clone(),
+            EngineClass::General,
+        ),
+        fake_classed(
+            "marginalia",
+            FakeBehavior::Error(SearchErrorCode::ServerNotAvailable),
+            calls.clone(),
+            EngineClass::Niche,
+        ),
+        fake_classed("wikipedia", FakeBehavior::Empty, calls.clone(), EngineClass::Vertical),
+    ]);
+    let e = expect_err(engine.search(engine_input()).await);
+    assert_eq!(e.code, SearchErrorCode::ServerNotAvailable);
+}
+
+#[tokio::test]
+async fn fallback_general_empty_is_authoritative() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let engine = FallbackEngine::new(vec![
+        fake_classed("mojeek", FakeBehavior::Empty, calls.clone(), EngineClass::General),
+        fake_classed(
+            "marginalia",
+            FakeBehavior::Error(SearchErrorCode::ServerNotAvailable),
+            calls.clone(),
+            EngineClass::Niche,
+        ),
+    ]);
+    let r = engine.search(engine_input()).await.unwrap();
+    assert!(r.results.is_empty());
+    assert_eq!(r.engine.as_deref(), Some("mojeek"));
+}
+
+#[tokio::test]
+async fn fallback_niche_empty_ok_when_no_general_errored() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let engine = FallbackEngine::new(vec![
+        fake_classed("marginalia", FakeBehavior::Empty, calls.clone(), EngineClass::Niche),
+        fake_classed("wikipedia", FakeBehavior::Empty, calls.clone(), EngineClass::Vertical),
+    ]);
+    let r = engine.search(engine_input()).await.unwrap();
+    assert!(r.results.is_empty());
 }
 
 #[tokio::test]

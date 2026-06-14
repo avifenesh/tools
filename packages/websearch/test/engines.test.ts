@@ -342,3 +342,45 @@ describe("SearxngEngine", () => {
     }
   });
 });
+
+describe("http status mapping (rate-limit vs malformed query)", () => {
+  it("403 (bot-block) → SERVER_NOT_AVAILABLE, not INVALID_PARAM", async () => {
+    const srv = await startServer((_req, res) => {
+      res.statusCode = 403;
+      res.end("forbidden");
+    });
+    try {
+      await expect(
+        createMojeekEngine({ baseUrl: srv.url }).search(engineInput()),
+      ).rejects.toMatchObject({ code: "SERVER_NOT_AVAILABLE" });
+    } finally {
+      await srv.close();
+    }
+  });
+  it("429 (throttle) → SERVER_NOT_AVAILABLE", async () => {
+    const srv = await startServer((_req, res) => {
+      res.statusCode = 429;
+      res.end("slow down");
+    });
+    try {
+      await expect(
+        createMarginaliaEngine({ baseUrl: srv.url }).search(engineInput()),
+      ).rejects.toMatchObject({ code: "SERVER_NOT_AVAILABLE" });
+    } finally {
+      await srv.close();
+    }
+  });
+  it("400 (genuinely malformed) stays INVALID_PARAM", async () => {
+    const srv = await startServer((_req, res) => {
+      res.statusCode = 400;
+      res.end("bad");
+    });
+    try {
+      await expect(
+        createSearxngEngine(srv.url).search(engineInput()),
+      ).rejects.toMatchObject({ code: "INVALID_PARAM" });
+    } finally {
+      await srv.close();
+    }
+  });
+});

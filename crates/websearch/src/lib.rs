@@ -19,7 +19,7 @@ mod types;
 
 pub use constants::*;
 pub use engine::{
-    default_engine, ReqwestEngine, SearchError, SearchErrorCode, WebSearchEngine,
+    default_engine, EngineClass, ReqwestEngine, SearchError, SearchErrorCode, WebSearchEngine,
     WebSearchEngineInput, WebSearchEngineResult,
 };
 pub use engines::{

@@ -44,6 +44,10 @@ impl WebSearchEngine for WikipediaEngine {
         ENGINE_NAME
     }
 
+    fn engine_class(&self) -> crate::engine::EngineClass {
+        crate::engine::EngineClass::Vertical
+    }
+
     async fn search(
         &self,
         input: WebSearchEngineInput,

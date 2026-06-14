@@ -34,13 +34,15 @@ export interface FallbackEngineResult extends WebSearchEngineResult {
  * The parent signal (caller cancel or the orchestrator's hard backstop) still
  * aborts the entire chain immediately.
  *
- * Outcome semantics:
+ * Outcome semantics (engine-class aware — see EngineClass):
  * - At least one engine returned results → ok (first non-empty wins).
- * - Every engine reachable but all returned zero hits → empty (the web had
- *   nothing).
- * - Mixed (some empty, some errored, none with results) → if ANY engine
- *   cleanly returned empty, treat the whole thing as empty (a real "no hits"
- *   signal beats a pile of transport errors).
+ * - A "general" engine (broad web index) returned empty → authoritative empty
+ *   (the web really had nothing); return empty.
+ * - Only "niche"/"vertical" engines returned empty AND a general engine
+ *   ERRORED → degraded: search broke, so throw a chain error (don't let a
+ *   Wikipedia-empty masquerade as "no web results" when Mojeek+Marginalia
+ *   actually failed). If no general engine errored (e.g. Mojeek disabled),
+ *   a niche/vertical empty is the best signal we have → return empty.
  * - Every engine errored → throw a synthesized SearchError summarizing the
  *   chain, so the orchestrator can render an actionable hint.
  */
@@ -56,8 +58,9 @@ export function createFallbackEngine(
       input: WebSearchEngineInput,
     ): Promise<FallbackEngineResult> {
       const attempts: FallbackAttempt[] = [];
-      let sawEmpty = false;
-      let lastEmpty: WebSearchEngineResult | null = null;
+      let generalEmpty: WebSearchEngineResult | null = null;
+      let fallbackEmpty: WebSearchEngineResult | null = null;
+      let generalErrored = false;
       const errors: SearchError[] = [];
 
       const overallMs = input.timeoutMs;
@@ -93,8 +96,12 @@ export function createFallbackEngine(
             return { ...r, engine: r.engine ?? engine.name, attempts };
           }
           attempts.push({ engine: engine.name, outcome: "empty" });
-          sawEmpty = true;
-          lastEmpty = { ...r, engine: r.engine ?? engine.name };
+          const tagged = { ...r, engine: r.engine ?? engine.name };
+          if (engine.engineClass === "general") {
+            generalEmpty ??= tagged;
+          } else {
+            fallbackEmpty ??= tagged;
+          }
         } catch (e) {
           const se =
             e instanceof SearchError
@@ -102,6 +109,7 @@ export function createFallbackEngine(
               : new SearchError("IO_ERROR", String((e as Error).message), {
                   engine: engine.name,
                 });
+          if (engine.engineClass === "general") generalErrored = true;
           errors.push(se);
           attempts.push({
             engine: engine.name,
@@ -119,12 +127,22 @@ export function createFallbackEngine(
         if (input.signal.aborted) break;
       }
 
-      // A clean "no hits" from any reachable engine beats a pile of errors.
-      if (sawEmpty && lastEmpty) {
-        return { ...lastEmpty, attempts };
+      // A general (broad-web) engine's empty is authoritative: the web had
+      // nothing. Return it regardless of later niche/vertical noise.
+      if (generalEmpty) {
+        return { ...generalEmpty, attempts };
       }
 
-      // Everything errored (or aborted). Synthesize a chain-summary error.
+      // Only niche/vertical engines returned empty. If a general engine
+      // ERRORED, search is degraded — throw so the model retries rather than
+      // trusting a Wikipedia-empty as "no web results". Otherwise (no general
+      // engine failed, e.g. Mojeek disabled) the niche/vertical empty is the
+      // best signal we have.
+      if (fallbackEmpty && !generalErrored) {
+        return { ...fallbackEmpty, attempts };
+      }
+
+      // Everything errored (or degraded). Synthesize a chain-summary error.
       throw synthesizeChainError(errors, attempts, input.signal.aborted);
     },
   };

@@ -62,10 +62,19 @@ pub(crate) async fn http_get(
         .to_ascii_lowercase();
 
     if status >= 400 {
-        if status >= 500 || status == 429 {
+        // 5xx + 429 (throttle) + 401/403 (auth/bot-block) → backend unavailable
+        // to us, a per-engine failure the chain skips. Only a genuine malformed
+        // query 4xx is InvalidParam — a rate-limit surfaced as InvalidParam would
+        // wrongly tell the model its query was bad.
+        if status >= 500 || status == 429 || status == 401 || status == 403 {
+            let suffix = if status == 429 || status == 403 {
+                "; rate-limited or bot-blocked"
+            } else {
+                ""
+            };
             return Err(SearchError::new(
                 SearchErrorCode::ServerNotAvailable,
-                format!("{} returned HTTP {}", engine, status),
+                format!("{} is unavailable (HTTP {}{})", engine, status, suffix),
             ));
         }
         return Err(SearchError::new(
