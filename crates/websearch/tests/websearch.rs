@@ -4,7 +4,7 @@
 use bytes::Bytes;
 use harness_core::{PermissionPolicy, ToolErrorCode};
 use harness_websearch::{
-    classify_ip, default_engine, websearch, BlockClass, WebSearchPermissionPolicy,
+    classify_ip, default_engine, websearch, BlockClass, EngineBaseUrls, WebSearchPermissionPolicy,
     WebSearchResult, WebSearchSessionConfig,
 };
 use http_body_util::Full;
@@ -102,12 +102,32 @@ async fn rejects_invalid_time_range_enum() {
 }
 
 #[tokio::test]
-async fn errors_when_no_backend_configured() {
-    let s = mk_session(); // no searxng_url
+async fn no_backend_falls_back_to_keyless_chain() {
+    // v2: no searxng_url is no longer an error — it uses the keyless chain.
+    // Kept hermetic by pointing Mojeek at a local fixture server.
+    let body = r#"<ul class="results-standard"><!--rs--><li><a class="title" href="https://ex.com/a">A title</a><p class="s">snippet a</p></li><!--re--></ul>"#;
+    let handler: Handler = Arc::new(move |_req| ServerResponse {
+        status: StatusCode::OK,
+        content_type: "text/html",
+        body: Bytes::from_static(
+            br#"<ul class="results-standard"><!--rs--><li><a class="title" href="https://ex.com/a">A title</a><p class="s">snippet a</p></li><!--re--></ul>"#,
+        ),
+    });
+    let (addr, _jh) = start_server(handler).await;
+    let _ = body;
+
+    let perms = PermissionPolicy::new(Vec::<String>::new());
+    let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
+    let mut s = WebSearchSessionConfig::auto(ws_perms);
+    s.allow_loopback = true;
+    s.engine_base_urls = Some(EngineBaseUrls {
+        mojeek: Some(format!("http://{}", addr)),
+        ..Default::default()
+    });
     let r = websearch(json!({"query": "x"}), &s).await;
-    let e = expect_error(&r);
-    assert_eq!(e.error.code, ToolErrorCode::InvalidParam);
-    assert!(e.error.message.contains("no search backend configured"));
+    let ok = expect_ok(&r);
+    assert_eq!(ok.results[0].url, "https://ex.com/a");
+    assert_eq!(ok.meta.engine.as_deref(), Some("mojeek"));
 }
 
 #[tokio::test]
@@ -490,7 +510,8 @@ async fn prompt_injection_snippet_surfaced_verbatim() {
 #[tokio::test]
 async fn error_result_serializes_with_kind_tag() {
     let s = mk_session();
-    let r = websearch(json!({"query": "x"}), &s).await; // no backend → error
+    // A bad alias param always errors before any network, regardless of backend.
+    let r = websearch(json!({"q": "x"}), &s).await;
     let v: Value = serde_json::to_value(&r).unwrap();
     assert_eq!(v.get("kind").and_then(|v| v.as_str()), Some("error"));
 }

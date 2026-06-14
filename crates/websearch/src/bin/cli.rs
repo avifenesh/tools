@@ -1,9 +1,7 @@
 //! `harness-websearch-cli` — JSON-RPC bridge. Method: websearch.
 
 use harness_core::{PermissionPolicy, ToolError, ToolErrorCode};
-use harness_websearch::{
-    default_engine, websearch, WebSearchPermissionPolicy, WebSearchSessionConfig,
-};
+use harness_websearch::{websearch, WebSearchPermissionPolicy, WebSearchSessionConfig};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -52,6 +50,14 @@ struct SessionSpec {
     #[serde(default)]
     searxng_url: Option<String>,
     #[serde(default)]
+    brave_api_key: Option<String>,
+    #[serde(default)]
+    tavily_api_key: Option<String>,
+    #[serde(default)]
+    disable_mojeek: bool,
+    #[serde(default)]
+    fallback_to_keyless: bool,
+    #[serde(default)]
     default_headers: Option<HashMap<String, String>>,
     #[serde(default)]
     allow_loopback: bool,
@@ -76,8 +82,14 @@ impl SessionSpec {
         perms.bypass_workspace_guard = self.bypass_workspace_guard;
         let ws_perms = WebSearchPermissionPolicy::new(perms)
             .with_unsafe_bypass(self.unsafe_allow_search_without_hook);
-        let mut cfg = WebSearchSessionConfig::new(ws_perms, default_engine());
+        // Zero-config by default: no explicit engine override, so the resolver
+        // picks the keyless chain unless a key / searxng_url is provided.
+        let mut cfg = WebSearchSessionConfig::auto(ws_perms);
         cfg.searxng_url = self.searxng_url;
+        cfg.brave_api_key = self.brave_api_key;
+        cfg.tavily_api_key = self.tavily_api_key;
+        cfg.disable_mojeek = self.disable_mojeek;
+        cfg.fallback_to_keyless = self.fallback_to_keyless;
         cfg.default_headers = self.default_headers;
         cfg.allow_loopback = self.allow_loopback;
         cfg.allow_private_networks = self.allow_private_networks;

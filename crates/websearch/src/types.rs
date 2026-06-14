@@ -90,9 +90,24 @@ impl std::fmt::Debug for WebSearchPermissionPolicy {
 #[derive(Clone)]
 pub struct WebSearchSessionConfig {
     pub permissions: WebSearchPermissionPolicy,
-    pub engine: Arc<dyn WebSearchEngine>,
-    /// Base URL of the self-hosted SearXNG instance, e.g. http://127.0.0.1:8888
+    /// Explicit engine override. When set, the resolver uses it verbatim and
+    /// bypasses the built-in chain (advanced / tests / legacy direct wiring).
+    pub engine_override: Option<Arc<dyn WebSearchEngine>>,
+    /// Base URL of a self-hosted SearXNG instance, e.g. http://127.0.0.1:8888.
+    /// When set, SearXNG leads the chain; when unset (and no key), the keyless
+    /// bundled engines are used so search works with zero config.
     pub searxng_url: Option<String>,
+    /// Brave Search API key — when set, Brave leads the chain (reliable upgrade).
+    pub brave_api_key: Option<String>,
+    /// Tavily API key — when set, Tavily joins the head of the chain.
+    pub tavily_api_key: Option<String>,
+    /// Drop the Mojeek scrape engine from the keyless chain (ToS gray area).
+    pub disable_mojeek: bool,
+    /// When an explicit backend is configured, also fall back to the keyless
+    /// chain if it returns nothing/errors. Default false (explicit is exclusive).
+    pub fallback_to_keyless: bool,
+    /// Per-engine base-URL overrides (tests point these at fixture servers).
+    pub engine_base_urls: Option<crate::engines::EngineBaseUrls>,
     pub default_headers: Option<HashMap<String, String>>,
     pub allow_loopback: bool,
     pub allow_private_networks: bool,
@@ -106,14 +121,18 @@ pub struct WebSearchSessionConfig {
 }
 
 impl WebSearchSessionConfig {
-    pub fn new(
-        permissions: WebSearchPermissionPolicy,
-        engine: Arc<dyn WebSearchEngine>,
-    ) -> Self {
+    /// Zero-config constructor: no explicit engine, no backend — the resolver
+    /// will use the bundled keyless chain (Mojeek → Marginalia → Wikipedia).
+    pub fn auto(permissions: WebSearchPermissionPolicy) -> Self {
         Self {
             permissions,
-            engine,
+            engine_override: None,
             searxng_url: None,
+            brave_api_key: None,
+            tavily_api_key: None,
+            disable_mojeek: false,
+            fallback_to_keyless: false,
+            engine_base_urls: None,
             default_headers: None,
             allow_loopback: false,
             allow_private_networks: false,
@@ -124,6 +143,17 @@ impl WebSearchSessionConfig {
             redact_query_in_hook: false,
             session_id: None,
         }
+    }
+
+    /// Back-compat constructor matching the v1 signature: wires an explicit
+    /// engine override (e.g. `default_engine()`), as before.
+    pub fn new(
+        permissions: WebSearchPermissionPolicy,
+        engine: Arc<dyn WebSearchEngine>,
+    ) -> Self {
+        let mut s = Self::auto(permissions);
+        s.engine_override = Some(engine);
+        s
     }
 
     pub fn with_searxng_url(mut self, url: impl Into<String>) -> Self {
@@ -158,6 +188,9 @@ pub struct SearchMetadata {
     pub count: usize,
     pub time_range: WebSearchTimeRange,
     pub elapsed_ms: u64,
+    /// Which engine served the results (provenance), e.g. "mojeek".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

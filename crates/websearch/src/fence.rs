@@ -13,6 +13,7 @@ pub struct AskArgs<'a> {
     pub query: &'a str,
     pub backend_url: &'a str,
     pub backend_host: &'a str,
+    pub chain: &'a [String],
     pub count: usize,
     pub time_range: WebSearchTimeRange,
     pub safe_search: SafeSearch,
@@ -24,7 +25,14 @@ pub async fn ask_permission(
     args: AskArgs<'_>,
 ) -> PermissionOutcome {
     let permissions = &session.permissions.inner;
-    let pattern = format!("WebSearch(backend:{})", args.backend_host);
+    let primary = format!("WebSearch(backend:{})", args.backend_host);
+    let mut patterns = vec![primary.clone()];
+    for name in args.chain {
+        let p = format!("WebSearch(backend:{})", name);
+        if p != primary {
+            patterns.push(p);
+        }
+    }
 
     if permissions.hook.is_none() {
         if session.permissions.unsafe_allow_search_without_hook {
@@ -44,6 +52,7 @@ pub async fn ask_permission(
         "safe_search": args.safe_search.as_str(),
         "categories": args.categories,
         "backend_host": args.backend_host,
+        "engine_chain": args.chain,
     });
     if session.redact_query_in_hook {
         metadata["query_length"] = serde_json::json!(args.query.chars().count());
@@ -55,7 +64,7 @@ pub async fn ask_permission(
         tool: "websearch".to_string(),
         path: args.backend_url.to_string(),
         action: "read".to_string(),
-        always_patterns: vec![pattern.clone()],
+        always_patterns: patterns,
         metadata,
     };
     let hook = permissions.hook.as_ref().unwrap();
@@ -65,7 +74,7 @@ pub async fn ask_permission(
         PermissionDecision::Deny => PermissionOutcome::Deny {
             reason: format!(
                 "Search blocked by permission policy. Pattern hint: {}",
-                pattern
+                primary
             ),
         },
         PermissionDecision::Ask => PermissionOutcome::Deny {

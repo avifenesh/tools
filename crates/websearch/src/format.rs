@@ -4,10 +4,15 @@ use crate::types::{SearchMetadata, WebSearchResultItem};
 /// Render the <search>...</search> block that opens the ok results. Uniform
 /// shape so the model parses the same surface.
 pub fn render_search_block(meta: &SearchMetadata) -> String {
+    let engine_line = match &meta.engine {
+        Some(e) if !e.is_empty() => format!("\n  <engine>{}</engine>", e),
+        _ => String::new(),
+    };
     format!(
-        "<search>\n  <query>{}</query>\n  <backend>{}</backend>\n  <count>{}</count>\n  <time_range>{}</time_range>\n</search>",
+        "<search>\n  <query>{}</query>\n  <backend>{}</backend>{}\n  <count>{}</count>\n  <time_range>{}</time_range>\n</search>",
         meta.query,
         meta.backend_host,
+        engine_line,
         meta.count,
         meta.time_range.as_str(),
     )
@@ -38,6 +43,10 @@ pub fn format_ok_text(args: FormatOkArgs<'_>) -> String {
         .join("\n");
     let results_block = format!("<results>\n{}\n</results>", numbered);
     let n = args.results.len();
+    let via = match &args.meta.engine {
+        Some(e) if !e.is_empty() => format!("{} ({})", e, args.meta.backend_host),
+        _ => args.meta.backend_host.clone(),
+    };
     let hint = if n < args.requested {
         format!(
             "(Only {} results — fewer than the {} requested. Try broader terms or a wider time_range.)",
@@ -46,7 +55,7 @@ pub fn format_ok_text(args: FormatOkArgs<'_>) -> String {
     } else {
         format!(
             "(Found {} results for \"{}\" via {} in {}ms. Fetch a URL with webfetch to read it.)",
-            n, args.meta.query, args.meta.backend_host, args.meta.elapsed_ms
+            n, args.meta.query, via, args.meta.elapsed_ms
         )
     };
     format!("{}\n{}\n{}", header, results_block, hint)

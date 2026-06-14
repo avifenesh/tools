@@ -8,6 +8,7 @@ use url::Url;
 
 use crate::types::{SafeSearch, WebSearchResultItem, WebSearchTimeRange};
 
+#[derive(Clone)]
 pub struct WebSearchEngineInput {
     pub backend_url: String,
     pub query: String,
@@ -33,6 +34,9 @@ pub struct WebSearchEngineResult {
     pub results: Vec<WebSearchResultItem>,
     pub backend_host: String,
     pub elapsed_ms: u64,
+    /// Which engine served this result (provenance). None until set by an
+    /// engine or the fallback layer.
+    pub engine: Option<String>,
 }
 
 #[async_trait]
@@ -41,6 +45,12 @@ pub trait WebSearchEngine: Send + Sync {
         &self,
         input: WebSearchEngineInput,
     ) -> Result<WebSearchEngineResult, SearchError>;
+
+    /// Engine name for provenance / fallback diagnostics. Defaults to
+    /// "searxng" for the legacy ReqwestEngine; new engines override it.
+    fn name(&self) -> &str {
+        "searxng"
+    }
 }
 
 /// Engine-local error code, distinct from `harness_core::ToolErrorCode`. The
@@ -79,12 +89,19 @@ pub struct ReqwestEngine {
 
 impl ReqwestEngine {
     pub fn new() -> Self {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .expect("reqwest client build");
-        Self { client }
+        Self {
+            client: shared_client(),
+        }
     }
+}
+
+/// A reqwest client configured the way every engine wants it (no auto-redirect
+/// so we control SSRF; gzip; rustls). Cheap to clone (Arc inside).
+pub(crate) fn shared_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("reqwest client build")
 }
 
 impl Default for ReqwestEngine {
@@ -159,6 +176,7 @@ impl WebSearchEngine for ReqwestEngine {
             results,
             backend_host: host,
             elapsed_ms: started.elapsed().as_millis() as u64,
+            engine: Some("searxng".to_string()),
         })
     }
 }
@@ -213,7 +231,7 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
     out
 }
 
-fn classify_reqwest_error(e: reqwest::Error) -> SearchError {
+pub(crate) fn classify_reqwest_error(e: reqwest::Error) -> SearchError {
     let msg = e.to_string();
     // reqwest's top-level Display rarely carries the OS-level reason
     // ("Connection refused"); walk the source chain so the orchestrator can
@@ -251,7 +269,7 @@ fn classify_reqwest_error(e: reqwest::Error) -> SearchError {
 }
 
 /// Flatten an error and its source chain into one string for keyword sniffing.
-fn error_chain(e: &reqwest::Error) -> String {
+pub(crate) fn error_chain(e: &reqwest::Error) -> String {
     let mut parts = vec![e.to_string()];
     let mut src = std::error::Error::source(e);
     while let Some(s) = src {

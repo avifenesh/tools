@@ -9,6 +9,7 @@
 
 mod constants;
 mod engine;
+mod engines;
 mod fence;
 mod format;
 mod run;
@@ -20,6 +21,10 @@ pub use constants::*;
 pub use engine::{
     default_engine, ReqwestEngine, SearchError, SearchErrorCode, WebSearchEngine,
     WebSearchEngineInput, WebSearchEngineResult,
+};
+pub use engines::{
+    resolve_engine, BraveEngine, EngineBaseUrls, FallbackEngine, MarginaliaEngine, MojeekEngine,
+    ResolvedEngine, TavilyEngine, WikipediaEngine,
 };
 pub use format::{format_empty_text, format_ok_text, render_search_block};
 pub use schema::{
