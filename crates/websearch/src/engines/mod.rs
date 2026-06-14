@@ -9,6 +9,7 @@ mod html;
 mod http;
 mod marginalia;
 mod mojeek;
+mod rank;
 mod tavily;
 mod wikipedia;
 

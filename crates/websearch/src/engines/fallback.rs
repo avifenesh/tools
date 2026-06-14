@@ -5,8 +5,10 @@
 //! engines/budget run out.
 //!
 //! Fast path: if the FIRST engine alone meets count, return it directly (no
-//! mixing). Mixing only happens when the leading engine(s) come up short, and
-//! then the merged result carries per-row source + a contributors list.
+//! mixing, no re-rank). When more than one engine contributes, results are
+//! fused with Reciprocal Rank Fusion + engine weights (see rank.rs) — a page
+//! two engines agree on floats up (consensus) and a niche/encyclopedic backstop
+//! can't outrank broad web just because the leader was short.
 //!
 //! Timeout fairness: `input.timeout_ms` is the OVERALL budget; each engine
 //! gets a slice (≈ overall / engine_count, clamped) via a per-engine timeout.
@@ -16,11 +18,12 @@
 //! is degraded → error; all-error → chain-summary error.
 
 use async_trait::async_trait;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::dedupe::normalize_url_for_dedup;
+use super::rank::{fuse_rrf, FusionCandidate, RankOccurrence};
 use crate::engine::{
     EngineClass, SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput,
     WebSearchEngineResult,
@@ -65,8 +68,9 @@ impl WebSearchEngine for FallbackEngine {
         let mut errors: Vec<SearchError> = Vec::new();
         let mut summary: Vec<String> = Vec::new();
 
-        let mut merged: Vec<WebSearchResultItem> = Vec::new();
-        let mut seen: HashSet<String> = HashSet::new();
+        // Deduped candidate pool keyed on normalized URL; each candidate
+        // records every (engine, rank) that surfaced it, for RRF fusion.
+        let mut candidates: HashMap<String, FusionCandidate> = HashMap::new();
         let mut contributors: Vec<String> = Vec::new();
         let mut backend_host = String::new();
         let mut first_engine: Option<String> = None;
@@ -80,7 +84,7 @@ impl WebSearchEngine for FallbackEngine {
         let mut general_errored = false;
 
         for (idx, engine) in self.engines.iter().enumerate() {
-            if merged.len() >= input.count {
+            if candidates.len() >= input.count {
                 break; // sufficiency reached
             }
             let remaining = deadline
@@ -120,36 +124,48 @@ impl WebSearchEngine for FallbackEngine {
                         out.engine_class = Some(class);
                         return Ok(out);
                     }
-                    // Merge with dedup; tag each kept item with its source.
-                    let mut added = 0usize;
+                    // Accumulate into the candidate pool. A URL already seen
+                    // from an earlier engine records an additional (engine,
+                    // rank) occurrence (consensus) instead of being dropped.
                     let r_time = r.time_range_applied;
                     let r_host = r.backend_host.clone();
-                    for mut item in r.results.into_iter() {
+                    for (rank, item) in r.results.into_iter().enumerate() {
                         let key = normalize_url_for_dedup(&item.url);
-                        if seen.contains(&key) {
-                            continue;
-                        }
-                        seen.insert(key);
-                        item.source = Some(name.clone());
-                        merged.push(item);
-                        added += 1;
-                        if merged.len() >= input.count {
-                            break;
+                        if let Some(existing) = candidates.get_mut(&key) {
+                            existing.occurrences.push(RankOccurrence {
+                                engine: name.clone(),
+                                class,
+                                rank,
+                            });
+                        } else {
+                            let order = candidates.len();
+                            candidates.insert(
+                                key,
+                                FusionCandidate {
+                                    item,
+                                    occurrences: vec![RankOccurrence {
+                                        engine: name.clone(),
+                                        class,
+                                        rank,
+                                    }],
+                                    order,
+                                },
+                            );
                         }
                     }
                     summary.push(format!("{}: results", name));
-                    if added > 0 {
+                    if !contributors.contains(&name) {
                         contributors.push(name.clone());
-                        if first_engine.is_none() {
-                            first_engine = Some(name);
-                            first_class = Some(class);
-                            backend_host = r_host;
-                        }
-                        match r_time {
-                            Some(true) => any_time_applied = true,
-                            Some(false) => any_time_ignored = true,
-                            None => {}
-                        }
+                    }
+                    if first_engine.is_none() {
+                        first_engine = Some(name);
+                        first_class = Some(class);
+                        backend_host = r_host;
+                    }
+                    match r_time {
+                        Some(true) => any_time_applied = true,
+                        Some(false) => any_time_ignored = true,
+                        None => {}
                     }
                 }
                 Ok(Err(e)) => {
@@ -172,21 +188,35 @@ impl WebSearchEngine for FallbackEngine {
             }
         }
 
-        if !merged.is_empty() {
+        if !candidates.is_empty() {
             let mixed = contributors.len() > 1;
-            if !mixed {
-                // Single contributor — strip the per-result source tags.
-                for item in merged.iter_mut() {
-                    item.source = None;
-                }
-            }
+            // Fuse the candidate pool with RRF + engine weights, then truncate.
+            // For a single contributor RRF preserves that engine's order, so
+            // it's a stable no-op reorder — we just clear the source tag.
+            let pool: Vec<FusionCandidate> = candidates.into_values().collect();
+            let fused = fuse_rrf(pool);
+            let results: Vec<WebSearchResultItem> = fused
+                .into_iter()
+                .take(input.count)
+                .map(|f| {
+                    let mut item = f.item;
+                    item.source = if mixed {
+                        // Multi-engine: surface the contributing engine(s) for
+                        // this row (consensus shows all agreeing engines).
+                        Some(f.sources.join("+"))
+                    } else {
+                        None
+                    };
+                    item
+                })
+                .collect();
             let time_range_applied = if any_time_applied || any_time_ignored {
                 Some(!any_time_ignored)
             } else {
                 None
             };
             return Ok(WebSearchEngineResult {
-                results: merged,
+                results,
                 backend_host,
                 elapsed_ms: total_elapsed,
                 engine: first_engine.or_else(|| contributors.first().cloned()),

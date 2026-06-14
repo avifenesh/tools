@@ -400,6 +400,48 @@ async fn fallback_fast_path_first_engine_meets_count() {
 }
 
 #[tokio::test]
+async fn fallback_rrf_consensus_boosts_agreed_url() {
+    // mojeek: [seo#0, shared#1, junk#2]; marginalia: [shared#0, boats#1].
+    // shared = mojeek#1 (1.0/11=.0909) + marginalia#0 (.8/10=.080) = .171,
+    // beating mojeek#0 seo (.100) → consensus floats it to #1.
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let engine = FallbackEngine::new(vec![
+        fake_classed(
+            "mojeek",
+            FakeBehavior::Results(vec![item("seo.example/x"), item("shared.example/p"), item("junk.example/y")]),
+            calls.clone(),
+            EngineClass::General,
+        ),
+        fake_classed(
+            "marginalia",
+            FakeBehavior::Results(vec![item("shared.example/p"), item("boats.example/b")]),
+            calls.clone(),
+            EngineClass::Niche,
+        ),
+    ]);
+    let r = engine.search(engine_input()).await.unwrap();
+    assert_eq!(r.results[0].url, "https://shared.example/p");
+    assert_eq!(r.results[0].source.as_deref(), Some("marginalia+mojeek")); // best-rank first
+}
+
+#[tokio::test]
+async fn fallback_rrf_weight_keeps_general_above_vertical() {
+    // Short general leader + a vertical engine; weighting keeps general #1.
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let engine = FallbackEngine::new(vec![
+        fake_classed("mojeek", FakeBehavior::Results(vec![item("k8s.io/docs")]), calls.clone(), EngineClass::General),
+        fake_classed(
+            "wikipedia",
+            FakeBehavior::Results(vec![item("en.wikipedia.org/?curid=1"), item("en.wikipedia.org/?curid=2")]),
+            calls.clone(),
+            EngineClass::Vertical,
+        ),
+    ]);
+    let r = engine.search(engine_input()).await.unwrap();
+    assert_eq!(r.results[0].url, "https://k8s.io/docs");
+}
+
+#[tokio::test]
 async fn fallback_skips_error_then_continues() {
     let calls = Arc::new(Mutex::new(Vec::new()));
     let engine = FallbackEngine::new(vec![
@@ -540,7 +582,8 @@ async fn fallback_merges_and_dedupes_across_two_fixture_engines() {
     match r {
         WebSearchResult::Ok(ok) => {
             let urls: Vec<&str> = ok.results.iter().map(|x| x.url.as_str()).collect();
-            // 5 unique results; the shared page de-duped to one (Mojeek's form).
+            // 5 unique results; the shared page de-duped to one. RRF ranks the
+            // consensus page (both engines) first, then mojeek-only, then m1-3.
             assert_eq!(
                 urls,
                 vec![
@@ -556,7 +599,9 @@ async fn fallback_merges_and_dedupes_across_two_fixture_engines() {
                 Some(&["mojeek".to_string(), "marginalia".to_string()][..])
             );
             assert!(ok.output.contains("mojeek+marginalia (general web)"));
-            assert_eq!(ok.results[0].source.as_deref(), Some("mojeek"));
+            // The shared page is a CONSENSUS hit → source names both engines.
+            assert_eq!(ok.results[0].source.as_deref(), Some("mojeek+marginalia"));
+            assert_eq!(ok.results[1].source.as_deref(), Some("mojeek"));
             assert_eq!(ok.results[2].source.as_deref(), Some("marginalia"));
         }
         other => panic!("expected ok, got {:?}", other),
