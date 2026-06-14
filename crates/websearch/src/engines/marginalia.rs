@@ -88,6 +88,7 @@ impl WebSearchEngine for MarginaliaEngine {
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
             engine_class: None,
+            engines: None,
             // Marginalia's public API has no recency filter.
             time_range_applied: if input.time_range == WebSearchTimeRange::All {
                 None
@@ -123,6 +124,7 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             snippet,
             age: None,
             score,
+            source: None,
         });
     }
     out

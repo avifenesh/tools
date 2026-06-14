@@ -91,6 +91,7 @@ impl WebSearchEngine for MojeekEngine {
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
             engine_class: None,
+            engines: None,
             // Mojeek's SERP scrape has no recency filter.
             time_range_applied: if input.time_range == WebSearchTimeRange::All {
                 None
@@ -130,6 +131,7 @@ pub(crate) fn parse_mojeek(html: &str) -> Vec<WebSearchResultItem> {
             snippet,
             age: None,
             score: None,
+            source: None,
         });
     }
     out

@@ -1,21 +1,31 @@
-//! Ordered fallback engine — mirrors `ddgs backend="auto"` and the TS
-//! `engines/fallback.ts`. Tries each engine in order; first non-empty wins;
-//! per-engine failures are recorded and the chain continues; a clean empty
-//! beats a pile of errors; all-error throws a chain-summary SearchError.
+//! Ordered fallback engine — mirrors `ddgs backend="auto"` / SearXNG's
+//! cross-engine merge and the TS `engines/fallback.ts`. Engines are tried in
+//! chain order (general-first); their results are ACCUMULATED, de-duplicated
+//! by normalized URL, until the requested `count` is met (sufficiency) or
+//! engines/budget run out.
+//!
+//! Fast path: if the FIRST engine alone meets count, return it directly (no
+//! mixing). Mixing only happens when the leading engine(s) come up short, and
+//! then the merged result carries per-row source + a contributors list.
 //!
 //! Timeout fairness: `input.timeout_ms` is the OVERALL budget; each engine
-//! gets a slice (≈ overall / engine_count, clamped) via a per-engine timeout
-//! so a slow engine can't starve the next. The per-engine timeout is applied
-//! by `tokio::time::timeout` here AND passed as the engine's own timeout_ms.
+//! gets a slice (≈ overall / engine_count, clamped) via a per-engine timeout.
+//!
+//! Empty/degraded (engine-class aware): a general engine's empty is
+//! authoritative; a niche/vertical-only empty while a general engine errored
+//! is degraded → error; all-error → chain-summary error.
 
 use async_trait::async_trait;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use super::dedupe::normalize_url_for_dedup;
 use crate::engine::{
     EngineClass, SearchError, SearchErrorCode, WebSearchEngine, WebSearchEngineInput,
     WebSearchEngineResult,
 };
+use crate::types::WebSearchResultItem;
 
 const PER_ENGINE_FLOOR_MS: u64 = 3_000;
 const PER_ENGINE_CAP_MS: u64 = 8_000;
@@ -48,17 +58,31 @@ impl WebSearchEngine for FallbackEngine {
     ) -> Result<WebSearchEngineResult, SearchError> {
         let overall_ms = input.timeout_ms;
         let deadline = Instant::now() + Duration::from_millis(overall_ms);
-        let count = self.engines.len().max(1) as u64;
+        let n_engines = self.engines.len().max(1) as u64;
         let per_engine_ms =
-            (overall_ms / count).clamp(PER_ENGINE_FLOOR_MS.min(overall_ms), PER_ENGINE_CAP_MS);
+            (overall_ms / n_engines).clamp(PER_ENGINE_FLOOR_MS.min(overall_ms), PER_ENGINE_CAP_MS);
 
         let mut errors: Vec<SearchError> = Vec::new();
         let mut summary: Vec<String> = Vec::new();
-        let mut general_empty: Option<WebSearchEngineResult> = None;
-        let mut fallback_empty: Option<WebSearchEngineResult> = None;
+
+        let mut merged: Vec<WebSearchResultItem> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut contributors: Vec<String> = Vec::new();
+        let mut backend_host = String::new();
+        let mut first_engine: Option<String> = None;
+        let mut first_class: Option<EngineClass> = None;
+        let mut total_elapsed: u64 = 0;
+        let mut any_time_applied = false;
+        let mut any_time_ignored = false;
+
+        let mut general_empty = false;
+        let mut fallback_empty = false;
         let mut general_errored = false;
 
-        for engine in &self.engines {
+        for (idx, engine) in self.engines.iter().enumerate() {
+            if merged.len() >= input.count {
+                break; // sufficiency reached
+            }
             let remaining = deadline
                 .checked_duration_since(Instant::now())
                 .map(|d| d.as_millis() as u64)
@@ -68,8 +92,6 @@ impl WebSearchEngine for FallbackEngine {
             }
             let budget = per_engine_ms.min(remaining).max(1);
 
-            // Per-engine input carries the slice as its own timeout, and the
-            // tokio timeout is the hard cut-off if the engine ignores it.
             let mut per_input = input.clone();
             per_input.timeout_ms = budget;
 
@@ -78,7 +100,18 @@ impl WebSearchEngine for FallbackEngine {
             let fut = engine.search(per_input);
             match tokio::time::timeout(Duration::from_millis(budget), fut).await {
                 Ok(Ok(r)) => {
-                    if !r.results.is_empty() {
+                    total_elapsed += r.elapsed_ms;
+                    if r.results.is_empty() {
+                        summary.push(format!("{}: empty", name));
+                        if class == EngineClass::General {
+                            general_empty = true;
+                        } else {
+                            fallback_empty = true;
+                        }
+                        continue;
+                    }
+                    // Fast path: first engine alone meets count → return it.
+                    if idx == 0 && r.results.len() >= input.count {
                         summary.push(format!("{}: results", name));
                         let mut out = r;
                         if out.engine.is_none() {
@@ -87,18 +120,36 @@ impl WebSearchEngine for FallbackEngine {
                         out.engine_class = Some(class);
                         return Ok(out);
                     }
-                    summary.push(format!("{}: empty", name));
-                    let mut e = r;
-                    if e.engine.is_none() {
-                        e.engine = Some(name);
-                    }
-                    e.engine_class = Some(class);
-                    if class == EngineClass::General {
-                        if general_empty.is_none() {
-                            general_empty = Some(e);
+                    // Merge with dedup; tag each kept item with its source.
+                    let mut added = 0usize;
+                    let r_time = r.time_range_applied;
+                    let r_host = r.backend_host.clone();
+                    for mut item in r.results.into_iter() {
+                        let key = normalize_url_for_dedup(&item.url);
+                        if seen.contains(&key) {
+                            continue;
                         }
-                    } else if fallback_empty.is_none() {
-                        fallback_empty = Some(e);
+                        seen.insert(key);
+                        item.source = Some(name.clone());
+                        merged.push(item);
+                        added += 1;
+                        if merged.len() >= input.count {
+                            break;
+                        }
+                    }
+                    summary.push(format!("{}: results", name));
+                    if added > 0 {
+                        contributors.push(name.clone());
+                        if first_engine.is_none() {
+                            first_engine = Some(name);
+                            first_class = Some(class);
+                            backend_host = r_host;
+                        }
+                        match r_time {
+                            Some(true) => any_time_applied = true,
+                            Some(false) => any_time_ignored = true,
+                            None => {}
+                        }
                     }
                 }
                 Ok(Err(e)) => {
@@ -121,20 +172,51 @@ impl WebSearchEngine for FallbackEngine {
             }
         }
 
-        // A general (broad-web) engine's empty is authoritative: the web had
-        // nothing. Otherwise, a niche/vertical-only empty is trustworthy only
-        // if no general engine errored; if one did, search is degraded → error
-        // so the model retries rather than trusting e.g. a Wikipedia-empty.
-        if let Some(empty) = general_empty {
-            return Ok(empty);
-        }
-        if let Some(empty) = fallback_empty {
-            if !general_errored {
-                return Ok(empty);
+        if !merged.is_empty() {
+            let mixed = contributors.len() > 1;
+            if !mixed {
+                // Single contributor — strip the per-result source tags.
+                for item in merged.iter_mut() {
+                    item.source = None;
+                }
             }
+            let time_range_applied = if any_time_applied || any_time_ignored {
+                Some(!any_time_ignored)
+            } else {
+                None
+            };
+            return Ok(WebSearchEngineResult {
+                results: merged,
+                backend_host,
+                elapsed_ms: total_elapsed,
+                engine: first_engine.or_else(|| contributors.first().cloned()),
+                engine_class: first_class,
+                engines: if mixed { Some(contributors) } else { None },
+                time_range_applied,
+            });
         }
 
+        // No results gathered. A general engine's empty is authoritative.
+        if general_empty {
+            return Ok(empty_result(backend_host, total_elapsed));
+        }
+        // Niche/vertical-only empty: trustworthy only if no general engine broke.
+        if fallback_empty && !general_errored {
+            return Ok(empty_result(backend_host, total_elapsed));
+        }
         Err(synthesize_chain_error(&errors, &summary))
+    }
+}
+
+fn empty_result(backend_host: String, elapsed_ms: u64) -> WebSearchEngineResult {
+    WebSearchEngineResult {
+        results: Vec::new(),
+        backend_host,
+        elapsed_ms,
+        engine: None,
+        engine_class: None,
+        engines: None,
+        time_range_applied: None,
     }
 }
 

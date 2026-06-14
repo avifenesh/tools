@@ -310,6 +310,7 @@ impl WebSearchEngine for FakeEngine {
                 elapsed_ms: 1,
                 engine: None,
                 engine_class: None,
+                engines: None,
                 time_range_applied: None,
             }),
             FakeBehavior::Empty => Ok(WebSearchEngineResult {
@@ -318,6 +319,7 @@ impl WebSearchEngine for FakeEngine {
                 elapsed_ms: 1,
                 engine: None,
                 engine_class: None,
+                engines: None,
                 time_range_applied: None,
             }),
             FakeBehavior::Error(code) => Err(SearchError::new(*code, "fake error")),
@@ -332,6 +334,7 @@ fn item(u: &str) -> WebSearchResultItem {
         snippet: "s".to_string(),
         age: None,
         score: None,
+        source: None,
     }
 }
 
@@ -360,17 +363,40 @@ fn fake_classed(
 use harness_websearch::FallbackEngine;
 
 #[tokio::test]
-async fn fallback_returns_first_non_empty_skipping_empties() {
+async fn fallback_merges_when_leader_short_skipping_empties() {
     let calls = Arc::new(Mutex::new(Vec::new()));
     let engine = FallbackEngine::new(vec![
         fake("a", FakeBehavior::Empty, calls.clone()),
         fake("b", FakeBehavior::Results(vec![item("b1")]), calls.clone()),
         fake("c", FakeBehavior::Results(vec![item("c1")]), calls.clone()),
     ]);
+    // count=5; b and c each give 1 → merged to fill the quota.
     let r = engine.search(engine_input()).await.unwrap();
-    assert_eq!(r.results[0].url, "https://b1");
-    assert_eq!(r.engine.as_deref(), Some("b"));
-    assert_eq!(*calls.lock().unwrap(), vec!["a", "b"]); // c not tried
+    assert_eq!(
+        r.results.iter().map(|x| x.url.as_str()).collect::<Vec<_>>(),
+        vec!["https://b1", "https://c1"]
+    );
+    assert_eq!(r.engine.as_deref(), Some("b")); // first contributor leads
+    assert_eq!(r.engines.as_deref(), Some(&["b".to_string(), "c".to_string()][..]));
+    assert_eq!(r.results[0].source.as_deref(), Some("b"));
+    assert_eq!(r.results[1].source.as_deref(), Some("c"));
+    assert_eq!(*calls.lock().unwrap(), vec!["a", "b", "c"]);
+}
+
+#[tokio::test]
+async fn fallback_fast_path_first_engine_meets_count() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let five: Vec<_> = (0..5).map(|i| item(&format!("a{}", i))).collect();
+    let engine = FallbackEngine::new(vec![
+        fake("a", FakeBehavior::Results(five), calls.clone()),
+        fake("b", FakeBehavior::Results(vec![item("b1")]), calls.clone()),
+    ]);
+    let r = engine.search(engine_input()).await.unwrap();
+    assert_eq!(r.results.len(), 5);
+    assert_eq!(r.engine.as_deref(), Some("a"));
+    assert!(r.engines.is_none()); // single engine, not mixed
+    assert!(r.results.iter().all(|x| x.source.is_none()));
+    assert_eq!(*calls.lock().unwrap(), vec!["a"]); // b not tried
 }
 
 #[tokio::test]
@@ -444,7 +470,7 @@ async fn fallback_general_empty_is_authoritative() {
     ]);
     let r = engine.search(engine_input()).await.unwrap();
     assert!(r.results.is_empty());
-    assert_eq!(r.engine.as_deref(), Some("mojeek"));
+    // empty path no longer carries a per-result engine; the attempt trace does.
 }
 
 #[tokio::test]
@@ -483,6 +509,61 @@ async fn fallback_mixed_errors_summarize_as_server_not_available() {
 // ---- resolver via the public websearch() (zero-config provenance) ----
 
 #[tokio::test]
+async fn fallback_merges_and_dedupes_across_two_fixture_engines() {
+    // Mojeek returns 2 (one shared with Marginalia), Marginalia returns 3 more.
+    // count=5 → merge; the shared URL (www + trailing slash + utm) de-duped.
+    let mojeek_h: H = Arc::new(|_req| Resp {
+        status: StatusCode::OK,
+        content_type: "text/html",
+        body: Bytes::from_static(
+            br##"<ul class="results-standard"><!--rs--><li><a class="title" href="https://shared.example/page">Shared</a><p class="s">from mojeek</p></li><!--re--><!--rs--><li><a class="title" href="https://mojeek-only.example/x">MojeekOnly</a><p class="s">m</p></li><!--re--></ul>"##,
+        ),
+    });
+    let (maddr, _mj) = serve(mojeek_h).await;
+    let marg_h: H = Arc::new(|_req| {
+        json_resp(Bytes::from_static(
+            br#"{"results":[{"url":"https://www.shared.example/page/?utm_source=x","title":"dup","description":"from marginalia"},{"url":"https://m1.example/a","title":"M1","description":"d","quality":3.1},{"url":"https://m2.example/b","title":"M2","description":"d"},{"url":"https://m3.example/c","title":"M3","description":"d"}]}"#,
+        ))
+    });
+    let (gaddr, _gj) = serve(marg_h).await;
+
+    let perms = PermissionPolicy::new(Vec::<String>::new());
+    let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
+    let mut s = WebSearchSessionConfig::auto(ws_perms);
+    s.allow_loopback = true;
+    s.engine_base_urls = Some(EngineBaseUrls {
+        mojeek: Some(format!("http://{}", maddr)),
+        marginalia: Some(format!("http://{}", gaddr)),
+        ..Default::default()
+    });
+    let r = websearch(json!({"query": "merge demo", "count": 5}), &s).await;
+    match r {
+        WebSearchResult::Ok(ok) => {
+            let urls: Vec<&str> = ok.results.iter().map(|x| x.url.as_str()).collect();
+            // 5 unique results; the shared page de-duped to one (Mojeek's form).
+            assert_eq!(
+                urls,
+                vec![
+                    "https://shared.example/page",
+                    "https://mojeek-only.example/x",
+                    "https://m1.example/a",
+                    "https://m2.example/b",
+                    "https://m3.example/c",
+                ]
+            );
+            assert_eq!(
+                ok.meta.engines.as_deref(),
+                Some(&["mojeek".to_string(), "marginalia".to_string()][..])
+            );
+            assert!(ok.output.contains("mojeek+marginalia (general web)"));
+            assert_eq!(ok.results[0].source.as_deref(), Some("mojeek"));
+            assert_eq!(ok.results[2].source.as_deref(), Some("marginalia"));
+        }
+        other => panic!("expected ok, got {:?}", other),
+    }
+}
+
+#[tokio::test]
 async fn zero_config_uses_keyless_and_reports_provenance() {
     // Mojeek fixture server first in the chain; provenance must say "mojeek".
     let handler: H = Arc::new(|_req| Resp {
@@ -501,14 +582,17 @@ async fn zero_config_uses_keyless_and_reports_provenance() {
         mojeek: Some(format!("http://{}", addr)),
         ..Default::default()
     });
-    let r = websearch(json!({"query": "x"}), &s).await;
+    let r = websearch(json!({"query": "x", "count": 1}), &s).await;
     match r {
         WebSearchResult::Ok(ok) => {
+            // count=1 is satisfied by the Mojeek fixture alone (fast path) —
+            // hermetic, single-engine provenance.
             assert_eq!(ok.meta.engine.as_deref(), Some("mojeek"));
             assert_eq!(
                 ok.meta.engine_class,
                 Some(harness_websearch::EngineClass::General)
             );
+            assert!(ok.meta.engines.is_none());
             // New compact format labels the engine class in the header.
             assert!(ok.output.contains("mojeek (general web)"));
             assert!(ok.output.starts_with("WEB \"x\""));
@@ -562,7 +646,7 @@ async fn honest_recency_note_when_engine_ignores_time_range() {
         mojeek: Some(format!("http://{}", addr)),
         ..Default::default()
     });
-    let r = websearch(json!({"query": "x", "time_range": "week"}), &s).await;
+    let r = websearch(json!({"query": "x", "time_range": "week", "count": 1}), &s).await;
     match r {
         WebSearchResult::Ok(ok) => {
             assert_eq!(ok.meta.time_range_applied, Some(false));

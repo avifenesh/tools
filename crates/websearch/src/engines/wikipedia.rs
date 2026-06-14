@@ -97,6 +97,7 @@ impl WebSearchEngine for WikipediaEngine {
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
             engine_class: None,
+            engines: None,
             // Wikipedia search ignores recency filtering.
             time_range_applied: if input.time_range == WebSearchTimeRange::All {
                 None
@@ -144,6 +145,7 @@ fn map_results(parsed: &serde_json::Value, origin: &str) -> Vec<WebSearchResultI
             snippet,
             age,
             score: None,
+            source: None,
         });
     }
     out

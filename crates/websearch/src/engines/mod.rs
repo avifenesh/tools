@@ -3,6 +3,7 @@
 //! existing `WebSearchEngine` trait so they slot into the session unchanged.
 
 mod brave;
+mod dedupe;
 mod fallback;
 mod html;
 mod http;

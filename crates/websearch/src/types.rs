@@ -192,6 +192,11 @@ pub struct WebSearchResultItem {
     /// synthesized.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score: Option<f64>,
+    /// Which engine contributed this specific result, set by the fallback
+    /// layer when results were MERGED across engines. None for a single-engine
+    /// result (the header already names the engine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,6 +212,10 @@ pub struct SearchMetadata {
     /// Coverage class of the serving engine, for a model-readable label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine_class: Option<crate::engine::EngineClass>,
+    /// When results were merged across engines, the contributing engine names
+    /// in chain order. None/single for a single-engine result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engines: Option<Vec<String>>,
     /// Whether the serving engine applied the requested time_range. None when
     /// no time filter was requested (time_range=all).
     #[serde(default, skip_serializing_if = "Option::is_none")]

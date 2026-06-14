@@ -111,6 +111,7 @@ impl WebSearchEngine for TavilyEngine {
             elapsed_ms: started.elapsed().as_millis() as u64,
             engine: Some(ENGINE_NAME.to_string()),
             engine_class: None,
+            engines: None,
             // Tavily honors time_range when one was requested.
             time_range_applied: if input.time_range == WebSearchTimeRange::All {
                 None
@@ -156,6 +157,7 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             snippet,
             age,
             score,
+            source: None,
         });
     }
     out

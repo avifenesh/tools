@@ -84,6 +84,7 @@ impl WebSearchEngine for BraveEngine {
             elapsed_ms: res.elapsed_ms,
             engine: Some(ENGINE_NAME.to_string()),
             engine_class: None,
+            engines: None,
             // Brave honors freshness when a time_range was requested.
             time_range_applied: if input.time_range == WebSearchTimeRange::All {
                 None
@@ -142,6 +143,7 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             snippet,
             age,
             score: None,
+            source: None,
         });
     }
     out

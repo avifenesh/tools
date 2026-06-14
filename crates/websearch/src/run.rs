@@ -178,6 +178,7 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         .engine_class
         .or(resolved.sole_engine_class);
     let time_range_applied = engine_result.time_range_applied;
+    let engines = engine_result.engines.clone();
 
     let mut results = engine_result.results;
     results.truncate(count);
@@ -190,6 +191,7 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         elapsed_ms: engine_result.elapsed_ms,
         engine: served_by,
         engine_class,
+        engines,
         time_range_applied,
     };
 

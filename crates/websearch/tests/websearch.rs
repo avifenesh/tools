@@ -124,7 +124,7 @@ async fn no_backend_falls_back_to_keyless_chain() {
         mojeek: Some(format!("http://{}", addr)),
         ..Default::default()
     });
-    let r = websearch(json!({"query": "x"}), &s).await;
+    let r = websearch(json!({"query": "x", "count": 1}), &s).await;
     let ok = expect_ok(&r);
     assert_eq!(ok.results[0].url, "https://ex.com/a");
     assert_eq!(ok.meta.engine.as_deref(), Some("mojeek"));

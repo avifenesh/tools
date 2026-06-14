@@ -39,6 +39,9 @@ pub struct WebSearchEngineResult {
     pub engine: Option<String>,
     /// Coverage class of the serving engine (set by the fallback layer).
     pub engine_class: Option<EngineClass>,
+    /// When the fallback chain MERGED results from more than one engine, the
+    /// contributing engine names in chain order. None/single otherwise.
+    pub engines: Option<Vec<String>>,
     /// Whether the serving engine applied the requested time_range. None when
     /// time_range=all (nothing to apply).
     pub time_range_applied: Option<bool>,
@@ -212,6 +215,7 @@ impl WebSearchEngine for ReqwestEngine {
             elapsed_ms: started.elapsed().as_millis() as u64,
             engine: Some("searxng".to_string()),
             engine_class: None,
+            engines: None,
             // SearXNG applies the time_range param when one is requested.
             time_range_applied: if input.time_range == WebSearchTimeRange::All {
                 None
@@ -269,6 +273,7 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             snippet: snippet.to_string(),
             age: None,
             score: None,
+            source: None,
         });
     }
     out

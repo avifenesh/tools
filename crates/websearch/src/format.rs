@@ -12,15 +12,15 @@ use crate::types::{SearchMetadata, WebSearchResultItem, WebSearchTimeRange};
 ///   WEB "rust async" · mojeek (general web) · 5 results
 fn header_line(meta: &SearchMetadata, n: usize) -> String {
     let mut parts: Vec<String> = vec![format!("WEB \"{}\"", meta.query)];
-    let via = match &meta.engine {
-        Some(e) if !e.is_empty() => {
-            let label = meta
-                .engine_class
-                .map(|c| c.label())
-                .unwrap_or("web");
-            format!("{} ({})", e, label)
-        }
-        _ => meta.backend_host.clone(),
+    let engine_name = match &meta.engines {
+        Some(es) if es.len() > 1 => es.join("+"),
+        _ => meta.engine.clone().unwrap_or_default(),
+    };
+    let via = if !engine_name.is_empty() {
+        let label = meta.engine_class.map(|c| c.label()).unwrap_or("web");
+        format!("{} ({})", engine_name, label)
+    } else {
+        meta.backend_host.clone()
     };
     parts.push(via);
     parts.push(format!("{} result{}", n, if n == 1 { "" } else { "s" }));
@@ -52,9 +52,23 @@ pub fn format_ok_text(args: FormatOkArgs<'_>) -> String {
         .iter()
         .enumerate()
         .map(|(i, r)| {
-            let age_part = match &r.age {
-                Some(a) if !a.is_empty() => format!(" · {}", a),
-                _ => String::new(),
+            // Optional source (when merged across engines) + age (when the
+            // backend provided it) on the url line.
+            let mut tags: Vec<String> = Vec::new();
+            if let Some(s) = &r.source {
+                if !s.is_empty() {
+                    tags.push(s.clone());
+                }
+            }
+            if let Some(a) = &r.age {
+                if !a.is_empty() {
+                    tags.push(a.clone());
+                }
+            }
+            let age_part = if tags.is_empty() {
+                String::new()
+            } else {
+                format!(" · {}", tags.join(" · "))
             };
             let snippet = trim_snippet(&r.snippet, args.snippet_cap);
             let snippet_line = if snippet.is_empty() {
