@@ -1,0 +1,28 @@
+---
+"@agent-sh/harness-websearch": minor
+---
+
+Self-contained zero-config web search + token-efficient output + RRF ranking.
+
+`websearch` now works with **no API key and no self-hosted service**: with nothing
+configured it queries a bundled keyless fallback chain (Mojeek → Marginalia →
+Wikipedia) and returns the first backend with results. Optional Brave/Tavily API
+keys or a self-hosted SearXNG remain supported and take priority when configured.
+
+- **BREAKING**: the `INVALID_PARAM: no search backend configured` error is gone —
+  zero config now uses the keyless chain instead of failing. Output rendering
+  changed to a compact ranked-text format (the `<search>` XML block was replaced);
+  parse the structured `meta`/`results`, not the `output` string.
+- Token-efficient compact output (~18% smaller at count=5), an engine-class label
+  (`general web` / `indie/small-web index` / `encyclopedic`), and honest recency
+  (per-result `age` only when the backend provides it; an explicit "time filter
+  NOT applied" note when the serving engine ignores `time_range`).
+- Cross-engine gather + merge with a sufficiency threshold, URL de-duplication,
+  engine-class-aware empty/degraded handling, rate-limit (401/403/429) →
+  `SERVER_NOT_AVAILABLE`, per-engine timeout fairness, and Reciprocal Rank Fusion
+  with engine weights for merge ranking.
+- New session options: `braveApiKey`, `tavilyApiKey`, `disableMojeek`,
+  `fallbackToKeyless`, `snippetCap`, `engineBaseUrls`.
+
+Validated end-to-end against a real model (full websearch e2e suite, 10/10 on both
+the TS and Rust engines). The Rust crate (`harness-websearch`) is updated at parity.
