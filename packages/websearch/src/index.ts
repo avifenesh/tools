@@ -22,6 +22,19 @@ export { createBraveEngine } from "./engines/brave.js";
 export { createTavilyEngine } from "./engines/tavily.js";
 export { stripTags, decodeEntities } from "./engines/html.js";
 export { normalizeUrlForDedup } from "./engines/dedupe.js";
+export {
+  fuseRrf,
+  fusedScore,
+  engineWeight,
+  RRF_K,
+  ENGINE_WEIGHTS,
+  KEYED_ENGINE_WEIGHT,
+} from "./engines/rank.js";
+export type {
+  FusionCandidate,
+  FusedResult,
+  RankOccurrence,
+} from "./engines/rank.js";
 export { classifyHost, classifyIp, resolveHost } from "./ssrf.js";
 export {
   formatOkText,

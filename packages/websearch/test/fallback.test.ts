@@ -84,12 +84,76 @@ describe("FallbackEngine — gather, merge & dedupe", () => {
       fakeEngine("c", { kind: "results", items: [item("c1")] }, spy),
     ]);
     const r = (await engine.search(engineInput({ count: 3 }))) as FallbackEngineResult;
+    // RRF interleaves by rank across engines (same weight): a1 and b1 are each
+    // their engine's #1 (tie → insertion order a1<b1), a2 is a's #2. So the
+    // 3 gathered candidates fuse to [a1, b1, a2] — not a-exhausted-first.
     expect(r.results.map((x) => x.url)).toEqual([
       "https://a1",
-      "https://a2",
       "https://b1",
+      "https://a2",
     ]);
-    expect(spy.calls).toEqual(["a", "b"]); // c not needed
+    expect(spy.calls).toEqual(["a", "b"]); // c not needed (3 candidates pooled)
+  });
+
+  it("RRF: a page two engines AGREE on is boosted above a single-engine #1 (consensus)", async () => {
+    // mojeek: [seo, shared, junk]; marginalia: [shared, boats].
+    // 'shared' appears at mojeek#2 (1.0/12=.083) + marginalia#1 (.8/10=.080)
+    // = .163, beating mojeek#1 'seo' (.100). Consensus floats it to the top.
+    const engine = createFallbackEngine([
+      fakeEngine(
+        "mojeek",
+        {
+          kind: "results",
+          items: [item("seo.example/x"), item("shared.example/p"), item("junk.example/y")],
+        },
+        undefined,
+        "general",
+      ),
+      fakeEngine(
+        "marginalia",
+        {
+          kind: "results",
+          items: [item("shared.example/p"), item("boats.example/b")],
+        },
+        undefined,
+        "niche",
+      ),
+    ]);
+    const r = (await engine.search(engineInput({ count: 5 }))) as FallbackEngineResult;
+    expect(r.results[0]?.url).toBe("https://shared.example/p");
+    // consensus row names both contributing engines, best-rank-first
+    // (marginalia had it at #1, mojeek at #2).
+    expect(r.results[0]?.source).toBe("marginalia+mojeek");
+    expect(r.engines).toContain("mojeek");
+    expect(r.engines).toContain("marginalia");
+  });
+
+  it("RRF weighting: a vertical (encyclopedic) hit does not outrank broad web when the leader is short", async () => {
+    // mojeek(general) #1 weight 1.0/(10)=.100; wikipedia(vertical) #1
+    // weight 0.6/(10)=.060 → general stays on top even though the chain only
+    // had 1 general hit. (A/B scenario 4.)
+    const engine = createFallbackEngine([
+      fakeEngine("mojeek", { kind: "results", items: [item("k8s.io/docs")] }, undefined, "general"),
+      fakeEngine(
+        "wikipedia",
+        { kind: "results", items: [item("en.wikipedia.org/?curid=1"), item("en.wikipedia.org/?curid=2")] },
+        undefined,
+        "vertical",
+      ),
+    ]);
+    const r = (await engine.search(engineInput({ count: 5 }))) as FallbackEngineResult;
+    expect(r.results[0]?.url).toBe("https://k8s.io/docs");
+  });
+
+  it("RRF is deterministic for the same engine lists", async () => {
+    const build = () =>
+      createFallbackEngine([
+        fakeEngine("a", { kind: "results", items: [item("x/1"), item("x/2")] }, undefined, "general"),
+        fakeEngine("b", { kind: "results", items: [item("x/2"), item("x/3")] }, undefined, "niche"),
+      ]);
+    const r1 = (await build().search(engineInput({ count: 5 }))) as FallbackEngineResult;
+    const r2 = (await build().search(engineInput({ count: 5 }))) as FallbackEngineResult;
+    expect(r1.results.map((x) => x.url)).toEqual(r2.results.map((x) => x.url));
   });
 
   it("de-duplicates the same URL surfaced by multiple engines", async () => {

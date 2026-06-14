@@ -1,4 +1,5 @@
 import type {
+  EngineClass,
   NamedWebSearchEngine,
   WebSearchEngine,
   WebSearchEngineInput,
@@ -6,6 +7,7 @@ import type {
   WebSearchResultItem,
 } from "../types.js";
 import { normalizeUrlForDedup } from "./dedupe.js";
+import { fuseRrf, type FusionCandidate } from "./rank.js";
 import { SearchError } from "./searchError.js";
 
 export interface FallbackAttempt {
@@ -33,12 +35,19 @@ export interface FallbackEngineResult extends WebSearchEngineResult {
  * backstop only contributes the slots the broad-web engines couldn't fill.
  *
  * Fast path preserved: if the FIRST engine already returns ≥ count results, we
- * return immediately — no extra latency, no mixing (single-engine provenance).
- * Mixing only happens when the leading engine(s) come up short.
+ * return immediately — no extra latency, no mixing, no re-ranking (the engine's
+ * own ranking is best when it alone satisfies the request).
  *
- * Dedup: results are keyed on a normalized URL (see dedupe.ts); the first
- * engine to surface a URL owns the entry and its rank position. The original
- * URL is always preserved in output.
+ * Merge ranking: when more than one engine contributes, results are fused with
+ * Reciprocal Rank Fusion + engine weights (see rank.ts) rather than plain
+ * chain concatenation — so a page two engines agree on floats up (consensus),
+ * and a niche/encyclopedic backstop can't outrank broad web just because the
+ * leader was short. Dedup is by normalized URL (see dedupe.ts); the first
+ * engine to surface a URL owns the emitted item fields, but EVERY engine's
+ * rank for that URL feeds the fused score. The original URL is preserved.
+ *
+ * Sufficiency: engines are tried until the deduped candidate pool reaches
+ * `count` (then fused + truncated), or engines/budget run out.
  *
  * Timeout fairness: `input.timeoutMs` is the OVERALL budget; each engine gets a
  * slice (≈ overall / engineCount, clamped, bounded by remaining). A slow
@@ -64,12 +73,13 @@ export function createFallbackEngine(
       input: WebSearchEngineInput,
     ): Promise<FallbackEngineResult> {
       const attempts: FallbackAttempt[] = [];
-      const merged: WebSearchResultItem[] = [];
-      const seen = new Set<string>();
+      // Deduped candidate pool keyed on normalized URL; each candidate records
+      // every (engine, rank) that surfaced it, for RRF fusion at the end.
+      const candidates = new Map<string, FusionCandidate>();
       const contributors: string[] = [];
       let backendHost = "";
       let firstEngineName: string | undefined;
-      let firstEngineClass: NamedWebSearchEngine["engineClass"] | undefined;
+      let firstEngineClass: EngineClass | undefined;
       let totalElapsed = 0;
       // timeRangeApplied across contributors: true only if EVERY contributor
       // that was asked for a time filter actually applied it; false if any
@@ -96,7 +106,7 @@ export function createFallbackEngine(
       for (const engine of engines) {
         engineIndex += 1;
         if (input.signal.aborted) break;
-        if (merged.length >= input.count) break; // sufficiency reached
+        if (candidates.size >= input.count) break; // sufficiency reached
         const remaining = deadline - Date.now();
         if (remaining <= 0) break; // overall budget exhausted
         const budget = Math.min(perEngineMs, remaining);
@@ -140,20 +150,35 @@ export function createFallbackEngine(
                 attempts,
               };
             }
-            // Merge with dedup. Tag each kept item with its source engine so
-            // per-result provenance survives the merge (only surfaced in
-            // output when the final result set is mixed).
+            // Accumulate into the candidate pool. A URL already seen from an
+            // earlier engine records an additional (engine, rank) occurrence
+            // (consensus) instead of being dropped; a new URL starts a
+            // candidate owned by this engine's item fields.
             let added = 0;
-            for (const item of r.results) {
+            r.results.forEach((item, rank) => {
               const key = normalizeUrlForDedup(item.url);
-              if (seen.has(key)) continue;
-              seen.add(key);
-              merged.push({ ...item, source: engine.name });
+              const existing = candidates.get(key);
+              if (existing) {
+                existing.occurrences.push({
+                  engine: engine.name,
+                  engineClass: engine.engineClass,
+                  rank,
+                });
+                return;
+              }
+              candidates.set(key, {
+                item,
+                occurrences: [
+                  { engine: engine.name, engineClass: engine.engineClass, rank },
+                ],
+                order: candidates.size,
+              });
               added += 1;
-              if (merged.length >= input.count) break;
-            }
-            if (added > 0) {
-              contributors.push(engine.name);
+            });
+            if (added > 0 || r.results.length > 0) {
+              if (!contributors.includes(engine.name)) {
+                contributors.push(engine.name);
+              }
               if (firstEngineName === undefined) {
                 firstEngineName = engine.name;
                 firstEngineClass = engine.engineClass;
@@ -191,14 +216,23 @@ export function createFallbackEngine(
         if (input.signal.aborted) break;
       }
 
-      if (merged.length > 0) {
+      if (candidates.size > 0) {
         const mixed = contributors.length > 1;
-        // Per-result `source` was tagged during merge; keep it only when the
-        // final set actually mixed engines, else strip it (the header already
-        // names the single engine).
-        const results = mixed
-          ? merged
-          : merged.map(({ source: _source, ...rest }) => rest);
+        // Fuse the candidate pool with RRF + engine weights, then truncate to
+        // count. For a single contributor RRF preserves that engine's order
+        // (scores are monotonically decreasing in rank), so this is a no-op
+        // reorder — we just strip the source tag.
+        const fused = fuseRrf([...candidates.values()]).slice(0, input.count);
+        const results: WebSearchResultItem[] = fused.map(({ item, sources }) => {
+          if (!mixed) {
+            // Single engine — header already names it; no per-row source.
+            const { source: _drop, ...rest } = item;
+            return rest;
+          }
+          // Multi-engine: surface the contributing engine(s) for this row.
+          // A consensus hit shows all agreeing engines (e.g. "mojeek+marginalia").
+          return { ...item, source: sources.join("+") };
+        });
         const timeRangeApplied =
           anyTimeApplied || anyTimeIgnored
             ? anyTimeIgnored
