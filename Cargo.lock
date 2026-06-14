@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "harness-tools"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "harness-bash",
  "harness-batch",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "harness-websearch"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
