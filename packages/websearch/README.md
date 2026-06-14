@@ -1,6 +1,6 @@
 # @agent-sh/harness-websearch
 
-Web search for AI agent harnesses, backed by a self-hosted SearXNG instance — tool-layer SSRF defense, declarative provider-neutral query controls, a result-count cap, and a discriminated result surface.
+Web search for AI agent harnesses — **works with no API key and no setup**. With nothing configured it queries a bundled keyless fallback chain (Mojeek → Marginalia → Wikipedia) and returns the first backend that has results. Optionally upgrade to Brave/Tavily (API key) or a self-hosted SearXNG for higher coverage — same tool, same output. Tool-layer SSRF defense, declarative provider-neutral query controls, a result-count cap, engine provenance, and a discriminated result surface.
 
 Part of the [`@agent-sh/harness-*`](https://github.com/avifenesh/tools) monorepo — see the top-level README for architectural context and the full tool surface. WebSearch finds URLs; [`webfetch`](../webfetch) reads them. They compose.
 
@@ -14,17 +14,38 @@ Requires Node ≥ 20.
 
 ## Usage
 
+Zero-config — keyless, just works:
+
 ```ts
 import { websearch } from "@agent-sh/harness-websearch";
 
 const session = {
   permissions: { roots: [], sensitivePatterns: [], unsafeAllowSearchWithoutHook: true },
-  searxngUrl: "http://127.0.0.1:8888",
-  allowLoopback: true, // self-hosted SearXNG is usually on localhost
 };
 
 const r = await websearch({ query: "rust async runtime benchmarks", count: 5 }, session);
+// r.meta.engine tells you which backend served the results (e.g. "mojeek").
 ```
+
+Upgrade to a reliable keyed provider, or a self-hosted SearXNG:
+
+```ts
+// Brave (recommended; free tier at api-dashboard.search.brave.com):
+const braveSession = { ...session, braveApiKey: process.env.BRAVE_API_KEY };
+
+// Self-hosted SearXNG (loopback opt-in since it's usually on localhost):
+const searxngSession = { ...session, searxngUrl: "http://127.0.0.1:8888", allowLoopback: true };
+
+// An explicit backend is exclusive by default; opt into the keyless tail as a backstop:
+const withFallback = { ...braveSession, fallbackToKeyless: true };
+```
+
+Notes:
+- `disableMojeek: true` drops the Mojeek scrape engine (its robots.txt disallows `/search`; the documented Marginalia/Wikipedia APIs remain).
+- `snippetCap` tunes the per-result snippet length (default 240 chars; clamped 80–600) to trade detail for tokens.
+- When the leading backend returns fewer than `count`, the tool **gathers and merges** results across the chain (de-duplicating the same page by normalized URL) until the quota is met; a backend that already satisfies `count` short-circuits. Merged results are ranked by **Reciprocal Rank Fusion + engine weights** (a page multiple engines agree on is boosted; a niche/encyclopedic backstop won't outrank broad web), name the contributing engines in the header, and tag each result with its `source`.
+- Output is compact ranked text: a `WEB "query" · engine (class) · N results` header then numbered entries; the engine's coverage class (`general web` / `indie/small-web index` / `encyclopedic`) and per-result `age` (when the backend provides it) are shown so the model can judge source quality and freshness. Parse `meta`/`results`, not the `output` string.
+- Zero hits is a normal `kind: "empty"` result, not an error.
 
 ## Contract
 

@@ -10,6 +10,7 @@ use crate::constants::{
     MAX_COUNT, MIN_COUNT, MIN_TIMEOUT_MS, SESSION_BACKSTOP_MS,
 };
 use crate::engine::{SearchError, SearchErrorCode, WebSearchEngineInput};
+use crate::engines::resolve_engine;
 use crate::fence::{ask_permission, permission_denied_error, AskArgs, PermissionOutcome};
 use crate::format::{format_empty_text, format_ok_text, FormatOkArgs};
 use crate::schema::safe_parse_websearch_params;
@@ -54,38 +55,21 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         Err(e) => return err(ToolError::new(ToolErrorCode::InvalidParam, e.to_string())),
     };
 
-    // Backend must be configured on the session — never a model param.
-    let searxng_url = match &session.searxng_url {
-        Some(u) if !u.is_empty() => u.clone(),
-        _ => {
-            return err(ToolError::new(
-                ToolErrorCode::InvalidParam,
-                "no search backend configured; set session.searxng_url",
-            ));
-        }
-    };
+    // Resolve the engine chain. With no key and no searxng_url this yields the
+    // bundled keyless default (Mojeek → Marginalia → Wikipedia), so search
+    // works with zero config — there is no longer a hard "no backend" error.
+    let resolved = resolve_engine(session);
 
-    let backend_url = match Url::parse(&searxng_url) {
-        Ok(u) => u,
-        Err(_) => {
-            return err(ToolError::new(
-                ToolErrorCode::InvalidParam,
-                format!("invalid session.searxng_url: {}", searxng_url),
-            ));
+    // When an explicit SearXNG backend is configured, validate its URL/scheme
+    // and SSRF up front so the model gets the SearXNG-specific hint. The
+    // keyless/keyed engines self-check their (public) hosts per call.
+    if let Some(searxng_url) = session.searxng_url.as_deref() {
+        if !searxng_url.is_empty() {
+            if let Some(e) = validate_searxng_backend(searxng_url, session).await {
+                return err(e);
+            }
         }
-    };
-    let scheme = backend_url.scheme();
-    if scheme != "http" && scheme != "https" {
-        return err(ToolError::new(
-            ToolErrorCode::InvalidParam,
-            format!(
-                "session.searxng_url must be http(s); received '{}:'",
-                scheme
-            ),
-        )
-        .with_meta(serde_json::json!({ "backend": searxng_url })));
     }
-    let backend_host = backend_url.host_str().unwrap_or("").to_string();
 
     let count = clamp_count(params.count);
     let time_range: WebSearchTimeRange = params.time_range.unwrap_or(WebSearchTimeRange::All);
@@ -107,25 +91,22 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
     let effective_timeout = timeout_ms.min(session_backstop);
     let headers = normalize_headers(session);
 
-    // SSRF check on the backend host before anything fires.
-    match classify_host(&backend_host, session).await {
-        SsrfDecision::Allowed => {}
-        SsrfDecision::Blocked { reason, hint } => {
-            return err(ToolError::new(
-                ToolErrorCode::SsrfBlocked,
-                format!("{}\nBackend: {}\nHint: {}", reason, searxng_url, hint),
-            )
-            .with_meta(
-                serde_json::json!({ "backend": searxng_url, "host": backend_host }),
-            ));
-        }
-    }
+    let permission_host = permission_backend_host(session);
+    let backend_label = session
+        .searxng_url
+        .clone()
+        .unwrap_or_else(|| format!("keyless ({})", resolved.chain.join(" → ")));
 
     // Permission hook (autonomous — allow or deny).
+    let backend_url_for_hook = session
+        .searxng_url
+        .clone()
+        .unwrap_or_else(|| format!("keyless:{}", resolved.chain.join("+")));
     let ask_args = AskArgs {
         query: &params.query,
-        backend_url: &searxng_url,
-        backend_host: &backend_host,
+        backend_url: &backend_url_for_hook,
+        backend_host: &permission_host,
+        chain: &resolved.chain,
         count,
         time_range,
         safe_search,
@@ -138,7 +119,7 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         }
     }
 
-    // Per-request host-check closure (re-classifies the resolved backend host).
+    // Per-request host-check closure (re-classifies the resolved host).
     let session_for_check = session.clone();
     let check_host: crate::engine::HostCheckFn = Arc::new(move |h: String| {
         let s = session_for_check.clone();
@@ -153,7 +134,7 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
     });
 
     let engine_input = WebSearchEngineInput {
-        backend_url: searxng_url.clone(),
+        backend_url: session.searxng_url.clone().unwrap_or_default(),
         query: params.query.clone(),
         count,
         time_range,
@@ -165,29 +146,39 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         check_host,
     };
 
-    let search_fut = session.engine.search(engine_input);
-    let engine_result = match tokio::time::timeout(
-        Duration::from_millis(session_backstop),
-        search_fut,
-    )
-    .await
-    {
-        Ok(r) => r,
-        Err(_) => {
-            return err(translate_search_error(
-                SearchError::new(
-                    SearchErrorCode::Timeout,
-                    "session backstop elapsed".to_string(),
-                ),
-                &params.query,
-                &searxng_url,
-            ));
-        }
+    let ctx = TranslateCtx {
+        keyless_default: resolved.keyless_default,
+        backend_label: &backend_label,
     };
+
+    let search_fut = resolved.engine.search(engine_input);
+    let engine_result =
+        match tokio::time::timeout(Duration::from_millis(session_backstop), search_fut).await {
+            Ok(r) => r,
+            Err(_) => {
+                return err(translate_search_error(
+                    SearchError::new(SearchErrorCode::Timeout, "session backstop elapsed"),
+                    &params.query,
+                    &ctx,
+                ));
+            }
+        };
     let engine_result = match engine_result {
         Ok(r) => r,
-        Err(e) => return err(translate_search_error(e, &params.query, &searxng_url)),
+        Err(e) => return err(translate_search_error(e, &params.query, &ctx)),
     };
+
+    let served_by = engine_result
+        .engine
+        .clone()
+        .or_else(|| resolved.chain.first().cloned());
+    // engine_class comes from the fallback layer; for a single resolved engine
+    // fall back to the resolver's known class.
+    let engine_class = engine_result
+        .engine_class
+        .or(resolved.sole_engine_class);
+    let time_range_applied = engine_result.time_range_applied;
+    let engines = engine_result.engines.clone();
 
     let mut results = engine_result.results;
     results.truncate(count);
@@ -198,7 +189,13 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         count: results.len(),
         time_range,
         elapsed_ms: engine_result.elapsed_ms,
+        engine: served_by,
+        engine_class,
+        engines,
+        time_range_applied,
     };
+
+    let snippet_cap = crate::format::clamp_snippet_cap(session.snippet_cap);
 
     if results.is_empty() {
         return WebSearchResult::Empty(WebSearchEmpty {
@@ -211,6 +208,7 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         meta: &meta,
         results: &results,
         requested: count,
+        snippet_cap,
     });
     WebSearchResult::Ok(WebSearchOk {
         output,
@@ -220,47 +218,118 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
     })
 }
 
-fn translate_search_error(e: SearchError, query: &str, backend: &str) -> ToolError {
-    let echo = format!("\nQuery: \"{}\"\nBackend: {}", query, backend);
-    let meta = serde_json::json!({ "query": query, "backend": backend });
-    match e.code {
-        SearchErrorCode::ServerNotAvailable => {
-            // Distinguish a refused connection (down) from a 5xx (reachable
-            // but failing) by the message shape.
-            let lower = e.message.to_lowercase();
-            if lower.contains("refused") || lower.contains("connect") {
-                ToolError::new(
-                    ToolErrorCode::ServerNotAvailable,
-                    format!(
-                        "Could not reach the search backend.{}\nReason: connection refused\nHint: The SearXNG instance does not appear to be running. Start it (docker run searxng/searxng) and ensure session.searxng_url points at its address with JSON format enabled.",
-                        echo
-                    ),
-                )
-                .with_meta(meta)
-            } else {
-                ToolError::new(
-                    ToolErrorCode::ServerNotAvailable,
-                    format!(
-                        "The search backend returned an error.{}\nReason: {}\nHint: The SearXNG instance is reachable but failing. Check its logs and that JSON format is enabled.",
-                        echo, e.message
-                    ),
-                )
-                .with_meta(meta)
-            }
+/// Host label used for the permission pattern + audit metadata.
+fn permission_backend_host(session: &WebSearchSessionConfig) -> String {
+    if let Some(u) = session.searxng_url.as_deref() {
+        if !u.is_empty() {
+            return Url::parse(u)
+                .ok()
+                .and_then(|x| x.host_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| u.to_string());
         }
-        SearchErrorCode::Timeout => ToolError::new(
-            ToolErrorCode::Timeout,
-            format!(
-                "The search timed out.{}\nReason: {}\nHint: The metasearch may be slow; raise session.search_timeout_ms (max 30000) or simplify the query.",
-                echo, e.message
-            ),
-        )
-        .with_meta(meta),
+    }
+    if session.brave_api_key.as_deref().is_some_and(|k| !k.is_empty()) {
+        return "brave".to_string();
+    }
+    if session
+        .tavily_api_key
+        .as_deref()
+        .is_some_and(|k| !k.is_empty())
+    {
+        return "tavily".to_string();
+    }
+    "keyless".to_string()
+}
+
+/// Up-front validation + SSRF for an explicitly configured SearXNG backend.
+async fn validate_searxng_backend(
+    searxng_url: &str,
+    session: &WebSearchSessionConfig,
+) -> Option<ToolError> {
+    let backend_url = match Url::parse(searxng_url) {
+        Ok(u) => u,
+        Err(_) => {
+            return Some(ToolError::new(
+                ToolErrorCode::InvalidParam,
+                format!("invalid session.searxng_url: {}", searxng_url),
+            ));
+        }
+    };
+    let scheme = backend_url.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Some(
+            ToolError::new(
+                ToolErrorCode::InvalidParam,
+                format!("session.searxng_url must be http(s); received '{}:'", scheme),
+            )
+            .with_meta(serde_json::json!({ "backend": searxng_url })),
+        );
+    }
+    let backend_host = backend_url.host_str().unwrap_or("").to_string();
+    match classify_host(&backend_host, session).await {
+        SsrfDecision::Allowed => None,
+        SsrfDecision::Blocked { reason, hint } => Some(
+            ToolError::new(
+                ToolErrorCode::SsrfBlocked,
+                format!("{}\nBackend: {}\nHint: {}", reason, searxng_url, hint),
+            )
+            .with_meta(serde_json::json!({ "backend": searxng_url, "host": backend_host })),
+        ),
+    }
+}
+
+struct TranslateCtx<'a> {
+    keyless_default: bool,
+    backend_label: &'a str,
+}
+
+const KEYLESS_HINT: &str = "All search backends are rate-limited or returned nothing. For reliable results, set a free Brave Search API key (api-dashboard.search.brave.com) via session.brave_api_key, add a Tavily key, or run a local SearXNG and set session.searxng_url.";
+
+fn translate_search_error(e: SearchError, query: &str, ctx: &TranslateCtx<'_>) -> ToolError {
+    let echo = format!("\nQuery: \"{}\"\nBackend: {}", query, ctx.backend_label);
+    let meta = serde_json::json!({ "query": query, "backend": ctx.backend_label });
+    match e.code {
+        SearchErrorCode::SsrfBlocked => {
+            ToolError::new(ToolErrorCode::SsrfBlocked, format!("{}{}", e.message, echo))
+                .with_meta(meta)
+        }
+        SearchErrorCode::ServerNotAvailable => {
+            let lower = e.message.to_lowercase();
+            let hint = if ctx.keyless_default {
+                KEYLESS_HINT.to_string()
+            } else if lower.contains("refused") || lower.contains("connect") {
+                "The SearXNG instance does not appear to be running. Start it (docker run searxng/searxng) and ensure session.searxng_url points at its address with JSON format enabled.".to_string()
+            } else {
+                "The backend is reachable but returned an error status. Check its logs, that JSON format is enabled (SearXNG), or that the API key is valid.".to_string()
+            };
+            ToolError::new(
+                ToolErrorCode::ServerNotAvailable,
+                format!(
+                    "The search backend returned an error.{}\nReason: {}\nHint: {}",
+                    echo, e.message, hint
+                ),
+            )
+            .with_meta(meta)
+        }
+        SearchErrorCode::Timeout => {
+            let hint = if ctx.keyless_default {
+                "Keyless backends can be slow; raise session.search_timeout_ms (max 30000), simplify the query, or add a Brave/Tavily key."
+            } else {
+                "Raise session.search_timeout_ms (max 30000) or simplify the query."
+            };
+            ToolError::new(
+                ToolErrorCode::Timeout,
+                format!("The search timed out.{}\nReason: {}\nHint: {}", echo, e.message, hint),
+            )
+            .with_meta(meta)
+        }
         SearchErrorCode::DnsError => ToolError::new(
             ToolErrorCode::DnsError,
             format!(
-                "Could not resolve the search backend hostname.{}\nReason: {}\nHint: Check session.searxng_url points at a reachable host.",
-                echo, e.message
+                "Could not resolve the search backend hostname.{}\nReason: {}\nHint: Check network connectivity{}.",
+                echo,
+                e.message,
+                if ctx.keyless_default { "" } else { " and session.searxng_url" }
             ),
         )
         .with_meta(meta),
@@ -272,24 +341,22 @@ fn translate_search_error(e: SearchError, query: &str, backend: &str) -> ToolErr
             ),
         )
         .with_meta(meta),
-        SearchErrorCode::ConnectionReset => ToolError::new(
-            ToolErrorCode::ConnectionReset,
-            format!(
-                "Could not reach the search backend.{}\nReason: connection reset\nHint: The SearXNG instance does not appear to be running. Start it (docker run searxng/searxng) and ensure session.searxng_url points at its address with JSON format enabled.",
-                echo
-            ),
-        )
-        .with_meta(meta),
-        SearchErrorCode::SsrfBlocked => ToolError::new(
-            ToolErrorCode::SsrfBlocked,
-            format!("{}{}", e.message, echo),
-        )
-        .with_meta(meta),
-        SearchErrorCode::InvalidParam => ToolError::new(
-            ToolErrorCode::InvalidParam,
-            format!("{}{}", e.message, echo),
-        )
-        .with_meta(meta),
+        SearchErrorCode::ConnectionReset => {
+            let hint = if ctx.keyless_default {
+                "All keyless backends were unreachable. Check network connectivity, or set a Brave/Tavily key or local SearXNG for reliability."
+            } else {
+                "The SearXNG instance does not appear to be running. Start it (docker run searxng/searxng) and ensure session.searxng_url points at its address with JSON format enabled."
+            };
+            ToolError::new(
+                ToolErrorCode::ConnectionReset,
+                format!("Could not reach the search backend.{}\nReason: connection reset\nHint: {}", echo, hint),
+            )
+            .with_meta(meta)
+        }
+        SearchErrorCode::InvalidParam => {
+            ToolError::new(ToolErrorCode::InvalidParam, format!("{}{}", e.message, echo))
+                .with_meta(meta)
+        }
         SearchErrorCode::IoError => ToolError::new(
             ToolErrorCode::IoError,
             format!("Search failed.{}\nReason: {}", echo, e.message),

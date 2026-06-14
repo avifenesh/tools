@@ -119,6 +119,12 @@ export function makeWebSearchExecutorRust(
       unsafe_allow_search_without_hook:
         session.permissions.unsafeAllowSearchWithoutHook ?? false,
       searxng_url: session.searxngUrl ?? null,
+      brave_api_key: session.braveApiKey ?? null,
+      tavily_api_key: session.tavilyApiKey ?? null,
+      disable_mojeek: session.disableMojeek ?? false,
+      fallback_to_keyless: session.fallbackToKeyless ?? false,
+      snippet_cap: session.snippetCap ?? null,
+      engine_base_urls: session.engineBaseUrls ?? null,
       default_headers: session.defaultHeaders ?? null,
       allow_loopback: session.allowLoopback ?? false,
       allow_private_networks: session.allowPrivateNetworks ?? false,

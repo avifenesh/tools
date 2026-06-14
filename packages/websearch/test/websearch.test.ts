@@ -56,8 +56,8 @@ describe("websearch — happy path (WS1)", () => {
     assertKind(r, "ok");
     expect(r.results.length).toBe(5);
     expect(r.results[0]?.title).toBe("Result 1");
-    expect(r.output).toContain("<search>");
-    expect(r.output).toContain("<results>");
+    expect(r.output).toContain(`WEB "rust async runtime"`);
+    expect(r.output).toMatch(/^WEB .* · \d+ results/m);
     expect(r.output).toMatch(/Fetch a URL with webfetch/);
     // The query URL hit /search with the JSON format + query.
     expect(lastUrl).toContain("/search");
@@ -121,7 +121,7 @@ describe("websearch — empty results (WS, empty kind)", () => {
     );
     assertKind(r, "empty");
     expect(r.meta.count).toBe(0);
-    expect(r.output).toMatch(/No results for/);
+    expect(r.output).toMatch(/No results/);
   });
 
   it("skips results missing url, and empties to kind=empty if all are dropped", async () => {
@@ -178,6 +178,24 @@ describe("websearch — request URL building (WS3)", () => {
     expect(lastUrl).not.toContain("time_range");
     expect(lastUrl).toContain("safesearch=1"); // moderate default
   });
+
+  it("surfaces engine class + applied time_range in meta and output", async () => {
+    await setHandler((_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(cannedResults(3));
+    });
+    const r = await websearch(
+      { query: "privacy", time_range: "month" },
+      makeSession({ searxngUrl: server.url }),
+    );
+    assertKind(r, "ok");
+    expect(r.meta.engine).toBe("searxng");
+    expect(r.meta.engineClass).toBe("general");
+    expect(r.meta.timeRangeApplied).toBe(true);
+    expect(r.output).toContain("searxng (general web)");
+    expect(r.output).toContain("time:month");
+    expect(r.output).not.toContain("NOT applied");
+  });
 });
 
 describe("websearch — parameter / alias validation", () => {
@@ -200,14 +218,26 @@ describe("websearch — parameter / alias validation", () => {
     expect(r.error.message).toMatch(/Use 'query' instead/);
   });
 
-  it("errors when no backend is configured", async () => {
+  it("with no SearXNG backend, falls back to the keyless chain (zero-config default)", async () => {
+    // The v2 breaking change: no searxngUrl is no longer an error — it uses
+    // the bundled keyless engines. Kept hermetic by pointing them at the
+    // local fixture server (which answers like Mojeek).
+    await setHandler((_req, res) => {
+      res.setHeader("content-type", "text/html");
+      res.end(
+        `<ul class="results-standard"><!--rs--><li><a class="title" href="https://ex.com/a">A title</a><p class="s">snippet a</p></li><!--re--></ul>`,
+      );
+    });
     const r = await websearch(
       { query: "x" },
-      makeSession({ searxngUrl: undefined }),
+      makeSession({
+        searxngUrl: undefined,
+        engineBaseUrls: { mojeek: server.url },
+      }),
     );
-    assertKind(r, "error");
-    expect(r.error.code).toBe("INVALID_PARAM");
-    expect(r.error.message).toMatch(/no search backend configured/);
+    assertKind(r, "ok");
+    expect(r.results[0]?.url).toBe("https://ex.com/a");
+    expect(r.meta.engine).toBe("mojeek");
   });
 
   it("rejects a non-http(s) backend scheme", async () => {

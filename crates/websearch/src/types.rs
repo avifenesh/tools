@@ -90,9 +90,26 @@ impl std::fmt::Debug for WebSearchPermissionPolicy {
 #[derive(Clone)]
 pub struct WebSearchSessionConfig {
     pub permissions: WebSearchPermissionPolicy,
-    pub engine: Arc<dyn WebSearchEngine>,
-    /// Base URL of the self-hosted SearXNG instance, e.g. http://127.0.0.1:8888
+    /// Explicit engine override. When set, the resolver uses it verbatim and
+    /// bypasses the built-in chain (advanced / tests / legacy direct wiring).
+    pub engine_override: Option<Arc<dyn WebSearchEngine>>,
+    /// Base URL of a self-hosted SearXNG instance, e.g. http://127.0.0.1:8888.
+    /// When set, SearXNG leads the chain; when unset (and no key), the keyless
+    /// bundled engines are used so search works with zero config.
     pub searxng_url: Option<String>,
+    /// Brave Search API key — when set, Brave leads the chain (reliable upgrade).
+    pub brave_api_key: Option<String>,
+    /// Tavily API key — when set, Tavily joins the head of the chain.
+    pub tavily_api_key: Option<String>,
+    /// Drop the Mojeek scrape engine from the keyless chain (ToS gray area).
+    pub disable_mojeek: bool,
+    /// Per-result snippet character cap (default 240; clamped 80–600).
+    pub snippet_cap: Option<usize>,
+    /// When an explicit backend is configured, also fall back to the keyless
+    /// chain if it returns nothing/errors. Default false (explicit is exclusive).
+    pub fallback_to_keyless: bool,
+    /// Per-engine base-URL overrides (tests point these at fixture servers).
+    pub engine_base_urls: Option<crate::engines::EngineBaseUrls>,
     pub default_headers: Option<HashMap<String, String>>,
     pub allow_loopback: bool,
     pub allow_private_networks: bool,
@@ -106,14 +123,19 @@ pub struct WebSearchSessionConfig {
 }
 
 impl WebSearchSessionConfig {
-    pub fn new(
-        permissions: WebSearchPermissionPolicy,
-        engine: Arc<dyn WebSearchEngine>,
-    ) -> Self {
+    /// Zero-config constructor: no explicit engine, no backend — the resolver
+    /// will use the bundled keyless chain (Mojeek → Marginalia → Wikipedia).
+    pub fn auto(permissions: WebSearchPermissionPolicy) -> Self {
         Self {
             permissions,
-            engine,
+            engine_override: None,
             searxng_url: None,
+            brave_api_key: None,
+            tavily_api_key: None,
+            disable_mojeek: false,
+            snippet_cap: None,
+            fallback_to_keyless: false,
+            engine_base_urls: None,
             default_headers: None,
             allow_loopback: false,
             allow_private_networks: false,
@@ -124,6 +146,17 @@ impl WebSearchSessionConfig {
             redact_query_in_hook: false,
             session_id: None,
         }
+    }
+
+    /// Back-compat constructor matching the v1 signature: wires an explicit
+    /// engine override (e.g. `default_engine()`), as before.
+    pub fn new(
+        permissions: WebSearchPermissionPolicy,
+        engine: Arc<dyn WebSearchEngine>,
+    ) -> Self {
+        let mut s = Self::auto(permissions);
+        s.engine_override = Some(engine);
+        s
     }
 
     pub fn with_searxng_url(mut self, url: impl Into<String>) -> Self {
@@ -149,6 +182,21 @@ pub struct WebSearchResultItem {
     pub title: String,
     pub url: String,
     pub snippet: String,
+    /// Backend-provided freshness when available (Brave `age` / Wikipedia
+    /// last-edit `timestamp`), normalized to YYYY-MM-DD. Usually None for the
+    /// keyless scrape engines; never fabricated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub age: Option<String>,
+    /// Backend-native relevance/quality score when available (Marginalia
+    /// `quality`, Tavily `score`). Opaque scale; surfaced verbatim, never
+    /// synthesized.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+    /// Which engine contributed this specific result, set by the fallback
+    /// layer when results were MERGED across engines. None for a single-engine
+    /// result (the header already names the engine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,6 +206,20 @@ pub struct SearchMetadata {
     pub count: usize,
     pub time_range: WebSearchTimeRange,
     pub elapsed_ms: u64,
+    /// Which engine served the results (provenance), e.g. "mojeek".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<String>,
+    /// Coverage class of the serving engine, for a model-readable label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine_class: Option<crate::engine::EngineClass>,
+    /// When results were merged across engines, the contributing engine names
+    /// in chain order. None/single for a single-engine result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engines: Option<Vec<String>>,
+    /// Whether the serving engine applied the requested time_range. None when
+    /// no time filter was requested (time_range=all).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_range_applied: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

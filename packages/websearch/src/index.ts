@@ -7,11 +7,40 @@ export {
   safeParseWebSearchParams,
 } from "./schema.js";
 export { createDefaultEngine, SearchError } from "./engine.js";
+export { resolveEngine } from "./engines/resolve.js";
+export type { ResolvedEngine } from "./engines/resolve.js";
+export { createFallbackEngine } from "./engines/fallback.js";
+export type {
+  FallbackAttempt,
+  FallbackEngineResult,
+} from "./engines/fallback.js";
+export { createSearxngEngine } from "./engines/searxng.js";
+export { createMojeekEngine, parseMojeek } from "./engines/mojeek.js";
+export { createMarginaliaEngine } from "./engines/marginalia.js";
+export { createWikipediaEngine } from "./engines/wikipedia.js";
+export { createBraveEngine } from "./engines/brave.js";
+export { createTavilyEngine } from "./engines/tavily.js";
+export { stripTags, decodeEntities } from "./engines/html.js";
+export { normalizeUrlForDedup } from "./engines/dedupe.js";
+export {
+  fuseRrf,
+  fusedScore,
+  engineWeight,
+  RRF_K,
+  ENGINE_WEIGHTS,
+  KEYED_ENGINE_WEIGHT,
+} from "./engines/rank.js";
+export type {
+  FusionCandidate,
+  FusedResult,
+  RankOccurrence,
+} from "./engines/rank.js";
 export { classifyHost, classifyIp, resolveHost } from "./ssrf.js";
 export {
   formatOkText,
   formatEmptyText,
   renderSearchBlock,
+  engineClassLabel,
 } from "./format.js";
 export {
   // DEFAULT_TIMEOUT_MS is intentionally NOT re-exported — it collides
@@ -29,6 +58,8 @@ export {
   DEFAULT_CATEGORIES,
   MAX_QUERY_LENGTH,
   SNIPPET_CAP,
+  MIN_SNIPPET_CAP,
+  MAX_SNIPPET_CAP,
   DEFAULT_USER_AGENT,
 } from "./constants.js";
 export type {
@@ -37,6 +68,8 @@ export type {
   WebSearchSafeSearch,
   WebSearchSessionConfig,
   WebSearchEngine,
+  NamedWebSearchEngine,
+  EngineClass,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,

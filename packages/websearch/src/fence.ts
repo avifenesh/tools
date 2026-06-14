@@ -18,6 +18,7 @@ export async function askPermission(
     query: string;
     backendUrl: string;
     backendHost: string;
+    chain?: readonly string[];
     count: number;
     timeRange: WebSearchTimeRange;
     safeSearch: WebSearchSafeSearch;
@@ -28,7 +29,14 @@ export async function askPermission(
   | { decision: "deny"; reason: string }
 > {
   const { permissions } = session;
-  const pattern = `WebSearch(backend:${args.backendHost})`;
+  // Primary pattern is keyed on the backend host; the engine chain (if any)
+  // contributes additional allow-list patterns so a hook can permit specific
+  // backends (e.g. allow mojeek+wikipedia, deny brave).
+  const primary = `WebSearch(backend:${args.backendHost})`;
+  const chainPatterns = (args.chain ?? []).map(
+    (name) => `WebSearch(backend:${name})`,
+  );
+  const patterns = [primary, ...chainPatterns.filter((p) => p !== primary)];
 
   if (permissions.hook === undefined) {
     if (permissions.unsafeAllowSearchWithoutHook === true) {
@@ -51,7 +59,7 @@ export async function askPermission(
     tool: "websearch",
     path: args.backendUrl,
     action: "read",
-    always_patterns: [pattern],
+    always_patterns: patterns,
     metadata: {
       ...queryField,
       count: args.count,
@@ -59,12 +67,13 @@ export async function askPermission(
       safe_search: args.safeSearch,
       categories: args.categories,
       backend_host: args.backendHost,
+      ...(args.chain !== undefined ? { engine_chain: args.chain } : {}),
     },
   });
   if (decision === "deny") {
     return {
       decision: "deny",
-      reason: `Search blocked by permission policy. Pattern hint: ${pattern}`,
+      reason: `Search blocked by permission policy. Pattern hint: ${primary}`,
     };
   }
   if (decision === "allow" || decision === "allow_once") {

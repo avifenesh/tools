@@ -8,6 +8,7 @@ use url::Url;
 
 use crate::types::{SafeSearch, WebSearchResultItem, WebSearchTimeRange};
 
+#[derive(Clone)]
 pub struct WebSearchEngineInput {
     pub backend_url: String,
     pub query: String,
@@ -33,6 +34,17 @@ pub struct WebSearchEngineResult {
     pub results: Vec<WebSearchResultItem>,
     pub backend_host: String,
     pub elapsed_ms: u64,
+    /// Which engine served this result (provenance). None until set by an
+    /// engine or the fallback layer.
+    pub engine: Option<String>,
+    /// Coverage class of the serving engine (set by the fallback layer).
+    pub engine_class: Option<EngineClass>,
+    /// When the fallback chain MERGED results from more than one engine, the
+    /// contributing engine names in chain order. None/single otherwise.
+    pub engines: Option<Vec<String>>,
+    /// Whether the serving engine applied the requested time_range. None when
+    /// time_range=all (nothing to apply).
+    pub time_range_applied: Option<bool>,
 }
 
 #[async_trait]
@@ -41,6 +53,41 @@ pub trait WebSearchEngine: Send + Sync {
         &self,
         input: WebSearchEngineInput,
     ) -> Result<WebSearchEngineResult, SearchError>;
+
+    /// Engine name for provenance / fallback diagnostics. Defaults to
+    /// "searxng" for the legacy ReqwestEngine; new engines override it.
+    fn name(&self) -> &str {
+        "searxng"
+    }
+
+    /// Coverage class, used by the fallback chain to decide whether an `empty`
+    /// result is authoritative. Defaults to General (SearXNG is broad web).
+    fn engine_class(&self) -> EngineClass {
+        EngineClass::General
+    }
+}
+
+/// Engine coverage class. A "general" engine's empty is a trustworthy "the web
+/// had nothing" signal; a niche/vertical empty says far less, so the fallback
+/// chain treats a niche/vertical-only empty while a general engine ERRORED as
+/// a degraded failure rather than a clean empty. Mirrors TS `EngineClass`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EngineClass {
+    General,
+    Niche,
+    Vertical,
+}
+
+impl EngineClass {
+    /// Human/model-readable coverage label used in the output header.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::General => "general web",
+            Self::Niche => "indie/small-web index",
+            Self::Vertical => "encyclopedic",
+        }
+    }
 }
 
 /// Engine-local error code, distinct from `harness_core::ToolErrorCode`. The
@@ -79,12 +126,19 @@ pub struct ReqwestEngine {
 
 impl ReqwestEngine {
     pub fn new() -> Self {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .expect("reqwest client build");
-        Self { client }
+        Self {
+            client: shared_client(),
+        }
     }
+}
+
+/// A reqwest client configured the way every engine wants it (no auto-redirect
+/// so we control SSRF; gzip; rustls). Cheap to clone (Arc inside).
+pub(crate) fn shared_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("reqwest client build")
 }
 
 impl Default for ReqwestEngine {
@@ -159,6 +213,15 @@ impl WebSearchEngine for ReqwestEngine {
             results,
             backend_host: host,
             elapsed_ms: started.elapsed().as_millis() as u64,
+            engine: Some("searxng".to_string()),
+            engine_class: None,
+            engines: None,
+            // SearXNG applies the time_range param when one is requested.
+            time_range_applied: if input.time_range == WebSearchTimeRange::All {
+                None
+            } else {
+                Some(true)
+            },
         })
     }
 }
@@ -208,12 +271,15 @@ fn map_results(parsed: &serde_json::Value) -> Vec<WebSearchResultItem> {
             title: title.to_string(),
             url: url.to_string(),
             snippet: snippet.to_string(),
+            age: None,
+            score: None,
+            source: None,
         });
     }
     out
 }
 
-fn classify_reqwest_error(e: reqwest::Error) -> SearchError {
+pub(crate) fn classify_reqwest_error(e: reqwest::Error) -> SearchError {
     let msg = e.to_string();
     // reqwest's top-level Display rarely carries the OS-level reason
     // ("Connection refused"); walk the source chain so the orchestrator can
@@ -251,7 +317,7 @@ fn classify_reqwest_error(e: reqwest::Error) -> SearchError {
 }
 
 /// Flatten an error and its source chain into one string for keyword sniffing.
-fn error_chain(e: &reqwest::Error) -> String {
+pub(crate) fn error_chain(e: &reqwest::Error) -> String {
     let mut parts = vec![e.to_string()];
     let mut src = std::error::Error::source(e);
     while let Some(s) = src {

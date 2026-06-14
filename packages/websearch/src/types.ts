@@ -19,6 +19,26 @@ export interface WebSearchResultItem {
   readonly title: string;
   readonly url: string;
   readonly snippet: string;
+  /**
+   * Backend-provided freshness, when available — Brave's `age` / Wikipedia's
+   * last-edit `timestamp`, normalized to `YYYY-MM-DD`. Most keyless backends
+   * (Mojeek, Marginalia) provide none, so this is usually undefined; we never
+   * fabricate it. Rendered per-result only when present.
+   */
+  readonly age?: string;
+  /**
+   * Backend-native relevance/quality score, when available (e.g. Marginalia's
+   * `quality`, Tavily's `score`). Opaque, backend-specific scale — surfaced
+   * verbatim, never synthesized. Usually undefined (rank is the signal).
+   */
+  readonly score?: number;
+  /**
+   * Which engine contributed this specific result, set by the fallback layer
+   * when results were MERGED across engines (so the model can see, per row,
+   * whether a hit came from the broad-web engine or the encyclopedic backstop).
+   * Undefined for a single-engine result (the header already names the engine).
+   */
+  readonly source?: string;
 }
 
 /**
@@ -45,10 +65,47 @@ export interface WebSearchEngineResult {
   readonly results: readonly WebSearchResultItem[];
   readonly backendHost: string;
   readonly elapsedMs: number;
+  /** Which engine served this result (provenance), e.g. "mojeek". */
+  readonly engine?: string;
+  /** Coverage class of the serving engine (set by the fallback layer). */
+  readonly engineClass?: EngineClass;
+  /**
+   * When the fallback chain MERGED results from more than one engine, the list
+   * of contributing engine names in chain order (e.g. ["mojeek","marginalia"]).
+   * Undefined/single-element for a single-engine result.
+   */
+  readonly engines?: readonly string[];
+  /**
+   * Whether the serving engine actually applied the requested time_range.
+   * Only searxng/brave/tavily honor it; mojeek/marginalia/wikipedia ignore it.
+   * The orchestrator uses this to tell the model the truth instead of
+   * mislabeling all-time results as filtered. Undefined when time_range=all
+   * (nothing to apply).
+   */
+  readonly timeRangeApplied?: boolean;
 }
 
 export interface WebSearchEngine {
   search(input: WebSearchEngineInput): Promise<WebSearchEngineResult>;
+}
+
+/**
+ * Engine coverage class, used by the fallback chain to decide whether an
+ * `empty` result is authoritative:
+ * - "general": broad web index (Mojeek, Brave, Tavily, SearXNG). An empty
+ *   from one of these is a trustworthy "the web had nothing" signal.
+ * - "niche": small/indie index (Marginalia) — an empty here says little.
+ * - "vertical": single-domain index (Wikipedia) — empty says even less.
+ * A niche/vertical-only empty while a general engine ERRORED is treated as a
+ * degraded failure (search broke), not a clean empty, so the model retries
+ * instead of concluding nothing exists.
+ */
+export type EngineClass = "general" | "niche" | "vertical";
+
+/** An engine that knows its own name + class, for the fallback chain. */
+export interface NamedWebSearchEngine extends WebSearchEngine {
+  readonly name: string;
+  readonly engineClass: EngineClass;
 }
 
 /**
@@ -62,9 +119,56 @@ export interface WebSearchPermissionPolicy extends PermissionPolicy {
 
 export interface WebSearchSessionConfig {
   readonly permissions: WebSearchPermissionPolicy;
-  /** Base URL of the self-hosted SearXNG instance, e.g. http://127.0.0.1:8888 */
+  /**
+   * Base URL of a self-hosted SearXNG instance, e.g. http://127.0.0.1:8888.
+   * Optional: when set, SearXNG is preferred at the head of the fallback
+   * chain. When unset, the tool falls back to the bundled keyless engines
+   * (Mojeek → Marginalia → Wikipedia) so search works with no config.
+   */
   readonly searxngUrl?: string;
+  /**
+   * Brave Search API key (X-Subscription-Token). When set, the Brave engine
+   * leads the chain — the recommended reliable upgrade for production.
+   * api-dashboard.search.brave.com (free tier, no card).
+   */
+  readonly braveApiKey?: string;
+  /** Tavily API key. When set, the Tavily engine joins the head of the chain. */
+  readonly tavilyApiKey?: string;
+  /**
+   * Drop the Mojeek scrape engine from the default chain. Mojeek's robots.txt
+   * disallows /search (ToS gray area); set true to use only the documented
+   * APIs (Marginalia/Wikipedia + any keyed engine).
+   */
+  readonly disableMojeek?: boolean;
+  /**
+   * Per-result snippet character cap (default 240; was 300 in v1). Lower it to
+   * save tokens, raise it for richer snippets. Clamped to a sane floor/ceiling.
+   */
+  readonly snippetCap?: number;
+  /**
+   * When an explicit backend (SearXNG / Brave / Tavily) is configured, also
+   * fall back to the bundled keyless engines if it returns nothing or errors.
+   * Default false: an explicit backend is exclusive (a self-hosted SearXNG
+   * hiccup should not silently leak the query to public scrape engines).
+   * Has no effect on the zero-config case, which always uses the keyless chain.
+   */
+  readonly fallbackToKeyless?: boolean;
+  /**
+   * Fully override engine selection. When provided, this engine is used
+   * verbatim and the built-in chain/resolver is bypassed (advanced / tests).
+   */
   readonly engine?: WebSearchEngine;
+  /**
+   * Override the per-engine base URLs (tests point these at local fixture
+   * servers). Production leaves these unset and uses the real public hosts.
+   */
+  readonly engineBaseUrls?: {
+    readonly mojeek?: string;
+    readonly marginalia?: string;
+    readonly wikipedia?: string;
+    readonly brave?: string;
+    readonly tavily?: string;
+  };
   readonly defaultHeaders?: Readonly<Record<string, string>>;
   readonly allowLoopback?: boolean;
   readonly allowPrivateNetworks?: boolean;
@@ -86,6 +190,20 @@ export interface SearchMetadata {
   readonly count: number;
   readonly timeRange: WebSearchTimeRange;
   readonly elapsedMs: number;
+  /** Which engine actually served the results (provenance), e.g. "mojeek". */
+  readonly engine?: string;
+  /** Coverage class of the serving engine, for a human/model-readable label. */
+  readonly engineClass?: EngineClass;
+  /**
+   * When results were merged across engines, the contributing engine names in
+   * chain order. Undefined/single for a single-engine result.
+   */
+  readonly engines?: readonly string[];
+  /**
+   * Whether the serving engine applied the requested time_range. Undefined
+   * when no time filter was requested (timeRange=all).
+   */
+  readonly timeRangeApplied?: boolean;
 }
 
 export type WebSearchOk = {
