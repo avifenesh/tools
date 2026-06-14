@@ -63,7 +63,13 @@ export function createWikipediaEngine(
       }
 
       const results = mapResults(parsed, lang, origin);
-      return { results, backendHost: res.host, elapsedMs: res.elapsedMs };
+      return {
+        results,
+        backendHost: res.host,
+        elapsedMs: res.elapsedMs,
+        // Wikipedia search ignores recency filtering.
+        ...(input.timeRange === "all" ? {} : { timeRangeApplied: false }),
+      };
     },
   };
 }
@@ -85,6 +91,7 @@ function mapResults(
       title?: unknown;
       pageid?: unknown;
       snippet?: unknown;
+      timestamp?: unknown;
     };
     const title = typeof e.title === "string" ? e.title : "";
     if (title.length === 0) continue;
@@ -95,7 +102,15 @@ function mapResults(
       url = `${origin.replace(/\/+$/, "")}/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
     }
     const snippet = typeof e.snippet === "string" ? stripTags(e.snippet) : "";
-    out.push({ title, url, snippet });
+    // `timestamp` is the article's last-edit time; surface the date portion
+    // as `age` (NB: last-edit, not first-publication).
+    const age =
+      typeof e.timestamp === "string" ? isoDate(e.timestamp) : undefined;
+    out.push(
+      age !== undefined
+        ? { title, url, snippet, age }
+        : { title, url, snippet },
+    );
   }
   return out;
 }
@@ -113,4 +128,10 @@ function normalizeLang(language: string): string {
 function joinPath(basePath: string, segments: string[]): string {
   const trimmed = basePath.replace(/\/+$/, "");
   return `${trimmed}/${segments.join("/")}`;
+}
+
+/** Extract the YYYY-MM-DD date portion from an ISO timestamp; null if unparseable. */
+export function isoDate(ts: string): string | undefined {
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(ts.trim());
+  return m ? m[1] : undefined;
 }

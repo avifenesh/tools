@@ -12,7 +12,9 @@ export const DEFAULT_SAFE_SEARCH = "moderate" as const;
 export const DEFAULT_CATEGORIES: readonly string[] = ["general"];
 
 export const MAX_QUERY_LENGTH = 512;
-export const SNIPPET_CAP = 300; // per-result snippet trim
+export const SNIPPET_CAP = 240; // per-result snippet trim (default; session-tunable)
+export const MIN_SNIPPET_CAP = 80;
+export const MAX_SNIPPET_CAP = 600;
 
 /**
  * Default User-Agent. Harnesses can override via session.defaultHeaders.

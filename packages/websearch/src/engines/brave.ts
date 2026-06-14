@@ -70,6 +70,8 @@ export function createBraveEngine(
         results: mapResults(parsed),
         backendHost: res.host,
         elapsedMs: res.elapsedMs,
+        // Brave honors freshness when a time_range was requested.
+        ...(input.timeRange === "all" ? {} : { timeRangeApplied: true }),
       };
     },
   };
@@ -103,13 +105,28 @@ function mapResults(parsed: unknown): WebSearchResultItem[] {
       title?: unknown;
       url?: unknown;
       description?: unknown;
+      age?: unknown;
+      page_age?: unknown;
     };
     const title = typeof e.title === "string" ? stripTags(e.title) : "";
     const url = typeof e.url === "string" ? e.url : "";
     if (title.length === 0 || url.length === 0) continue;
     const snippet =
       typeof e.description === "string" ? stripTags(e.description) : "";
-    out.push({ title, url, snippet });
+    // Brave exposes page freshness as `age` (or `page_age`); pass through the
+    // date portion when present.
+    const rawAge =
+      typeof e.age === "string"
+        ? e.age
+        : typeof e.page_age === "string"
+          ? e.page_age
+          : undefined;
+    const age = rawAge !== undefined ? normalizeAge(rawAge) : undefined;
+    out.push(
+      age !== undefined
+        ? { title, url, snippet, age }
+        : { title, url, snippet },
+    );
   }
   return out;
 }
@@ -117,4 +134,17 @@ function mapResults(parsed: unknown): WebSearchResultItem[] {
 function joinPath(basePath: string, segments: string[]): string {
   const trimmed = basePath.replace(/\/+$/, "");
   return `${trimmed}/${segments.join("/")}`;
+}
+
+/**
+ * Brave's `age` is sometimes an ISO date ("2025-06-10") and sometimes a
+ * relative string ("3 days ago") depending on the result. Keep an ISO date's
+ * date portion; otherwise pass the (short) relative string through verbatim.
+ */
+function normalizeAge(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return undefined;
+  const iso = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  if (iso) return iso[1];
+  return trimmed.length <= 24 ? trimmed : undefined;
 }

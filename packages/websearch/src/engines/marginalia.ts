@@ -61,7 +61,13 @@ export function createMarginaliaEngine(
       }
 
       const results = mapResults(parsed);
-      return { results, backendHost: res.host, elapsedMs: res.elapsedMs };
+      return {
+        results,
+        backendHost: res.host,
+        elapsedMs: res.elapsedMs,
+        // Marginalia's public API has no recency filter.
+        ...(input.timeRange === "all" ? {} : { timeRangeApplied: false }),
+      };
     },
   };
 }
@@ -77,13 +83,19 @@ function mapResults(parsed: unknown): WebSearchResultItem[] {
       title?: unknown;
       url?: unknown;
       description?: unknown;
+      quality?: unknown;
     };
     const title = typeof e.title === "string" ? e.title : "";
     const url = typeof e.url === "string" ? e.url : "";
     if (title.length === 0 || url.length === 0) continue;
     const snippet =
       typeof e.description === "string" ? stripTags(e.description) : "";
-    out.push({ title, url, snippet });
+    const score = typeof e.quality === "number" ? e.quality : undefined;
+    out.push(
+      score !== undefined
+        ? { title, url, snippet, score }
+        : { title, url, snippet },
+    );
   }
   return out;
 }

@@ -1,4 +1,5 @@
 import type {
+  EngineClass,
   NamedWebSearchEngine,
   WebSearchEngine,
   WebSearchSessionConfig,
@@ -17,6 +18,13 @@ export interface ResolvedEngine {
   readonly chain: readonly string[];
   /** True when no key and no searxngUrl — the bare keyless default. */
   readonly keylessDefault: boolean;
+  /**
+   * When exactly one engine was resolved (no fallback wrapper), its coverage
+   * class — so the orchestrator can label results even though a lone engine
+   * doesn't carry engineClass in its result. Undefined for a fallback chain
+   * (the FallbackEngine sets engineClass on the result it returns).
+   */
+  readonly soleEngineClass?: EngineClass;
 }
 
 /**
@@ -43,7 +51,6 @@ export function resolveEngine(session: WebSearchSessionConfig): ResolvedEngine {
       keylessDefault: false,
     };
   }
-
   const baseUrls = session.engineBaseUrls ?? {};
 
   const hasBrave =
@@ -85,13 +92,13 @@ export function resolveEngine(session: WebSearchSessionConfig): ResolvedEngine {
     engines = keyless;
   }
 
+  const sole = engines.length === 1 ? engines[0] : undefined;
   return {
     engine:
-      engines.length === 1 && engines[0] !== undefined
-        ? engines[0]
-        : createFallbackEngine(engines),
+      sole !== undefined ? sole : createFallbackEngine(engines),
     chain: engines.map((e) => e.name),
     keylessDefault: !hasExplicit,
+    ...(sole !== undefined ? { soleEngineClass: sole.engineClass } : {}),
   };
 }
 

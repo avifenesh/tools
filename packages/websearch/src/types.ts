@@ -19,6 +19,19 @@ export interface WebSearchResultItem {
   readonly title: string;
   readonly url: string;
   readonly snippet: string;
+  /**
+   * Backend-provided freshness, when available — Brave's `age` / Wikipedia's
+   * last-edit `timestamp`, normalized to `YYYY-MM-DD`. Most keyless backends
+   * (Mojeek, Marginalia) provide none, so this is usually undefined; we never
+   * fabricate it. Rendered per-result only when present.
+   */
+  readonly age?: string;
+  /**
+   * Backend-native relevance/quality score, when available (e.g. Marginalia's
+   * `quality`, Tavily's `score`). Opaque, backend-specific scale — surfaced
+   * verbatim, never synthesized. Usually undefined (rank is the signal).
+   */
+  readonly score?: number;
 }
 
 /**
@@ -47,6 +60,16 @@ export interface WebSearchEngineResult {
   readonly elapsedMs: number;
   /** Which engine served this result (provenance), e.g. "mojeek". */
   readonly engine?: string;
+  /** Coverage class of the serving engine (set by the fallback layer). */
+  readonly engineClass?: EngineClass;
+  /**
+   * Whether the serving engine actually applied the requested time_range.
+   * Only searxng/brave/tavily honor it; mojeek/marginalia/wikipedia ignore it.
+   * The orchestrator uses this to tell the model the truth instead of
+   * mislabeling all-time results as filtered. Undefined when time_range=all
+   * (nothing to apply).
+   */
+  readonly timeRangeApplied?: boolean;
 }
 
 export interface WebSearchEngine {
@@ -105,6 +128,11 @@ export interface WebSearchSessionConfig {
    */
   readonly disableMojeek?: boolean;
   /**
+   * Per-result snippet character cap (default 240; was 300 in v1). Lower it to
+   * save tokens, raise it for richer snippets. Clamped to a sane floor/ceiling.
+   */
+  readonly snippetCap?: number;
+  /**
    * When an explicit backend (SearXNG / Brave / Tavily) is configured, also
    * fall back to the bundled keyless engines if it returns nothing or errors.
    * Default false: an explicit backend is exclusive (a self-hosted SearXNG
@@ -151,6 +179,13 @@ export interface SearchMetadata {
   readonly elapsedMs: number;
   /** Which engine actually served the results (provenance), e.g. "mojeek". */
   readonly engine?: string;
+  /** Coverage class of the serving engine, for a human/model-readable label. */
+  readonly engineClass?: EngineClass;
+  /**
+   * Whether the serving engine applied the requested time_range. Undefined
+   * when no time filter was requested (timeRange=all).
+   */
+  readonly timeRangeApplied?: boolean;
 }
 
 export type WebSearchOk = {

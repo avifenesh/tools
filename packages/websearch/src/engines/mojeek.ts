@@ -62,7 +62,13 @@ export function createMojeekEngine(
           { engine: ENGINE_NAME },
         );
       }
-      return { results, backendHost: res.host, elapsedMs: res.elapsedMs };
+      return {
+        results,
+        backendHost: res.host,
+        elapsedMs: res.elapsedMs,
+        // Mojeek's SERP scrape has no recency filter.
+        ...(input.timeRange === "all" ? {} : { timeRangeApplied: false }),
+      };
     },
   };
 }

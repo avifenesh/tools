@@ -9,9 +9,12 @@ import {
   DEFAULT_TIMEOUT_MS,
   DEFAULT_USER_AGENT,
   MAX_COUNT,
+  MAX_SNIPPET_CAP,
   MIN_COUNT,
+  MIN_SNIPPET_CAP,
   MIN_TIMEOUT_MS,
   SESSION_BACKSTOP_MS,
+  SNIPPET_CAP,
 } from "./constants.js";
 import { resolveEngine } from "./engines/resolve.js";
 import { SearchError } from "./engines/searchError.js";
@@ -170,7 +173,19 @@ export async function websearch(
     timeRange,
     elapsedMs: engineResult.elapsedMs,
     engine: servedBy,
+    // engineClass comes from the fallback layer; for a single resolved engine
+    // fall back to the resolver's known class for that engine.
+    ...(engineResult.engineClass !== undefined
+      ? { engineClass: engineResult.engineClass }
+      : resolved.soleEngineClass !== undefined
+        ? { engineClass: resolved.soleEngineClass }
+        : {}),
+    ...(engineResult.timeRangeApplied !== undefined
+      ? { timeRangeApplied: engineResult.timeRangeApplied }
+      : {}),
   };
+
+  const snippetCap = clampSnippetCap(session.snippetCap);
 
   if (results.length === 0) {
     return { kind: "empty", output: formatEmptyText(meta), meta };
@@ -178,11 +193,18 @@ export async function websearch(
 
   return {
     kind: "ok",
-    output: formatOkText({ meta, results, requested: count }),
+    output: formatOkText({ meta, results, requested: count, snippetCap }),
     meta,
     results,
     requested: count,
   };
+}
+
+function clampSnippetCap(n: number | undefined): number {
+  if (n === undefined) return SNIPPET_CAP;
+  if (n < MIN_SNIPPET_CAP) return MIN_SNIPPET_CAP;
+  if (n > MAX_SNIPPET_CAP) return MAX_SNIPPET_CAP;
+  return Math.trunc(n);
 }
 
 /** Pick the host label used for the permission pattern + audit metadata. */

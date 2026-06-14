@@ -26,6 +26,7 @@ export {
   formatOkText,
   formatEmptyText,
   renderSearchBlock,
+  engineClassLabel,
 } from "./format.js";
 export {
   // DEFAULT_TIMEOUT_MS is intentionally NOT re-exported — it collides
@@ -43,6 +44,8 @@ export {
   DEFAULT_CATEGORIES,
   MAX_QUERY_LENGTH,
   SNIPPET_CAP,
+  MIN_SNIPPET_CAP,
+  MAX_SNIPPET_CAP,
   DEFAULT_USER_AGENT,
 } from "./constants.js";
 export type {

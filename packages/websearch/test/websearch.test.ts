@@ -56,8 +56,8 @@ describe("websearch — happy path (WS1)", () => {
     assertKind(r, "ok");
     expect(r.results.length).toBe(5);
     expect(r.results[0]?.title).toBe("Result 1");
-    expect(r.output).toContain("<search>");
-    expect(r.output).toContain("<results>");
+    expect(r.output).toContain(`WEB "rust async runtime"`);
+    expect(r.output).toMatch(/^WEB .* · \d+ results/m);
     expect(r.output).toMatch(/Fetch a URL with webfetch/);
     // The query URL hit /search with the JSON format + query.
     expect(lastUrl).toContain("/search");
@@ -121,7 +121,7 @@ describe("websearch — empty results (WS, empty kind)", () => {
     );
     assertKind(r, "empty");
     expect(r.meta.count).toBe(0);
-    expect(r.output).toMatch(/No results for/);
+    expect(r.output).toMatch(/No results/);
   });
 
   it("skips results missing url, and empties to kind=empty if all are dropped", async () => {
@@ -177,6 +177,24 @@ describe("websearch — request URL building (WS3)", () => {
     );
     expect(lastUrl).not.toContain("time_range");
     expect(lastUrl).toContain("safesearch=1"); // moderate default
+  });
+
+  it("surfaces engine class + applied time_range in meta and output", async () => {
+    await setHandler((_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(cannedResults(3));
+    });
+    const r = await websearch(
+      { query: "privacy", time_range: "month" },
+      makeSession({ searxngUrl: server.url }),
+    );
+    assertKind(r, "ok");
+    expect(r.meta.engine).toBe("searxng");
+    expect(r.meta.engineClass).toBe("general");
+    expect(r.meta.timeRangeApplied).toBe(true);
+    expect(r.output).toContain("searxng (general web)");
+    expect(r.output).toContain("time:month");
+    expect(r.output).not.toContain("NOT applied");
   });
 });
 

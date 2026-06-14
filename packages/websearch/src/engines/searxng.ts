@@ -53,7 +53,13 @@ export function createSearxngEngine(
         );
       }
       const results = mapResults(parsed);
-      return { results, backendHost: res.host, elapsedMs: res.elapsedMs };
+      return {
+        results,
+        backendHost: res.host,
+        elapsedMs: res.elapsedMs,
+        // SearXNG applies the time_range param when one is requested.
+        ...(input.timeRange === "all" ? {} : { timeRangeApplied: true }),
+      };
     },
   };
 }

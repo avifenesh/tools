@@ -76,10 +76,10 @@ export function createTavilyEngine(
       const status = res.statusCode;
       if (status >= 400) {
         await res.body.dump();
-        if (status >= 500 || status === 429) {
+        if (status >= 500 || status === 429 || status === 401 || status === 403) {
           throw new SearchError(
             "SERVER_NOT_AVAILABLE",
-            `tavily returned HTTP ${status}`,
+            `tavily is unavailable (HTTP ${status})`,
             { status, engine: ENGINE_NAME },
           );
         }
@@ -104,6 +104,8 @@ export function createTavilyEngine(
         results: mapResults(parsed),
         backendHost: url.hostname,
         elapsedMs: Date.now() - started,
+        // Tavily honors time_range when one was requested.
+        ...(input.timeRange === "all" ? {} : { timeRangeApplied: true }),
       };
     },
   };
@@ -116,12 +118,30 @@ function mapResults(parsed: unknown): WebSearchResultItem[] {
   const out: WebSearchResultItem[] = [];
   for (const entry of raw) {
     if (entry === null || typeof entry !== "object") continue;
-    const e = entry as { title?: unknown; url?: unknown; content?: unknown };
+    const e = entry as {
+      title?: unknown;
+      url?: unknown;
+      content?: unknown;
+      score?: unknown;
+      published_date?: unknown;
+    };
     const title = typeof e.title === "string" ? e.title : "";
     const url = typeof e.url === "string" ? e.url : "";
     if (title.length === 0 || url.length === 0) continue;
     const snippet = typeof e.content === "string" ? stripTags(e.content) : "";
-    out.push({ title, url, snippet });
+    const score = typeof e.score === "number" ? e.score : undefined;
+    const age =
+      typeof e.published_date === "string" && e.published_date.length > 0
+        ? (/^(\d{4}-\d{2}-\d{2})/.exec(e.published_date.trim())?.[1] ??
+          undefined)
+        : undefined;
+    out.push({
+      title,
+      url,
+      snippet,
+      ...(age !== undefined ? { age } : {}),
+      ...(score !== undefined ? { score } : {}),
+    });
   }
   return out;
 }

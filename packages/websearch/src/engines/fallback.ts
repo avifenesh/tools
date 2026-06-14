@@ -93,10 +93,19 @@ export function createFallbackEngine(
           });
           if (r.results.length > 0) {
             attempts.push({ engine: engine.name, outcome: "results" });
-            return { ...r, engine: r.engine ?? engine.name, attempts };
+            return {
+              ...r,
+              engine: r.engine ?? engine.name,
+              engineClass: engine.engineClass,
+              attempts,
+            };
           }
           attempts.push({ engine: engine.name, outcome: "empty" });
-          const tagged = { ...r, engine: r.engine ?? engine.name };
+          const tagged = {
+            ...r,
+            engine: r.engine ?? engine.name,
+            engineClass: engine.engineClass,
+          };
           if (engine.engineClass === "general") {
             generalEmpty ??= tagged;
           } else {

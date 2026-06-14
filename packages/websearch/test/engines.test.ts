@@ -154,6 +154,8 @@ describe("MarginaliaEngine (against the real saved JSON fixture)", () => {
       expect(r.results.length).toBeGreaterThan(0);
       expect(r.results[0]?.url).toMatch(/^https?:\/\//);
       expect(r.results[0]?.title.length).toBeGreaterThan(0);
+      // Marginalia exposes a `quality` float → surfaced as score.
+      expect(typeof r.results[0]?.score).toBe("number");
     } finally {
       await srv.close();
     }
@@ -206,6 +208,23 @@ describe("WikipediaEngine (against the real saved JSON fixture)", () => {
       expect(r.results[0]?.url).toMatch(/\/\?curid=\d+/);
       // The fixture snippet contains <span class="searchmatch"> tags.
       expect(r.results[0]?.snippet).not.toContain("<span");
+      // Wikipedia exposes a last-edit timestamp → age (YYYY-MM-DD).
+      expect(r.results[0]?.age).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  it("reports timeRangeApplied=false when a time_range was requested (Wikipedia ignores it)", async () => {
+    const srv = await startServer((_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(fixture("wikipedia.json"));
+    });
+    try {
+      const r = await createWikipediaEngine({ baseUrl: srv.url }).search(
+        engineInput({ timeRange: "week" }),
+      );
+      expect(r.timeRangeApplied).toBe(false);
     } finally {
       await srv.close();
     }
