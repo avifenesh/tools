@@ -200,14 +200,26 @@ describe("websearch — parameter / alias validation", () => {
     expect(r.error.message).toMatch(/Use 'query' instead/);
   });
 
-  it("errors when no backend is configured", async () => {
+  it("with no SearXNG backend, falls back to the keyless chain (zero-config default)", async () => {
+    // The v2 breaking change: no searxngUrl is no longer an error — it uses
+    // the bundled keyless engines. Kept hermetic by pointing them at the
+    // local fixture server (which answers like Mojeek).
+    await setHandler((_req, res) => {
+      res.setHeader("content-type", "text/html");
+      res.end(
+        `<ul class="results-standard"><!--rs--><li><a class="title" href="https://ex.com/a">A title</a><p class="s">snippet a</p></li><!--re--></ul>`,
+      );
+    });
     const r = await websearch(
       { query: "x" },
-      makeSession({ searxngUrl: undefined }),
+      makeSession({
+        searxngUrl: undefined,
+        engineBaseUrls: { mojeek: server.url },
+      }),
     );
-    assertKind(r, "error");
-    expect(r.error.code).toBe("INVALID_PARAM");
-    expect(r.error.message).toMatch(/no search backend configured/);
+    assertKind(r, "ok");
+    expect(r.results[0]?.url).toBe("https://ex.com/a");
+    expect(r.meta.engine).toBe("mojeek");
   });
 
   it("rejects a non-http(s) backend scheme", async () => {

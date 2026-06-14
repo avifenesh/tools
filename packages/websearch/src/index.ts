@@ -7,6 +7,20 @@ export {
   safeParseWebSearchParams,
 } from "./schema.js";
 export { createDefaultEngine, SearchError } from "./engine.js";
+export { resolveEngine } from "./engines/resolve.js";
+export type { ResolvedEngine } from "./engines/resolve.js";
+export { createFallbackEngine } from "./engines/fallback.js";
+export type {
+  FallbackAttempt,
+  FallbackEngineResult,
+} from "./engines/fallback.js";
+export { createSearxngEngine } from "./engines/searxng.js";
+export { createMojeekEngine, parseMojeek } from "./engines/mojeek.js";
+export { createMarginaliaEngine } from "./engines/marginalia.js";
+export { createWikipediaEngine } from "./engines/wikipedia.js";
+export { createBraveEngine } from "./engines/brave.js";
+export { createTavilyEngine } from "./engines/tavily.js";
+export { stripTags, decodeEntities } from "./engines/html.js";
 export { classifyHost, classifyIp, resolveHost } from "./ssrf.js";
 export {
   formatOkText,
@@ -37,6 +51,7 @@ export type {
   WebSearchSafeSearch,
   WebSearchSessionConfig,
   WebSearchEngine,
+  NamedWebSearchEngine,
   WebSearchEngineInput,
   WebSearchEngineResult,
   WebSearchResultItem,

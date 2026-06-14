@@ -13,10 +13,15 @@ export function renderSearchBlock(meta: SearchMetadata): string {
     `<search>`,
     `  <query>${meta.query}</query>`,
     `  <backend>${meta.backendHost}</backend>`,
+  ];
+  if (meta.engine !== undefined && meta.engine.length > 0) {
+    lines.push(`  <engine>${meta.engine}</engine>`);
+  }
+  lines.push(
     `  <count>${meta.count}</count>`,
     `  <time_range>${meta.timeRange}</time_range>`,
     `</search>`,
-  ];
+  );
   return lines.join("\n");
 }
 
@@ -35,11 +40,15 @@ export function formatOkText(args: {
     .join("\n");
   const resultsBlock = `<results>\n${numbered}\n</results>`;
   const n = args.results.length;
+  const via =
+    args.meta.engine !== undefined && args.meta.engine.length > 0
+      ? `${args.meta.engine} (${args.meta.backendHost})`
+      : args.meta.backendHost;
   let hint: string;
   if (n < args.requested) {
     hint = `(Only ${n} results — fewer than the ${args.requested} requested. Try broader terms or a wider time_range.)`;
   } else {
-    hint = `(Found ${n} results for "${args.meta.query}" via ${args.meta.backendHost} in ${args.meta.elapsedMs}ms. Fetch a URL with webfetch to read it.)`;
+    hint = `(Found ${n} results for "${args.meta.query}" via ${via} in ${args.meta.elapsedMs}ms. Fetch a URL with webfetch to read it.)`;
   }
   return [header, resultsBlock, hint].join("\n");
 }

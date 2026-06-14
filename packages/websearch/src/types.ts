@@ -45,10 +45,17 @@ export interface WebSearchEngineResult {
   readonly results: readonly WebSearchResultItem[];
   readonly backendHost: string;
   readonly elapsedMs: number;
+  /** Which engine served this result (provenance), e.g. "mojeek". */
+  readonly engine?: string;
 }
 
 export interface WebSearchEngine {
   search(input: WebSearchEngineInput): Promise<WebSearchEngineResult>;
+}
+
+/** An engine that knows its own name, for provenance in the fallback chain. */
+export interface NamedWebSearchEngine extends WebSearchEngine {
+  readonly name: string;
 }
 
 /**
@@ -62,9 +69,51 @@ export interface WebSearchPermissionPolicy extends PermissionPolicy {
 
 export interface WebSearchSessionConfig {
   readonly permissions: WebSearchPermissionPolicy;
-  /** Base URL of the self-hosted SearXNG instance, e.g. http://127.0.0.1:8888 */
+  /**
+   * Base URL of a self-hosted SearXNG instance, e.g. http://127.0.0.1:8888.
+   * Optional: when set, SearXNG is preferred at the head of the fallback
+   * chain. When unset, the tool falls back to the bundled keyless engines
+   * (Mojeek → Marginalia → Wikipedia) so search works with no config.
+   */
   readonly searxngUrl?: string;
+  /**
+   * Brave Search API key (X-Subscription-Token). When set, the Brave engine
+   * leads the chain — the recommended reliable upgrade for production.
+   * api-dashboard.search.brave.com (free tier, no card).
+   */
+  readonly braveApiKey?: string;
+  /** Tavily API key. When set, the Tavily engine joins the head of the chain. */
+  readonly tavilyApiKey?: string;
+  /**
+   * Drop the Mojeek scrape engine from the default chain. Mojeek's robots.txt
+   * disallows /search (ToS gray area); set true to use only the documented
+   * APIs (Marginalia/Wikipedia + any keyed engine).
+   */
+  readonly disableMojeek?: boolean;
+  /**
+   * When an explicit backend (SearXNG / Brave / Tavily) is configured, also
+   * fall back to the bundled keyless engines if it returns nothing or errors.
+   * Default false: an explicit backend is exclusive (a self-hosted SearXNG
+   * hiccup should not silently leak the query to public scrape engines).
+   * Has no effect on the zero-config case, which always uses the keyless chain.
+   */
+  readonly fallbackToKeyless?: boolean;
+  /**
+   * Fully override engine selection. When provided, this engine is used
+   * verbatim and the built-in chain/resolver is bypassed (advanced / tests).
+   */
   readonly engine?: WebSearchEngine;
+  /**
+   * Override the per-engine base URLs (tests point these at local fixture
+   * servers). Production leaves these unset and uses the real public hosts.
+   */
+  readonly engineBaseUrls?: {
+    readonly mojeek?: string;
+    readonly marginalia?: string;
+    readonly wikipedia?: string;
+    readonly brave?: string;
+    readonly tavily?: string;
+  };
   readonly defaultHeaders?: Readonly<Record<string, string>>;
   readonly allowLoopback?: boolean;
   readonly allowPrivateNetworks?: boolean;
@@ -86,6 +135,8 @@ export interface SearchMetadata {
   readonly count: number;
   readonly timeRange: WebSearchTimeRange;
   readonly elapsedMs: number;
+  /** Which engine actually served the results (provenance), e.g. "mojeek". */
+  readonly engine?: string;
 }
 
 export type WebSearchOk = {

@@ -1,6 +1,43 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { AddressInfo } from "node:net";
-import type { WebSearchSessionConfig } from "../src/types.js";
+import type {
+  WebSearchEngineInput,
+  WebSearchSessionConfig,
+} from "../src/types.js";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+/** Read a saved real-response fixture from test/fixtures/. */
+export function fixture(name: string): string {
+  return readFileSync(path.join(HERE, "fixtures", name), "utf8");
+}
+
+/**
+ * Build a WebSearchEngineInput for direct engine unit tests. checkHost
+ * defaults to a no-op (engines are tested against loopback fixture servers);
+ * pass a throwing checkHost to exercise the SSRF path.
+ */
+export function engineInput(
+  overrides: Partial<WebSearchEngineInput> = {},
+): WebSearchEngineInput {
+  return {
+    backendUrl: "",
+    query: "rust async runtime",
+    count: 5,
+    timeRange: "all",
+    language: "auto",
+    safeSearch: "moderate",
+    categories: ["general"],
+    timeoutMs: 5000,
+    headers: { "user-agent": "test" },
+    signal: new AbortController().signal,
+    checkHost: async () => {},
+    ...overrides,
+  };
+}
 
 export type Handler = (
   req: IncomingMessage,
