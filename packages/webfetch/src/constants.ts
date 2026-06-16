@@ -8,8 +8,8 @@ export const MAX_MAX_REDIRECTS = 10;
 export const INLINE_MARKDOWN_CAP = 200 * 1024; // 200 KB
 export const INLINE_RAW_CAP = 2 * 1024 * 1024; // 2 MB
 export const SPILL_HARD_CAP = 10 * 1024 * 1024; // 10 MB
-export const SPILL_HEAD_BYTES = 100 * 1024; // 100 KB head
-export const SPILL_TAIL_BYTES = 100 * 1024; // 100 KB tail
+export const SPILL_HEAD_BYTES = 32 * 1024; // 32 KB head
+export const SPILL_TAIL_BYTES = 32 * 1024; // 32 KB tail
 
 export const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export const MAX_URL_LENGTH = 2 * 1024; // 2 KB

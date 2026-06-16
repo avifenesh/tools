@@ -129,6 +129,8 @@ export type WebFetchHttpError = {
   readonly output: string;
   readonly meta: FetchMetadata;
   readonly bodyRaw: string;
+  readonly logPath?: string;
+  readonly byteCap: boolean;
 };
 
 export type WebFetchErrorResult = {

@@ -60,7 +60,7 @@ Non-goals for v1:
 - **No per-call SSRF opt-out.** If the model wants to hit localhost, the session config must enable it (`session.allowLoopback: true`). Per-call flags would let a prompt-injected model flip them.
 - **No `follow_redirects: false` flag.** Redirects follow by default up to `max_redirects`. If the model wants the raw 3xx, it uses `Bash(curl -i --no-location)`.
 - **No binary response support.** Responses with `Content-Type: image/*`, `application/octet-stream`, `application/zip`, etc. are rejected with a hint pointing at `Bash(curl -o file.bin ...)`.
-- **No streaming / chunked delivery.** Response is buffered to the inline cap, then spilled to disk past that. Models pick paths, not stream handles.
+- **No streaming / chunked delivery.** Response is buffered up to the hard cap, then either returned inline or spilled to disk with a bounded preview. Models pick paths, not stream handles.
 
 ### Parameter validation
 
@@ -101,7 +101,7 @@ Tool description must call out:
 >
 > **Redirects.** Up to 5 hops follow automatically. The response reports the full chain; check if the final URL is on a different host than you expected.
 >
-> **Size.** Responses up to 200 KB (extracted markdown) / 2 MB (raw body) return inline. Larger responses spill to a local file — the result gives you the path and the head+tail; use Read with offset/limit to paginate the middle. Responses over 10 MB are rejected: use `bash(curl -o file ...)` for bulk downloads.
+> **Size.** Responses up to 200 KB (cleaned markdown) / 2 MB (explicit raw body) return inline. Larger responses spill to a local file — the result gives you the path and at most a 64 KB head+tail preview; use Read with offset/limit to paginate the middle. For HTML, the default preview is extracted markdown; request `extract: "raw"` only when you need page HTML. Responses over 10 MB are rejected: use `bash(curl -o file ...)` for bulk downloads.
 
 Research backing: Anthropic's `web_fetch_20250910` warns "prompt injection is a significant risk with web fetch" verbatim. Claude Code's `WebFetch` tool description is not public but the Anthropic API wording above is the closest source of truth.
 
@@ -129,13 +129,14 @@ Output is a discriminated union by `kind`.
 ```
 
 - `body` format depends on `extract`:
-  - `"markdown"`: HTML → readability → turndown → markdown. JSON is passed through (readability only runs on `text/html`).
-  - `"raw"`: response body bytes decoded as UTF-8 (with replacement chars for invalid sequences).
+  - `"markdown"`: HTML → readability → turndown → markdown. JSON is passed through (readability only runs on `text/html`). This is the default for HTML so noisy page chrome, scripts, and layout markup do not flood the model.
+  - `"raw"`: response body bytes decoded as UTF-8 (with replacement chars for invalid sequences). Use this when the model explicitly needs the page HTML/source, not just page content.
   - `"both"`: markdown first, then `<raw_body>...</raw_body>` block.
 - Non-HTML text types (`application/json`, `text/plain`, `text/csv`, `application/xml`) pass through regardless of `extract`.
 - Continuation hint:
   - Fully captured: `(Response complete. {N} bytes extracted / {M} bytes raw. Content-type: {type}. Fetched in {T}ms.)`
-  - Spilled: `(Response exceeded inline cap; showing first 100 KB + last 100 KB of {total} bytes. Full response at {path} — Read with offset/limit to paginate.)`
+  - Spilled with clipped body: `(Response exceeded inline cap; showing 64 KB head+tail preview of {total} bytes. Full response at {path} — Read with offset/limit to paginate.)`
+  - Spilled with complete cleaned extraction: `(Response exceeded inline cap; showing extracted content inline from {total} raw bytes. Full response at {path} — Read with offset/limit to paginate.)`
 
 ### 3.2 `kind: "redirect_loop"`
 
@@ -148,7 +149,7 @@ Redirect chain exceeded `max_redirects`. Partial chain reported.
 
 ### 3.3 `kind: "http_error"` (4xx or 5xx)
 
-Server returned a non-2xx status. The body (if any, up to inline cap) is still included because 4xx/5xx pages often carry useful error messages.
+Server returned a non-2xx status. The body (if any, up to inline cap) is still included because 4xx/5xx pages often carry useful error messages. Oversized error bodies spill like successful responses and return only a 64 KB head+tail preview plus the spill path.
 
 ```text
 <request>...<status>{4xx|5xx}</status>...</request>
@@ -189,8 +190,8 @@ Hint: Cloud metadata endpoints are blocked by default to prevent credential exfi
 
 | Tier | Default | Behavior |
 |---|---|---|
-| **Inline**  | 200 KB extracted / 2 MB raw | Returned directly in the tool result. |
-| **Spill**   | Up to 10 MB raw | Full body written to `~/.agent-sh/webfetch-cache/{session}/{id}.{ext}`. Result contains head (first 100 KB) + tail (last 100 KB) + path. |
+| **Inline**  | 200 KB cleaned markdown / 2 MB explicit raw | Returned directly in the tool result. |
+| **Spill**   | Up to 10 MB raw | Full body written to `~/.agent-sh/webfetch-cache/{session}/{id}.{ext}`. Result contains at most 32 KB head + 32 KB tail + path. |
 | **Reject**  | > 10 MB raw | `Error [OVERSIZE]` with `bash(curl -o ...)` hint. |
 
 Per-stream overflow follows the same head+tail pattern as bash's output spill. Models can:
@@ -362,7 +363,7 @@ Core never depends on adapters.
 3. Parse with JSDOM (lightweight; enough for readability).
 4. Run `@mozilla/readability` — main-content extraction. If it returns null (too-short, no article), fall back to raw HTML.
 5. Convert the readability output to markdown with `turndown`.
-6. Trim to inline cap; spill past that.
+6. Render cleaned markdown by default for HTML. If inline caps are exceeded, spill the full raw response and return at most a 64 KB head+tail preview unless the cleaned extraction fits inline.
 
 Dependencies: `undici` (~400 KB), `jsdom` (~3 MB), `@mozilla/readability` (~50 KB), `turndown` (~100 KB). Total ~3.5 MB — heavy relative to our other tools. Trade-off accepted: the token savings on HTML pages are often 10× (a 500 KB article page becomes a 50 KB markdown doc). Harnesses that don't want this can install `@agent-sh/webfetch-lite` (no extraction).
 
@@ -395,7 +396,7 @@ Cached responses ARE deterministic within the 5-minute window — same request r
 13. Redirect to private IP mid-chain → `SSRF_BLOCKED` on that hop.
 14. HTTPS → HTTP downgrade redirect → `TLS_ERROR`.
 15. `content-type: application/octet-stream` → `UNSUPPORTED_CONTENT_TYPE`.
-16. 200 KB+1 byte response → spills to file; result has head+tail + path.
+16. 200 KB+1 byte extracted markdown or 2 MB+1 byte explicit raw response → spills to file; result has a 64 KB bounded preview + path.
 17. 10 MB+1 byte response → `OVERSIZE`.
 18. 500 response with useful body → `kind: "http_error"`, body included.
 19. Timeout → `kind: "error"`, `TIMEOUT`.
@@ -460,7 +461,7 @@ Breaking changes bump major. Additions (new error codes, new optional params) ar
 - **W-D2** (HTTP verbs): GET + POST. No PUT/DELETE/PATCH. Matches the majority of public harnesses.
 - **W-D3** (Extraction): readability + turndown built-in. Default `extract: "markdown"`. `raw` and `both` opt-in. Trade-off: ~3.5 MB deps for ~10× token savings on HTML.
 - **W-D4** (SSRF): blocked by default. Three session opt-ins (`allowLoopback`, `allowPrivateNetworks`, `allowMetadata`). Re-checked on every redirect hop. DNS-once + SNI defense against rebinding.
-- **W-D5** (Size cap): 3-tier — 200 KB extracted / 2 MB raw inline, spill to file up to 10 MB, reject above. Head+tail + path on spill. Mirrors bash's spill pattern.
+- **W-D5** (Size cap): 3-tier — 200 KB cleaned markdown / 2 MB explicit raw inline, spill to file up to 10 MB, reject above. Spill previews are bounded to 64 KB total (32 KB head + 32 KB tail) plus path. Mirrors bash's spill pattern without flooding the model context.
 - **W-D6** (Redirects): follow up to 5 (max 10), report chain, SSRF-check each hop. HTTPS→HTTP downgrade blocked.
 - **W-D7** (Timeout): 30s default, 1s floor, 120s session backstop. No partial-body return.
 - **W-D8** (Cache): per-session 5-min content cache keyed on (method, url, body-hash, headers-hash, extract). Hook still consulted on hits.

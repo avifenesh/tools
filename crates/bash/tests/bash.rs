@@ -2,9 +2,8 @@
 //! cases from `packages/bash/test/bash.test.ts`.
 
 use harness_bash::{
-    apply_cwd_carry, bash, bash_kill, bash_output, default_executor,
-    detect_top_level_cd, BashKillResult, BashOutputResult, BashPermissionPolicy,
-    BashResult, BashSessionConfig,
+    apply_cwd_carry, bash, bash_kill, bash_output, default_executor, detect_top_level_cd,
+    BashKillResult, BashOutputResult, BashPermissionPolicy, BashResult, BashSessionConfig,
 };
 use harness_core::{PermissionPolicy, ToolErrorCode};
 use serde_json::{json, Value};
@@ -59,7 +58,11 @@ async fn rejects_unknown_param_cmd_with_alias_hint() {
     let r = bash(json!({"cmd": "echo hi"}), &s).await;
     let e = expect_error(&r);
     assert_eq!(e.error.code, ToolErrorCode::InvalidParam);
-    assert!(e.error.message.contains("command"), "msg={}", e.error.message);
+    assert!(
+        e.error.message.contains("command"),
+        "msg={}",
+        e.error.message
+    );
 }
 
 #[tokio::test]
@@ -78,7 +81,10 @@ async fn rejects_stdin_with_v1_hint() {
     let s = mk_session(tmp.path());
     let r = bash(json!({"command": "cat", "stdin": "hello"}), &s).await;
     let e = expect_error(&r);
-    assert!(e.error.message.contains("Interactive stdin is not supported"));
+    assert!(e
+        .error
+        .message
+        .contains("Interactive stdin is not supported"));
 }
 
 #[tokio::test]
@@ -156,11 +162,7 @@ async fn runs_simple_echo() {
 async fn captures_stderr_independently() {
     let tmp = TempDir::new().unwrap();
     let s = mk_session(tmp.path());
-    let r = bash(
-        json!({"command": "echo out; echo err 1>&2"}),
-        &s,
-    )
-    .await;
+    let r = bash(json!({"command": "echo out; echo err 1>&2"}), &s).await;
     let ok = expect_ok(&r);
     assert!(ok.stdout.contains("out"));
     assert!(ok.stderr.contains("err"));
@@ -329,16 +331,14 @@ async fn bash_output_paginates_by_since_byte() {
     let job_id = bg.job_id.clone();
     let done = wait_for_done(&s, &job_id).await;
     let next_since = match &done {
-        BashOutputResult::Output { next_since_byte, .. } => *next_since_byte,
+        BashOutputResult::Output {
+            next_since_byte, ..
+        } => *next_since_byte,
         _ => unreachable!(),
     };
     assert!(next_since > 0);
 
-    let second = bash_output(
-        json!({"job_id": job_id, "since_byte": next_since}),
-        &s,
-    )
-    .await;
+    let second = bash_output(json!({"job_id": job_id, "since_byte": next_since}), &s).await;
     match second {
         BashOutputResult::Output { stdout, .. } => assert!(stdout.is_empty()),
         _ => panic!("expected output"),
@@ -349,11 +349,7 @@ async fn bash_output_paginates_by_since_byte() {
 async fn bash_kill_terminates_background_job() {
     let tmp = TempDir::new().unwrap();
     let s = mk_session(tmp.path());
-    let r = bash(
-        json!({"command": "sleep 5", "background": true}),
-        &s,
-    )
-    .await;
+    let r = bash(json!({"command": "sleep 5", "background": true}), &s).await;
     let bg = expect_background(&r);
     let job_id = bg.job_id.clone();
 
@@ -394,11 +390,7 @@ async fn bash_kill_rejects_unknown_job_id() {
 async fn bash_kill_rejects_bad_signal() {
     let tmp = TempDir::new().unwrap();
     let s = mk_session(tmp.path());
-    let r = bash_kill(
-        json!({"job_id": "x", "signal": "SIGHUP"}),
-        &s,
-    )
-    .await;
+    let r = bash_kill(json!({"job_id": "x", "signal": "SIGHUP"}), &s).await;
     match r {
         BashKillResult::Error(e) => {
             assert_eq!(e.error.code, ToolErrorCode::InvalidParam);
@@ -406,6 +398,40 @@ async fn bash_kill_rejects_bad_signal() {
         }
         _ => panic!("expected error"),
     }
+}
+
+// ---- Output caps ----
+
+#[tokio::test]
+async fn capped_curl_output_returns_head_tail_and_webfetch_hint() {
+    let tmp = TempDir::new().unwrap();
+    let mut s = mk_session(tmp.path());
+    s.max_output_bytes_inline = Some(1024);
+    s.max_output_bytes_file = Some(10 * 1024 * 1024);
+    let command = concat!(
+        "curl() { ",
+        "printf 'HTML_HEAD\\n'; ",
+        "printf '%2048s' | tr ' ' m; ",
+        "printf 'HTML_MIDDLE_MARKER'; ",
+        "printf '%2048s' | tr ' ' t; ",
+        "printf '\\nHTML_TAIL\\n'; ",
+        "}; ",
+        "curl https://github.com/agent-sh/tools"
+    );
+    let r = bash(json!({"command": command}), &s).await;
+    let ok = expect_ok(&r);
+    assert!(ok.byte_cap);
+    assert!(ok.log_path.is_some());
+    assert!(ok.stdout.contains("HTML_HEAD"), "stdout={}", ok.stdout);
+    assert!(ok.stdout.contains("HTML_TAIL"), "stdout={}", ok.stdout);
+    assert!(
+        !ok.stdout.contains("HTML_MIDDLE_MARKER"),
+        "stdout={}",
+        ok.stdout
+    );
+    assert!(ok.stdout.len() < 1400, "len={}", ok.stdout.len());
+    assert!(ok.output.contains("head+tail preview"));
+    assert!(ok.output.to_lowercase().contains("use webfetch"));
 }
 
 // ---- Serialization shape ----

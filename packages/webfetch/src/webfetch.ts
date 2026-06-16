@@ -246,7 +246,24 @@ export async function webfetch(
 
   // 4xx/5xx — still return the body so the model can read an error page.
   if (result.status >= 400) {
-    const bodyText = decodeBody(result.body, inlineRawCap);
+    const mustSpillRaw = result.body.length > inlineRawCap;
+    const logPath = mustSpillRaw
+      ? spillToFile({
+          bytes: result.body,
+          dir: spillDir,
+          sessionId,
+          contentType: contentTypeBase,
+        })
+      : undefined;
+    const bodyText =
+      mustSpillRaw && logPath !== undefined
+        ? headAndTail(
+            result.body,
+            SPILL_HEAD_BYTES,
+            SPILL_TAIL_BYTES,
+            logPath,
+          )
+        : decodeBody(result.body);
     const meta = {
       url: params.url,
       finalUrl: result.finalUrl,
@@ -259,9 +276,17 @@ export async function webfetch(
     };
     return {
       kind: "http_error",
-      output: formatHttpErrorText({ meta, body: bodyText }),
+      output: formatHttpErrorText({
+        meta,
+        body: bodyText,
+        ...(logPath !== undefined ? { logPath } : {}),
+        byteCap: mustSpillRaw,
+        totalBytes: result.body.length,
+      }),
       meta,
       bodyRaw: bodyText,
+      ...(logPath !== undefined ? { logPath } : {}),
+      byteCap: mustSpillRaw,
     };
   }
 
@@ -286,7 +311,7 @@ export async function webfetch(
   }
 
   // Decide whether to extract
-  const rawText = decodeBody(result.body, inlineRawCap);
+  const rawText = decodeBody(result.body);
   let markdown: string | undefined;
   let markdownBytes = 0;
   if (
@@ -301,14 +326,17 @@ export async function webfetch(
     markdown = rawText;
     markdownBytes = Buffer.byteLength(rawText, "utf8");
   }
+  const fullMarkdown = markdown;
 
   // Check inline caps; spill on overflow.
   const rawBytes = result.body.length;
   const mustSpillMarkdown =
     markdown !== undefined && markdownBytes > inlineMarkdownCap;
-  const mustSpillRaw = rawBytes > inlineRawCap;
+  const rawRequested = extract !== "markdown";
+  const mustSpillRaw = rawRequested && rawBytes > inlineRawCap;
+  const mustSpillSource = rawBytes > inlineRawCap || mustSpillMarkdown;
   let logPath: string | undefined;
-  if (mustSpillMarkdown || mustSpillRaw) {
+  if (mustSpillSource) {
     logPath = spillToFile({
       bytes: result.body,
       dir: spillDir,
@@ -324,7 +352,14 @@ export async function webfetch(
       );
     }
   }
-  const byteCap = mustSpillMarkdown || mustSpillRaw;
+  const rawForOutput =
+    rawRequested && mustSpillRaw && logPath !== undefined
+      ? headAndTail(result.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, logPath)
+      : rawRequested
+        ? rawText
+        : undefined;
+  const bodyClipped = mustSpillMarkdown || mustSpillRaw;
+  const byteCap = mustSpillSource;
 
   const meta = {
     url: params.url,
@@ -347,7 +382,7 @@ export async function webfetch(
       contentType: result.contentType,
       body: result.body,
       extract,
-      ...(markdown !== undefined ? { extractedMarkdown: markdown } : {}),
+      ...(fullMarkdown !== undefined ? { extractedMarkdown: fullMarkdown } : {}),
     };
     session.cache.set(key, entry);
   }
@@ -358,23 +393,21 @@ export async function webfetch(
       meta,
       extractHint: extract,
       ...(markdown !== undefined ? { markdown } : {}),
-      ...(extract !== "markdown" ? { raw: rawText } : {}),
+      ...(rawForOutput !== undefined ? { raw: rawForOutput } : {}),
       ...(logPath !== undefined ? { logPath } : {}),
       byteCap,
+      bodyClipped,
       totalBytes: rawBytes,
     }),
     meta,
     ...(markdown !== undefined ? { bodyMarkdown: markdown } : {}),
-    ...(extract !== "markdown" ? { bodyRaw: rawText } : {}),
+    ...(rawForOutput !== undefined ? { bodyRaw: rawForOutput } : {}),
     ...(logPath !== undefined ? { logPath } : {}),
     byteCap,
   };
 }
 
-function decodeBody(bytes: Uint8Array, cap: number): string {
-  if (bytes.length > cap) {
-    return Buffer.from(bytes.subarray(0, cap)).toString("utf8");
-  }
+function decodeBody(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("utf8");
 }
 
@@ -382,9 +415,16 @@ function formatCachedHit(
   hit: CachedResponse,
   extract: WebFetchExtract,
   params: WebFetchParams,
-  _session: WebFetchSessionConfig,
+  session: WebFetchSessionConfig,
 ): WebFetchResult {
   const ageSec = Math.floor((Date.now() - hit.at) / 1000);
+  const inlineMarkdownCap =
+    session.inlineMarkdownCap ?? INLINE_MARKDOWN_CAP;
+  const inlineRawCap = session.inlineRawCap ?? INLINE_RAW_CAP;
+  const spillDir =
+    session.spillDir ?? path.join(tmpdir(), "agent-sh-webfetch-cache");
+  const sessionId = session.sessionId ?? "default";
+  const contentTypeBase = parseContentTypeBase(hit.contentType);
   const meta = {
     url: params.url,
     finalUrl: hit.finalUrl,
@@ -398,31 +438,87 @@ function formatCachedHit(
   };
 
   if (hit.status >= 400) {
-    const body = Buffer.from(hit.body).toString("utf8");
+    const mustSpillRaw = hit.body.length > inlineRawCap;
+    const logPath = mustSpillRaw
+      ? spillToFile({
+          bytes: hit.body,
+          dir: spillDir,
+          sessionId,
+          contentType: contentTypeBase,
+        })
+      : undefined;
+    const body =
+      mustSpillRaw && logPath !== undefined
+        ? headAndTail(hit.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, logPath)
+        : decodeBody(hit.body);
     return {
       kind: "http_error",
-      output: formatHttpErrorText({ meta, body }),
+      output: formatHttpErrorText({
+        meta,
+        body,
+        ...(logPath !== undefined ? { logPath } : {}),
+        byteCap: mustSpillRaw,
+        totalBytes: hit.body.length,
+      }),
       meta,
       bodyRaw: body,
+      ...(logPath !== undefined ? { logPath } : {}),
+      byteCap: mustSpillRaw,
     };
   }
 
-  const rawText = Buffer.from(hit.body).toString("utf8");
-  const markdown = hit.extractedMarkdown ?? rawText;
+  const rawText = decodeBody(hit.body);
+  const markdown =
+    hit.extractedMarkdown ??
+    (extract === "markdown" || extract === "both" ? rawText : undefined);
+  const markdownBytes =
+    markdown !== undefined ? Buffer.byteLength(markdown, "utf8") : 0;
+  const rawRequested = extract !== "markdown";
+  const mustSpillMarkdown =
+    markdown !== undefined && markdownBytes > inlineMarkdownCap;
+  const mustSpillRaw = rawRequested && hit.body.length > inlineRawCap;
+  const mustSpillSource = hit.body.length > inlineRawCap || mustSpillMarkdown;
+  const logPath = mustSpillSource
+    ? spillToFile({
+        bytes: hit.body,
+        dir: spillDir,
+        sessionId,
+        contentType: contentTypeBase,
+      })
+    : undefined;
+  const markdownForOutput =
+    markdown !== undefined && mustSpillMarkdown && logPath !== undefined
+      ? headAndTail(
+          Buffer.from(markdown, "utf8"),
+          SPILL_HEAD_BYTES,
+          SPILL_TAIL_BYTES,
+          logPath,
+        )
+      : markdown;
+  const rawForOutput =
+    rawRequested && mustSpillRaw && logPath !== undefined
+      ? headAndTail(hit.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, logPath)
+      : rawRequested
+        ? rawText
+        : undefined;
+  const bodyClipped = mustSpillMarkdown || mustSpillRaw;
   return {
     kind: "ok",
     output: formatOkText({
       meta,
       extractHint: extract,
-      markdown,
-      ...(extract !== "markdown" ? { raw: rawText } : {}),
-      byteCap: false,
+      ...(markdownForOutput !== undefined ? { markdown: markdownForOutput } : {}),
+      ...(rawForOutput !== undefined ? { raw: rawForOutput } : {}),
+      ...(logPath !== undefined ? { logPath } : {}),
+      byteCap: mustSpillSource,
+      bodyClipped,
       totalBytes: hit.body.length,
     }),
     meta,
-    bodyMarkdown: markdown,
-    ...(extract !== "markdown" ? { bodyRaw: rawText } : {}),
-    byteCap: false,
+    ...(markdownForOutput !== undefined ? { bodyMarkdown: markdownForOutput } : {}),
+    ...(rawForOutput !== undefined ? { bodyRaw: rawForOutput } : {}),
+    ...(logPath !== undefined ? { logPath } : {}),
+    byteCap: mustSpillSource,
   };
 }
 
