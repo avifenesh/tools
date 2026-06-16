@@ -291,6 +291,33 @@ describe("webfetch — http error surface", () => {
     assertKind(r, "http_error");
     expect(r.meta.status).toBe(503);
   });
+
+  it("spills and previews large http_error bodies", async () => {
+    const big =
+      "HTTP_HEAD\n" +
+      "h".repeat(40 * 1024) +
+      "HTTP_MIDDLE_MARKER" +
+      "m".repeat(80 * 1024) +
+      "t".repeat(40 * 1024) +
+      "\nHTTP_TAIL";
+    await setHandler((_req, res) => {
+      res.statusCode = 500;
+      res.setHeader("content-type", "text/plain");
+      res.end(big);
+    });
+    const r = await webfetch(
+      { url: server.url },
+      makeSession({ inlineRawCap: 512 }),
+    );
+    assertKind(r, "http_error");
+    expect(r.byteCap).toBe(true);
+    expect(r.logPath).toBeTruthy();
+    expect(r.bodyRaw).toContain("HTTP_HEAD");
+    expect(r.bodyRaw).toContain("HTTP_TAIL");
+    expect(r.bodyRaw).not.toContain("HTTP_MIDDLE_MARKER");
+    expect(r.bodyRaw.length).toBeLessThan(72 * 1024);
+    expect(r.output).toContain("64 KB head+tail preview");
+  });
 });
 
 describe("webfetch — content-type handling", () => {
@@ -323,6 +350,61 @@ describe("webfetch — size caps", () => {
     expect(r.byteCap).toBe(true);
     expect(r.logPath).toBeTruthy();
     expect(r.output).toContain("Full response at");
+  });
+
+  it("caps explicit raw spill output to a 64 KB head+tail preview", async () => {
+    const big =
+      "RAW_HEAD\n" +
+      "h".repeat(40 * 1024) +
+      "RAW_MIDDLE_MARKER" +
+      "m".repeat(80 * 1024) +
+      "t".repeat(40 * 1024) +
+      "\nRAW_TAIL";
+    await setHandler((_req, res) => {
+      res.setHeader("content-type", "text/plain");
+      res.end(big);
+    });
+    const r = await webfetch(
+      { url: server.url, extract: "raw" },
+      makeSession({ inlineRawCap: 512, inlineMarkdownCap: 512 }),
+    );
+    assertKind(r, "ok");
+    expect(r.byteCap).toBe(true);
+    expect(r.logPath).toBeTruthy();
+    expect(r.bodyRaw).toContain("RAW_HEAD");
+    expect(r.bodyRaw).toContain("RAW_TAIL");
+    expect(r.bodyRaw).not.toContain("RAW_MIDDLE_MARKER");
+    expect(r.bodyRaw!.length).toBeLessThan(72 * 1024);
+    expect(r.output).toContain("64 KB head+tail preview");
+  });
+
+  it("uses cleaned markdown for spilled HTML unless raw HTML is requested", async () => {
+    const useful = "Useful repository content explains the actual README. ";
+    await setHandler((_req, res) => {
+      res.setHeader("content-type", "text/html");
+      res.end(
+        `<!DOCTYPE html><html><head><title>Repository Page</title></head><body>
+          <nav>GITHUB_NAV_NOISE ${"nav ".repeat(5000)}</nav>
+          <article>
+            <h1>Useful Repository Content</h1>
+            <p>${useful.repeat(3000)}</p>
+          </article>
+          <script>GITHUB_SCRIPT_NOISE</script>
+        </body></html>`,
+      );
+    });
+    const r = await webfetch(
+      { url: server.url },
+      makeSession({ inlineRawCap: 512, inlineMarkdownCap: 512 }),
+    );
+    assertKind(r, "ok");
+    expect(r.byteCap).toBe(true);
+    expect(r.logPath).toBeTruthy();
+    expect(r.bodyMarkdown).toContain("Useful Repository Content");
+    expect(r.bodyMarkdown).not.toContain("GITHUB_NAV_NOISE");
+    expect(r.bodyMarkdown).not.toContain("GITHUB_SCRIPT_NOISE");
+    expect(r.bodyMarkdown).not.toContain("<html");
+    expect(r.bodyMarkdown!.length).toBeLessThan(72 * 1024);
   });
 
   it("rejects response exceeding hard cap", async () => {
@@ -360,6 +442,45 @@ describe("webfetch — session cache", () => {
     expect(r2.meta.fromCache).toBe(true);
     expect(hits).toBe(1);
     expect(r2.output).toMatch(/Served from session cache/);
+  });
+
+  it("reapplies spill preview caps on cache hits", async () => {
+    const big =
+      "CACHE_HEAD\n" +
+      "h".repeat(40 * 1024) +
+      "CACHE_MIDDLE_MARKER" +
+      "m".repeat(80 * 1024) +
+      "t".repeat(40 * 1024) +
+      "\nCACHE_TAIL";
+    let hits = 0;
+    await setHandler((_req, res) => {
+      hits++;
+      res.setHeader("content-type", "text/plain");
+      res.end(big);
+    });
+    const cache = makeSessionCache();
+    const session = makeSession({
+      cache,
+      inlineRawCap: 512,
+      inlineMarkdownCap: 512,
+    });
+    const r1 = await webfetch(
+      { url: server.url, extract: "raw" },
+      session,
+    );
+    assertKind(r1, "ok");
+    const r2 = await webfetch(
+      { url: server.url, extract: "raw" },
+      session,
+    );
+    assertKind(r2, "ok");
+    expect(hits).toBe(1);
+    expect(r2.meta.fromCache).toBe(true);
+    expect(r2.byteCap).toBe(true);
+    expect(r2.bodyRaw).toContain("CACHE_HEAD");
+    expect(r2.bodyRaw).toContain("CACHE_TAIL");
+    expect(r2.bodyRaw).not.toContain("CACHE_MIDDLE_MARKER");
+    expect(r2.bodyRaw!.length).toBeLessThan(72 * 1024);
   });
 
   it("cache miss after TTL expires", async () => {

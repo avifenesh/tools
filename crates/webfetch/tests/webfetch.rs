@@ -67,11 +67,7 @@ async fn rejects_unknown_param_uri_with_alias_hint() {
 #[tokio::test]
 async fn rejects_timeout_seconds_alias() {
     let s = mk_session();
-    let r = webfetch(
-        json!({"url": "http://example.com", "timeout": 30}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": "http://example.com", "timeout": 30}), &s).await;
     let e = expect_error(&r);
     assert!(e.error.message.contains("timeout_ms"));
 }
@@ -79,11 +75,7 @@ async fn rejects_timeout_seconds_alias() {
 #[tokio::test]
 async fn rejects_cookies_v1_not_supported() {
     let s = mk_session();
-    let r = webfetch(
-        json!({"url": "http://example.com", "cookies": "x=y"}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": "http://example.com", "cookies": "x=y"}), &s).await;
     let e = expect_error(&r);
     assert!(e.error.message.to_lowercase().contains("cookie"));
 }
@@ -115,11 +107,7 @@ async fn rejects_unparseable_url() {
 #[tokio::test]
 async fn rejects_post_without_body() {
     let s = mk_session();
-    let r = webfetch(
-        json!({"url": "http://example.com", "method": "POST"}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": "http://example.com", "method": "POST"}), &s).await;
     let e = expect_error(&r);
     assert!(e.error.message.contains("POST requires"));
 }
@@ -127,11 +115,7 @@ async fn rejects_post_without_body() {
 #[tokio::test]
 async fn rejects_get_with_body() {
     let s = mk_session();
-    let r = webfetch(
-        json!({"url": "http://example.com", "body": "x"}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": "http://example.com", "body": "x"}), &s).await;
     let e = expect_error(&r);
     assert!(e.error.message.contains("GET does not accept"));
 }
@@ -139,11 +123,7 @@ async fn rejects_get_with_body() {
 #[tokio::test]
 async fn rejects_timeout_below_1s() {
     let s = mk_session();
-    let r = webfetch(
-        json!({"url": "http://example.com", "timeout_ms": 500}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": "http://example.com", "timeout_ms": 500}), &s).await;
     let e = expect_error(&r);
     assert!(e.error.message.contains(">= 1000"));
 }
@@ -201,7 +181,10 @@ fn classifies_public_v4_as_allowed() {
 
 #[test]
 fn classifies_v6_loopback_and_linklocal() {
-    assert_eq!(classify_ip(IpAddr::V6(Ipv6Addr::LOCALHOST)), Some(BlockClass::Loopback));
+    assert_eq!(
+        classify_ip(IpAddr::V6(Ipv6Addr::LOCALHOST)),
+        Some(BlockClass::Loopback)
+    );
     assert_eq!(
         classify_ip(IpAddr::V6("fe80::1".parse().unwrap())),
         Some(BlockClass::LinkLocal)
@@ -223,11 +206,7 @@ async fn ssrf_blocks_loopback_without_opt_in() {
 #[tokio::test]
 async fn ssrf_blocks_metadata_without_opt_in() {
     let s = mk_session();
-    let r = webfetch(
-        json!({"url": "http://169.254.169.254/latest/"}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": "http://169.254.169.254/latest/"}), &s).await;
     let e = expect_error(&r);
     assert_eq!(e.error.code, ToolErrorCode::SsrfBlocked);
 }
@@ -309,9 +288,7 @@ async fn start_server(handler: Handler) -> (SocketAddr, tokio::task::JoinHandle<
                         if let Some(loc) = resp.location {
                             builder = builder.header("location", loc);
                         }
-                        Ok::<_, Infallible>(
-                            builder.body(Full::new(resp.body)).unwrap(),
-                        )
+                        Ok::<_, Infallible>(builder.body(Full::new(resp.body)).unwrap())
                     }
                 });
                 let _ = hyper::server::conn::http1::Builder::new()
@@ -345,10 +322,43 @@ async fn happy_path_html_extracts_markdown() {
 }
 
 #[tokio::test]
+async fn spilled_html_defaults_to_cleaned_markdown_preview() {
+    let useful = "Useful repository content explains the actual README. ";
+    let html = format!(
+        "<!DOCTYPE html><html><head><title>Repository Page</title></head><body>\
+         <nav>GITHUB_NAV_NOISE {}</nav>\
+         <article><h1>Useful Repository Content</h1><p>{}</p></article>\
+         <script>GITHUB_SCRIPT_NOISE</script>\
+         </body></html>",
+        "nav ".repeat(5000),
+        useful.repeat(3000),
+    );
+    let handler: Handler = Arc::new(move |_req| ServerResponse::ok("text/html", html.clone()));
+    let (addr, _jh) = start_server(handler).await;
+    let url = format!("http://{}/repo", addr);
+    let mut s = mk_session_allow_loopback();
+    s.inline_raw_cap = Some(512);
+    s.inline_markdown_cap = Some(512);
+    let r = webfetch(json!({"url": url}), &s).await;
+    let ok = expect_ok(&r);
+    let md = ok.body_markdown.as_deref().unwrap_or("");
+    assert!(ok.byte_cap);
+    assert!(ok.log_path.is_some());
+    assert!(
+        md.contains("Useful repository content explains"),
+        "md={}",
+        md
+    );
+    assert!(!md.contains("GITHUB_NAV_NOISE"), "md={}", md);
+    assert!(!md.contains("GITHUB_SCRIPT_NOISE"), "md={}", md);
+    assert!(!md.contains("<html"), "md={}", md);
+    assert!(md.len() < 72 * 1024, "len={}", md.len());
+}
+
+#[tokio::test]
 async fn passthrough_json() {
-    let handler: Handler = Arc::new(|_req| {
-        ServerResponse::ok("application/json", r#"{"answer":42}"#)
-    });
+    let handler: Handler =
+        Arc::new(|_req| ServerResponse::ok("application/json", r#"{"answer":42}"#));
     let (addr, _jh) = start_server(handler).await;
     let url = format!("http://{}/data", addr);
     let s = mk_session_allow_loopback();
@@ -359,10 +369,35 @@ async fn passthrough_json() {
 }
 
 #[tokio::test]
+async fn caps_explicit_raw_spill_output_to_64kb_preview() {
+    let body = format!(
+        "RAW_HEAD\n{}RAW_MIDDLE_MARKER{}{}\nRAW_TAIL",
+        "h".repeat(40 * 1024),
+        "m".repeat(80 * 1024),
+        "t".repeat(40 * 1024),
+    );
+    let handler: Handler = Arc::new(move |_req| ServerResponse::ok("text/plain", body.clone()));
+    let (addr, _jh) = start_server(handler).await;
+    let url = format!("http://{}/large", addr);
+    let mut s = mk_session_allow_loopback();
+    s.inline_raw_cap = Some(512);
+    s.inline_markdown_cap = Some(512);
+    let r = webfetch(json!({"url": url, "extract": "raw"}), &s).await;
+    let ok = expect_ok(&r);
+    let raw = ok.body_raw.as_deref().unwrap_or("");
+    assert!(ok.byte_cap);
+    assert!(ok.log_path.is_some());
+    assert!(raw.contains("RAW_HEAD"), "raw={}", raw);
+    assert!(raw.contains("RAW_TAIL"), "raw={}", raw);
+    assert!(!raw.contains("RAW_MIDDLE_MARKER"), "raw={}", raw);
+    assert!(raw.len() < 72 * 1024, "len={}", raw.len());
+    assert!(ok.output.contains("64 KB head+tail preview"));
+}
+
+#[tokio::test]
 async fn rejects_unsupported_content_type() {
-    let handler: Handler = Arc::new(|_req| {
-        ServerResponse::ok("application/octet-stream", "binarydata")
-    });
+    let handler: Handler =
+        Arc::new(|_req| ServerResponse::ok("application/octet-stream", "binarydata"));
     let (addr, _jh) = start_server(handler).await;
     let url = format!("http://{}/bin", addr);
     let s = mk_session_allow_loopback();
@@ -373,9 +408,8 @@ async fn rejects_unsupported_content_type() {
 
 #[tokio::test]
 async fn surfaces_http_404_with_body() {
-    let handler: Handler = Arc::new(|_req| {
-        ServerResponse::not_found("Resource missing — try /other")
-    });
+    let handler: Handler =
+        Arc::new(|_req| ServerResponse::not_found("Resource missing — try /other"));
     let (addr, _jh) = start_server(handler).await;
     let url = format!("http://{}/missing", addr);
     let s = mk_session_allow_loopback();
@@ -383,6 +417,39 @@ async fn surfaces_http_404_with_body() {
     let he = expect_http_error(&r);
     assert_eq!(he.meta.status, 404);
     assert!(he.body_raw.contains("Resource missing"));
+}
+
+#[tokio::test]
+async fn spills_and_previews_large_http_error_body() {
+    let body = format!(
+        "HTTP_HEAD\n{}HTTP_MIDDLE_MARKER{}{}\nHTTP_TAIL",
+        "h".repeat(40 * 1024),
+        "m".repeat(80 * 1024),
+        "t".repeat(40 * 1024),
+    );
+    let handler: Handler = Arc::new(move |_req| ServerResponse {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        content_type: "text/plain",
+        body: Bytes::from(body.clone()),
+        location: None,
+    });
+    let (addr, _jh) = start_server(handler).await;
+    let url = format!("http://{}/error", addr);
+    let mut s = mk_session_allow_loopback();
+    s.inline_raw_cap = Some(512);
+    let r = webfetch(json!({"url": url}), &s).await;
+    let he = expect_http_error(&r);
+    assert!(he.byte_cap);
+    assert!(he.log_path.is_some());
+    assert!(he.body_raw.contains("HTTP_HEAD"), "body={}", he.body_raw);
+    assert!(he.body_raw.contains("HTTP_TAIL"), "body={}", he.body_raw);
+    assert!(
+        !he.body_raw.contains("HTTP_MIDDLE_MARKER"),
+        "body={}",
+        he.body_raw
+    );
+    assert!(he.body_raw.len() < 72 * 1024, "len={}", he.body_raw.len());
+    assert!(he.output.contains("64 KB head+tail preview"));
 }
 
 #[tokio::test]
@@ -402,7 +469,12 @@ async fn redirect_chain_reported() {
     let s = mk_session_allow_loopback();
     let r = webfetch(json!({"url": url, "extract": "raw"}), &s).await;
     let ok = expect_ok(&r);
-    assert_eq!(ok.meta.redirect_chain.len(), 3, "chain={:?}", ok.meta.redirect_chain);
+    assert_eq!(
+        ok.meta.redirect_chain.len(),
+        3,
+        "chain={:?}",
+        ok.meta.redirect_chain
+    );
     assert!(ok.meta.final_url.ends_with("/c"));
 }
 
@@ -412,11 +484,7 @@ async fn redirect_loop_exceeds_limit() {
     let (addr, _jh) = start_server(handler).await;
     let url = format!("http://{}/r", addr);
     let s = mk_session_allow_loopback();
-    let r = webfetch(
-        json!({"url": url, "max_redirects": 2}),
-        &s,
-    )
-    .await;
+    let r = webfetch(json!({"url": url, "max_redirects": 2}), &s).await;
     let e = expect_error(&r);
     assert_eq!(e.error.code, ToolErrorCode::RedirectLoop);
 }
@@ -439,6 +507,40 @@ async fn cache_hit_tag() {
     let ok = expect_ok(&r2);
     assert!(ok.meta.from_cache);
     assert_eq!(counter.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn cache_hit_reapplies_spill_preview_caps() {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    let body = format!(
+        "CACHE_HEAD\n{}CACHE_MIDDLE_MARKER{}{}\nCACHE_TAIL",
+        "h".repeat(40 * 1024),
+        "m".repeat(80 * 1024),
+        "t".repeat(40 * 1024),
+    );
+    let counter = Arc::new(AtomicU32::new(0));
+    let counter_clone = Arc::clone(&counter);
+    let handler: Handler = Arc::new(move |_req| {
+        counter_clone.fetch_add(1, Ordering::SeqCst);
+        ServerResponse::ok("text/plain", body.clone())
+    });
+    let (addr, _jh) = start_server(handler).await;
+    let url = format!("http://{}/cache-large", addr);
+    let mut s = mk_session_allow_loopback();
+    s.inline_raw_cap = Some(512);
+    s.inline_markdown_cap = Some(512);
+    s = s.with_cache();
+    let _ = webfetch(json!({"url": url.clone(), "extract": "raw"}), &s).await;
+    let r2 = webfetch(json!({"url": url, "extract": "raw"}), &s).await;
+    let ok = expect_ok(&r2);
+    let raw = ok.body_raw.as_deref().unwrap_or("");
+    assert!(ok.meta.from_cache);
+    assert!(ok.byte_cap);
+    assert_eq!(counter.load(Ordering::SeqCst), 1);
+    assert!(raw.contains("CACHE_HEAD"), "raw={}", raw);
+    assert!(raw.contains("CACHE_TAIL"), "raw={}", raw);
+    assert!(!raw.contains("CACHE_MIDDLE_MARKER"), "raw={}", raw);
+    assert!(raw.len() < 72 * 1024, "len={}", raw.len());
 }
 
 // ---- Serialization shape ----

@@ -147,9 +147,7 @@ pub fn safe_parse_bash_params(input: &Value) -> Result<BashParams, BashParseErro
     Ok(parsed)
 }
 
-pub fn safe_parse_bash_output_params(
-    input: &Value,
-) -> Result<BashOutputParams, BashParseError> {
+pub fn safe_parse_bash_output_params(input: &Value) -> Result<BashOutputParams, BashParseError> {
     let parsed: BashOutputParams = serde_json::from_value(input.clone())
         .map_err(|e| BashParseError::Message(e.to_string()))?;
     if parsed.job_id.is_empty() {
@@ -175,10 +173,12 @@ pub fn safe_parse_bash_kill_params(input: &Value) -> Result<BashKillParams, Bash
 }
 
 pub const BASH_TOOL_NAME: &str = "bash";
-pub const BASH_TOOL_DESCRIPTION: &str = "Run a single shell command in a bash subprocess. Output is captured and returned with the exit code. See design/bash.md for the full contract.";
+pub const BASH_TOOL_DESCRIPTION: &str = "Run a single shell command in a bash subprocess. Output is captured and returned with the exit code.\n\nUsage:\n- For URL page content or HTML, prefer webfetch instead of bash curl/wget; webfetch cleans HTML and spills oversized responses with pagination hints. Use curl/wget here only when you need raw source bytes, headers, downloads, or a shell-specific HTTP workflow.\n- Long-running processes and network requests that may stall must use background: true, or pass an explicit client-side timeout such as curl --max-time N.\n- Large stdout/stderr is capped to a head+tail preview and spilled to a local log file. If curl/wget output is capped, switch to webfetch for cleaned page content unless raw bytes are required.\n- No interactive commands; make commands non-interactive with flags or pipes.";
 
 pub const BASH_OUTPUT_TOOL_NAME: &str = "bash_output";
-pub const BASH_OUTPUT_TOOL_DESCRIPTION: &str = "Poll a backgrounded bash job's output since a given byte offset.";
+pub const BASH_OUTPUT_TOOL_DESCRIPTION: &str =
+    "Poll a backgrounded bash job's output since a given byte offset.";
 
 pub const BASH_KILL_TOOL_NAME: &str = "bash_kill";
-pub const BASH_KILL_TOOL_DESCRIPTION: &str = "Send a termination signal to a backgrounded bash job.";
+pub const BASH_KILL_TOOL_DESCRIPTION: &str =
+    "Send a termination signal to a backgrounded bash job.";

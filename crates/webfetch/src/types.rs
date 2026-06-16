@@ -96,10 +96,7 @@ pub struct WebFetchSessionConfig {
 }
 
 impl WebFetchSessionConfig {
-    pub fn new(
-        permissions: WebFetchPermissionPolicy,
-        engine: Arc<dyn WebFetchEngine>,
-    ) -> Self {
+    pub fn new(permissions: WebFetchPermissionPolicy, engine: Arc<dyn WebFetchEngine>) -> Self {
         Self {
             permissions,
             engine,
@@ -190,6 +187,9 @@ pub struct WebFetchHttpError {
     pub output: String,
     pub meta: FetchMetadata,
     pub body_raw: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log_path: Option<String>,
+    pub byte_cap: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

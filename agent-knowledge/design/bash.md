@@ -85,7 +85,11 @@ Tool description must call out:
 >
 > **Language-specific one-liners** are the way to run non-shell code: `python -c "print(2+2)"`, `node -e "console.log(2+2)"`, `deno eval "console.log(2+2)"`. For multi-line scripts, write a temp file with the write tool and invoke the interpreter on it.
 >
+> **URL/page fetching.** For page content or HTML, prefer `webfetch` over `bash` + `curl`/`wget`: WebFetch runs cleaned HTML extraction by default and returns bounded spill previews. Use `curl`/`wget` in Bash only when you need raw source bytes, headers, downloads, or shell-specific HTTP behavior.
+>
 > **Long-running processes** (servers, watchers) must use `background: true`. The tool returns a job ID; poll output with `bash_output(job_id)`. Do not leave a foreground command running past the 5-minute wall-clock backstop.
+>
+> **Large output.** Stdout/stderr are capped to a head+tail preview and spilled to a local log file. If capped output came from `curl`/`wget`, switch to `webfetch` for cleaned page content unless raw bytes are required.
 >
 > **No interactive commands.** Anything that needs stdin (pagers, Y/n prompts, REPLs, `git commit` without `-m`) will hang until the inactivity timeout. Use flags to make them non-interactive (`--yes`, `-y`, `--no-pager`) or pipe `echo "y" |` in front.
 
@@ -116,7 +120,8 @@ Output is a discriminated union by `kind`.
 - Order preserved within each stream; stdout/stderr interleave is not preserved (they're captured as two pipes).
 - Continuation hint:
   - Fully captured: `(Command completed in {N}ms. exit=0.)`
-  - Capped (see §4): `(Output capped at {LIMIT} KB. Full log: {path} — Read it with pagination if you need the middle.)`
+  - Capped (see §4): `(Output capped; showing head+tail preview. Full log: {path}. Read it with pagination if you need the middle.)`
+  - Capped URL fetch output adds: `This looks like curl/wget output; use webfetch for cleaned HTML/page content, and reserve bash for raw source or downloads.`
 
 ### 3.2 `kind: "nonzero_exit"`
 

@@ -10,11 +10,13 @@ import { randomUUID } from "node:crypto";
  */
 export class HeadTailBuffer {
   private readonly chunks: Uint8Array[] = [];
+  private readonly headChunks: Uint8Array[] = [];
+  private headBytes = 0;
+  private tail = new Uint8Array(0);
   private totalBytes = 0;
   private byteCap = false;
   private spilled = false;
   private spillPath: string | null = null;
-  private spillBytes: number[] = [];
 
   constructor(
     private readonly maxInline: number,
@@ -25,6 +27,8 @@ export class HeadTailBuffer {
 
   write(chunk: Uint8Array): void {
     this.totalBytes += chunk.byteLength;
+    this.rememberHead(chunk);
+    this.rememberTail(chunk);
     if (this.totalBytes <= this.maxInline) {
       this.chunks.push(chunk);
       return;
@@ -42,9 +46,37 @@ export class HeadTailBuffer {
       for (const c of this.chunks) this.appendSpill(c);
     }
     this.appendSpill(chunk);
-    // Keep a tail window (roughly half of maxInline in bytes) from spilled
-    // stream so the inline result has a useful tail slice.
-    this.spillBytes.push(chunk.byteLength);
+  }
+
+  private headLimit(): number {
+    return Math.ceil(this.maxInline / 2);
+  }
+
+  private tailLimit(): number {
+    return Math.floor(this.maxInline / 2);
+  }
+
+  private rememberHead(chunk: Uint8Array): void {
+    const remaining = this.headLimit() - this.headBytes;
+    if (remaining <= 0) return;
+    const slice = chunk.subarray(0, Math.min(remaining, chunk.byteLength));
+    this.headChunks.push(slice.slice());
+    this.headBytes += slice.byteLength;
+  }
+
+  private rememberTail(chunk: Uint8Array): void {
+    const limit = this.tailLimit();
+    if (limit <= 0) {
+      this.tail = new Uint8Array(0);
+      return;
+    }
+    const combined = new Uint8Array(this.tail.byteLength + chunk.byteLength);
+    combined.set(this.tail);
+    combined.set(chunk, this.tail.byteLength);
+    this.tail =
+      combined.byteLength > limit
+        ? combined.slice(combined.byteLength - limit)
+        : combined;
   }
 
   private appendSpill(chunk: Uint8Array): void {
@@ -71,16 +103,8 @@ export class HeadTailBuffer {
    * Return the inline render:
    *   - If not capped: the full buffered text.
    *   - If capped: head (first maxInline/2 bytes) + marker + tail
-   *     (last maxInline/2 bytes) approximation. We approximate the tail
-   *     by decoding only the tail window (maxInline/2 bytes from the spill
-   *     file) because the stream is write-once and we dropped the middle.
-   *
-   * The actual implementation is simpler: we keep only the head inline
-   * (first maxInline bytes, never overwritten) and emit a marker that
-   * points at the log path. Head-only is a deliberate simplification
-   * versus spec's head+tail — it matches OpenCode's default, and we
-   * rely on Read(path) to see the tail. Spec §4 head+tail is a v2
-   * improvement once we prove the file-path recovery path.
+   *     (last maxInline/2 bytes), with the full stream recoverable from
+   *     the spill file.
    */
   render(): { text: string; byteCap: boolean; logPath: string | null } {
     if (!this.spilled) {
@@ -91,14 +115,18 @@ export class HeadTailBuffer {
         logPath: null,
       };
     }
-    // Capped: return the first maxInline bytes and a pointer to the file.
     const head = Buffer.concat(
-      this.chunks.map((c) => Buffer.from(c)),
-      this.maxInline,
+      this.headChunks.map((c) => Buffer.from(c)),
+      this.headBytes,
     ).toString("utf8");
-    const marker = `\n... (stream exceeded ${this.maxInline} bytes; full log at ${this.spillPath}) ...`;
+    const tail = Buffer.from(this.tail).toString("utf8");
+    const elided = Math.max(
+      0,
+      this.totalBytes - this.headBytes - this.tail.byteLength,
+    );
+    const marker = `\n... (${elided} bytes elided; stream exceeded ${this.maxInline} bytes; full log at ${this.spillPath}) ...\n`;
     return {
-      text: head + marker,
+      text: head + marker + tail,
       byteCap: true,
       logPath: this.spillPath,
     };
@@ -137,12 +165,20 @@ export function formatResultText(args: {
   const exitLine = `<exit_code>${args.exitCode}</exit_code>`;
   const stdoutBlock = `<stdout>\n${args.stdout}\n</stdout>`;
   const stderrBlock = `<stderr>\n${args.stderr}\n</stderr>`;
+  const curlHint =
+    args.byteCap && looksLikeUrlFetchCommand(args.command)
+      ? " This looks like curl/wget output; use webfetch for cleaned HTML/page content, and reserve bash for raw source or downloads."
+      : "";
   const hint = args.byteCap
-    ? `(Output capped. Full log: ${args.logPath}. Read it with pagination if you need the middle.)`
+    ? `(Output capped; showing head+tail preview. Full log: ${args.logPath}. Read it with pagination if you need the middle.${curlHint})`
     : args.kind === "ok"
       ? `(Command completed in ${args.durationMs}ms. exit=0.)`
       : `(Command exited nonzero in ${args.durationMs}ms. Exit code: ${args.exitCode}.)`;
   return [header, exitLine, stdoutBlock, stderrBlock, hint].join("\n");
+}
+
+function looksLikeUrlFetchCommand(command: string): boolean {
+  return /(^|[\s;&|()])(?:\.\/)?(?:curl|wget)(?=$|[\s;&|()])/.test(command);
 }
 
 export function formatTimeoutText(args: {

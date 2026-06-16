@@ -29,6 +29,7 @@ export function formatOkText(args: {
   raw?: string;
   logPath?: string;
   byteCap: boolean;
+  bodyClipped?: boolean;
   totalBytes: number;
 }): string {
   const header = renderRequestBlock(args.meta);
@@ -46,7 +47,10 @@ export function formatOkText(args: {
   const bodyBlock = `<body extract="${bodyAttr}">\n${bodyInner}\n</body>`;
   let hint: string;
   if (args.byteCap && args.logPath !== undefined) {
-    hint = `(Response exceeded inline cap; showing head+tail of ${args.totalBytes} bytes. Full response at ${args.logPath} — Read with offset/limit to paginate.)`;
+    const shown = args.bodyClipped
+      ? `showing 64 KB head+tail preview of ${args.totalBytes} bytes`
+      : `showing extracted content inline from ${args.totalBytes} raw bytes`;
+    hint = `(Response exceeded inline cap; ${shown}. Full response at ${args.logPath} — Read with offset/limit to paginate.)`;
   } else {
     const warn =
       args.meta.url !== args.meta.finalUrl &&
@@ -74,10 +78,17 @@ export function formatRedirectLoopText(args: {
 export function formatHttpErrorText(args: {
   meta: FetchMetadata;
   body: string;
+  logPath?: string;
+  byteCap?: boolean;
+  totalBytes?: number;
 }): string {
   const header = renderRequestBlock(args.meta);
   const bodyBlock = `<body>\n${args.body}\n</body>`;
-  const hint = `(HTTP ${args.meta.status}. ${shortReason(args.meta.status)}. Retry or adjust the request per the body.)`;
+  const spillHint =
+    args.byteCap && args.logPath !== undefined
+      ? ` Body exceeded inline cap; showing 64 KB head+tail preview of ${args.totalBytes ?? "unknown"} bytes. Full response at ${args.logPath} — Read with offset/limit to paginate.`
+      : "";
+  const hint = `(HTTP ${args.meta.status}. ${shortReason(args.meta.status)}.${spillHint} Retry or adjust the request per the body.)`;
   return [header, bodyBlock, hint].join("\n");
 }
 

@@ -159,7 +159,7 @@ Usage:
 - For POST, pass the request body via 'body' and set 'headers: { "Content-Type": "application/json" }' (or similar) as needed.
 - Localhost, private IP ranges, and cloud metadata endpoints (169.254.169.254) are blocked by default to prevent SSRF. Do not try to bypass (URL-encoding, DNS rebinding).
 - Redirects follow up to 5 hops; the response reports the full chain. If the final URL is on a different host than expected, double-check it's legitimate.
-- Responses up to 200 KB markdown / 2 MB raw return inline. Larger responses spill to a local file — use Read with offset/limit to paginate the middle. Responses over 10 MB are rejected.
+- Responses up to 200 KB cleaned markdown / 2 MB explicit raw return inline. Larger responses spill to a local file and return only a 64 KB head+tail preview — use Read with offset/limit to paginate the middle. For HTML, the default preview is extracted markdown; request extract: "raw" only when you need page HTML. Responses over 10 MB are rejected.
 - Prefer this tool over bash(curl) for typical URL fetching. Drop to bash(curl -o file.bin ...) for bulk downloads or when you need PUT/DELETE/PATCH.`;
 
 export const webfetchToolDefinition: ToolDefinition = {

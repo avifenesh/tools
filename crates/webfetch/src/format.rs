@@ -24,6 +24,7 @@ pub struct FormatOkArgs<'a> {
     pub raw: Option<&'a str>,
     pub log_path: Option<&'a str>,
     pub byte_cap: bool,
+    pub body_clipped: bool,
     pub total_bytes: usize,
 }
 
@@ -39,12 +40,26 @@ pub fn format_ok_text(args: FormatOkArgs<'_>) -> String {
         ),
         _ => String::new(),
     };
-    let body_block = format!("<body extract=\"{}\">\n{}\n</body>", args.extract_hint, body_inner);
+    let body_block = format!(
+        "<body extract=\"{}\">\n{}\n</body>",
+        args.extract_hint, body_inner
+    );
 
     let hint = if args.byte_cap && args.log_path.is_some() {
+        let shown = if args.body_clipped {
+            format!(
+                "showing 64 KB head+tail preview of {} bytes",
+                args.total_bytes
+            )
+        } else {
+            format!(
+                "showing extracted content inline from {} raw bytes",
+                args.total_bytes
+            )
+        };
         format!(
-            "(Response exceeded inline cap; showing head+tail of {} bytes. Full response at {} — Read with offset/limit to paginate.)",
-            args.total_bytes,
+            "(Response exceeded inline cap; {}. Full response at {} — Read with offset/limit to paginate.)",
+            shown,
             args.log_path.unwrap(),
         )
     } else {
@@ -96,15 +111,28 @@ pub fn format_redirect_loop_text(args: FormatRedirectLoopArgs<'_>) -> String {
 pub struct FormatHttpErrorArgs<'a> {
     pub meta: &'a FetchMetadata,
     pub body: &'a str,
+    pub log_path: Option<&'a str>,
+    pub byte_cap: bool,
+    pub total_bytes: usize,
 }
 
 pub fn format_http_error_text(args: FormatHttpErrorArgs<'_>) -> String {
     let header = render_request_block(args.meta);
     let body_block = format!("<body>\n{}\n</body>", args.body);
+    let spill_hint = if args.byte_cap && args.log_path.is_some() {
+        format!(
+            " Body exceeded inline cap; showing 64 KB head+tail preview of {} bytes. Full response at {} — Read with offset/limit to paginate.",
+            args.total_bytes,
+            args.log_path.unwrap(),
+        )
+    } else {
+        String::new()
+    };
     let hint = format!(
-        "(HTTP {}. {}. Retry or adjust the request per the body.)",
+        "(HTTP {}. {}.{} Retry or adjust the request per the body.)",
         args.meta.status,
         short_reason(args.meta.status),
+        spill_hint,
     );
     format!("{}\n{}\n{}", header, body_block, hint)
 }
@@ -176,12 +204,7 @@ fn extension_for(content_type: &str) -> &'static str {
 
 /// Return head (first N bytes) + tail (last N bytes) concatenated with
 /// an elision marker. Mirrors the bash head+tail spill pattern.
-pub fn head_and_tail(
-    bytes: &[u8],
-    head_bytes: usize,
-    tail_bytes: usize,
-    log_path: &str,
-) -> String {
+pub fn head_and_tail(bytes: &[u8], head_bytes: usize, tail_bytes: usize, log_path: &str) -> String {
     if bytes.len() <= head_bytes + tail_bytes {
         return String::from_utf8_lossy(bytes).into_owned();
     }

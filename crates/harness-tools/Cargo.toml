@@ -1,6 +1,6 @@
 [package]
 name = "harness-tools"
-version = "0.4.0"
+version = "0.4.1"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -22,8 +22,8 @@ harness-read = { path = "../read", version = "0.1.1" }
 harness-write = { path = "../write", version = "0.3.0" }
 harness-grep = { path = "../grep", version = "0.1.1" }
 harness-glob = { path = "../glob", version = "0.1.1" }
-harness-bash = { path = "../bash", version = "0.2.0" }
-harness-webfetch = { path = "../webfetch", version = "0.1.0" }
+harness-bash = { path = "../bash", version = "0.2.1" }
+harness-webfetch = { path = "../webfetch", version = "0.1.1" }
 harness-websearch = { path = "../websearch", version = "0.2.0" }
 harness-lsp = { path = "../lsp", version = "0.1.1" }
 harness-skill = { path = "../skill", version = "0.1.0" }

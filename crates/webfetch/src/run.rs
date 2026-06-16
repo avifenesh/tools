@@ -8,12 +8,10 @@ use url::Url;
 
 use crate::constants::{
     CACHE_TTL_MS, DEFAULT_MAX_REDIRECTS, DEFAULT_TIMEOUT_MS, DEFAULT_USER_AGENT,
-    INLINE_MARKDOWN_CAP, INLINE_RAW_CAP, MANAGED_HEADERS, SESSION_BACKSTOP_MS,
-    SPILL_HARD_CAP, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, TEXT_PASSTHROUGH_TYPES,
+    INLINE_MARKDOWN_CAP, INLINE_RAW_CAP, MANAGED_HEADERS, SESSION_BACKSTOP_MS, SPILL_HARD_CAP,
+    SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, TEXT_PASSTHROUGH_TYPES,
 };
-use crate::engine::{
-    FetchError, FetchErrorCode, WebFetchEngineInput,
-};
+use crate::engine::{FetchError, FetchErrorCode, WebFetchEngineInput};
 use crate::extractor::{extract_markdown, is_html_like, parse_content_type_base};
 use crate::fence::{ask_permission, permission_denied_error, AskArgs, PermissionOutcome};
 use crate::format::{
@@ -184,7 +182,13 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
     }
 
     // Session cache
-    let key = cache_key(method, &params.url, params.body.as_deref(), &headers, extract);
+    let key = cache_key(
+        method,
+        &params.url,
+        params.body.as_deref(),
+        &headers,
+        extract,
+    );
     let cache_ttl = session.cache_ttl_ms.unwrap_or(CACHE_TTL_MS);
     if let Some(cache) = &session.cache {
         let hit = {
@@ -193,7 +197,7 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
         };
         if let Some(hit) = hit {
             if now_ms().saturating_sub(hit.at_ms) <= cache_ttl {
-                return format_cached_hit(hit, extract, &params.url, method);
+                return format_cached_hit(hit, extract, &params.url, method, session);
             }
         }
     }
@@ -201,15 +205,12 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
     let spill_hard_cap = session.spill_hard_cap.unwrap_or(SPILL_HARD_CAP);
     let inline_markdown_cap = session.inline_markdown_cap.unwrap_or(INLINE_MARKDOWN_CAP);
     let inline_raw_cap = session.inline_raw_cap.unwrap_or(INLINE_RAW_CAP);
-    let spill_dir_root = session
-        .spill_dir
-        .clone()
-        .unwrap_or_else(|| {
-            std::env::temp_dir()
-                .join("agent-sh-webfetch-cache")
-                .to_string_lossy()
-                .into_owned()
-        });
+    let spill_dir_root = session.spill_dir.clone().unwrap_or_else(|| {
+        std::env::temp_dir()
+            .join("agent-sh-webfetch-cache")
+            .to_string_lossy()
+            .into_owned()
+    });
     let session_id = session
         .session_id
         .clone()
@@ -242,21 +243,17 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
 
     let started = Instant::now();
     let fetch_fut = session.engine.fetch(engine_input);
-    let result = match tokio::time::timeout(
-        Duration::from_millis(session_backstop),
-        fetch_fut,
-    )
-    .await
-    {
-        Ok(r) => r,
-        Err(_) => {
-            return err(ToolError::new(
-                ToolErrorCode::Timeout,
-                format!("Request timed out (session backstop): {}", params.url),
-            )
-            .with_meta(serde_json::json!({ "url": params.url })));
-        }
-    };
+    let result =
+        match tokio::time::timeout(Duration::from_millis(session_backstop), fetch_fut).await {
+            Ok(r) => r,
+            Err(_) => {
+                return err(ToolError::new(
+                    ToolErrorCode::Timeout,
+                    format!("Request timed out (session backstop): {}", params.url),
+                )
+                .with_meta(serde_json::json!({ "url": params.url })));
+            }
+        };
     let result = match result {
         Ok(r) => r,
         Err(e) => return err(translate_fetch_error(e, &params.url)),
@@ -282,7 +279,27 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
 
     // HTTP error — still include the body.
     if result.status >= 400 {
-        let body_text = decode_body(&result.body, inline_raw_cap);
+        let must_spill_raw = result.body.len() > inline_raw_cap;
+        let log_path = if must_spill_raw {
+            spill_to_file(SpillArgs {
+                bytes: &result.body,
+                dir: std::path::Path::new(&spill_dir_root),
+                session_id: &session_id,
+                content_type: &content_type_base,
+            })
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned())
+        } else {
+            None
+        };
+        let body_text = if must_spill_raw {
+            match log_path.as_ref() {
+                Some(p) => head_and_tail(&result.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, p),
+                None => decode_body(&result.body),
+            }
+        } else {
+            decode_body(&result.body)
+        };
         let meta = FetchMetadata {
             url: params.url.clone(),
             final_url: result.final_url.clone(),
@@ -298,9 +315,14 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
             output: format_http_error_text(FormatHttpErrorArgs {
                 meta: &meta,
                 body: &body_text,
+                log_path: log_path.as_deref(),
+                byte_cap: must_spill_raw,
+                total_bytes: result.body.len(),
             }),
             meta,
             body_raw: body_text,
+            log_path,
+            byte_cap: must_spill_raw,
         });
     }
 
@@ -322,7 +344,7 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
         })));
     }
 
-    let raw_text = decode_body(&result.body, inline_raw_cap);
+    let raw_text = decode_body(&result.body);
     let mut markdown: Option<String> = None;
     let mut markdown_bytes = 0usize;
     let do_extract_markdown = matches!(extract, WebFetchExtract::Markdown | WebFetchExtract::Both);
@@ -336,13 +358,17 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
             markdown = Some(raw_text.clone());
         }
     }
+    let full_markdown = markdown.clone();
 
     let raw_bytes = result.body.len();
     let must_spill_markdown = markdown.is_some() && markdown_bytes > inline_markdown_cap;
-    let must_spill_raw = raw_bytes > inline_raw_cap;
-    let byte_cap = must_spill_markdown || must_spill_raw;
+    let raw_requested = !matches!(extract, WebFetchExtract::Markdown);
+    let must_spill_raw = raw_requested && raw_bytes > inline_raw_cap;
+    let must_spill_source = raw_bytes > inline_raw_cap || must_spill_markdown;
+    let body_clipped = must_spill_markdown || must_spill_raw;
+    let byte_cap = must_spill_source;
 
-    let log_path: Option<String> = if byte_cap {
+    let log_path: Option<String> = if must_spill_source {
         let path = spill_to_file(SpillArgs {
             bytes: &result.body,
             dir: std::path::Path::new(&spill_dir_root),
@@ -353,16 +379,24 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
         .map(|p| p.to_string_lossy().into_owned());
         if let (Some(md), Some(p)) = (markdown.as_ref(), path.as_ref()) {
             if must_spill_markdown {
-                let new_md = head_and_tail(
-                    md.as_bytes(),
-                    SPILL_HEAD_BYTES,
-                    SPILL_TAIL_BYTES,
-                    p,
-                );
+                let new_md = head_and_tail(md.as_bytes(), SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, p);
                 markdown = Some(new_md);
             }
         }
         path
+    } else {
+        None
+    };
+
+    let raw_for_output = if raw_requested {
+        if must_spill_raw {
+            log_path
+                .as_ref()
+                .map(|p| head_and_tail(&result.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, p))
+                .or_else(|| Some(raw_text.clone()))
+        } else {
+            Some(raw_text.clone())
+        }
     } else {
         None
     };
@@ -389,16 +423,11 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
             content_type: result.content_type.clone(),
             body: result.body.clone(),
             extract,
-            extracted_markdown: markdown.clone(),
+            extracted_markdown: full_markdown.clone(),
         };
         cache.lock().unwrap().insert(key, entry);
     }
 
-    let raw_for_output = if matches!(extract, WebFetchExtract::Raw | WebFetchExtract::Both) {
-        Some(raw_text.clone())
-    } else {
-        None
-    };
     let out_text = format_ok_text(FormatOkArgs {
         meta: &meta,
         extract_hint: extract.as_str(),
@@ -406,6 +435,7 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
         raw: raw_for_output.as_deref(),
         log_path: log_path.as_deref(),
         byte_cap,
+        body_clipped,
         total_bytes: raw_bytes,
     });
 
@@ -419,9 +449,8 @@ pub async fn webfetch_run(input: Value, session: &WebFetchSessionConfig) -> WebF
     })
 }
 
-fn decode_body(bytes: &[u8], cap: usize) -> String {
-    let slice = if bytes.len() > cap { &bytes[..cap] } else { bytes };
-    String::from_utf8_lossy(slice).into_owned()
+fn decode_body(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
 }
 
 fn format_cached_hit(
@@ -429,8 +458,22 @@ fn format_cached_hit(
     extract: WebFetchExtract,
     url: &str,
     method: WebFetchMethod,
+    session: &WebFetchSessionConfig,
 ) -> WebFetchResult {
     let age_sec = (now_ms().saturating_sub(hit.at_ms) / 1000) as u64;
+    let inline_markdown_cap = session.inline_markdown_cap.unwrap_or(INLINE_MARKDOWN_CAP);
+    let inline_raw_cap = session.inline_raw_cap.unwrap_or(INLINE_RAW_CAP);
+    let spill_dir_root = session.spill_dir.clone().unwrap_or_else(|| {
+        std::env::temp_dir()
+            .join("agent-sh-webfetch-cache")
+            .to_string_lossy()
+            .into_owned()
+    });
+    let session_id = session
+        .session_id
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+    let content_type_base = parse_content_type_base(&hit.content_type);
     let meta = FetchMetadata {
         url: url.to_string(),
         final_url: hit.final_url.clone(),
@@ -443,39 +486,113 @@ fn format_cached_hit(
         cache_age_sec: Some(age_sec),
     };
     if hit.status >= 400 {
-        let body = String::from_utf8_lossy(&hit.body).into_owned();
+        let must_spill_raw = hit.body.len() > inline_raw_cap;
+        let log_path = if must_spill_raw {
+            spill_to_file(SpillArgs {
+                bytes: &hit.body,
+                dir: std::path::Path::new(&spill_dir_root),
+                session_id: &session_id,
+                content_type: &content_type_base,
+            })
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned())
+        } else {
+            None
+        };
+        let body = if must_spill_raw {
+            match log_path.as_ref() {
+                Some(p) => head_and_tail(&hit.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, p),
+                None => decode_body(&hit.body),
+            }
+        } else {
+            decode_body(&hit.body)
+        };
         return WebFetchResult::HttpError(WebFetchHttpError {
             output: format_http_error_text(FormatHttpErrorArgs {
                 meta: &meta,
                 body: &body,
+                log_path: log_path.as_deref(),
+                byte_cap: must_spill_raw,
+                total_bytes: hit.body.len(),
             }),
             meta,
             body_raw: body,
+            log_path,
+            byte_cap: must_spill_raw,
         });
     }
-    let raw_text = String::from_utf8_lossy(&hit.body).into_owned();
-    let markdown = hit.extracted_markdown.clone().unwrap_or_else(|| raw_text.clone());
-    let raw_for_output = if matches!(extract, WebFetchExtract::Raw | WebFetchExtract::Both) {
-        Some(raw_text.clone())
+    let raw_text = decode_body(&hit.body);
+    let markdown = hit.extracted_markdown.clone().or_else(|| {
+        if matches!(extract, WebFetchExtract::Markdown | WebFetchExtract::Both) {
+            Some(raw_text.clone())
+        } else {
+            None
+        }
+    });
+    let markdown_bytes = markdown.as_ref().map(|m| m.as_bytes().len()).unwrap_or(0);
+    let raw_requested = !matches!(extract, WebFetchExtract::Markdown);
+    let must_spill_markdown = markdown.is_some() && markdown_bytes > inline_markdown_cap;
+    let must_spill_raw = raw_requested && hit.body.len() > inline_raw_cap;
+    let must_spill_source = hit.body.len() > inline_raw_cap || must_spill_markdown;
+    let body_clipped = must_spill_markdown || must_spill_raw;
+    let log_path = if must_spill_source {
+        spill_to_file(SpillArgs {
+            bytes: &hit.body,
+            dir: std::path::Path::new(&spill_dir_root),
+            session_id: &session_id,
+            content_type: &content_type_base,
+        })
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
+    } else {
+        None
+    };
+    let markdown_for_output = if let Some(md) = markdown.as_ref() {
+        if must_spill_markdown {
+            log_path
+                .as_ref()
+                .map(|p| head_and_tail(md.as_bytes(), SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, p))
+                .unwrap_or_else(|| md.clone())
+        } else {
+            md.clone()
+        }
+    } else {
+        String::new()
+    };
+    let markdown_for_result = if markdown.is_some() {
+        Some(markdown_for_output)
+    } else {
+        None
+    };
+    let raw_for_output = if raw_requested {
+        if must_spill_raw {
+            log_path
+                .as_ref()
+                .map(|p| head_and_tail(&hit.body, SPILL_HEAD_BYTES, SPILL_TAIL_BYTES, p))
+                .or_else(|| Some(raw_text.clone()))
+        } else {
+            Some(raw_text.clone())
+        }
     } else {
         None
     };
     let out_text = format_ok_text(FormatOkArgs {
         meta: &meta,
         extract_hint: extract.as_str(),
-        markdown: Some(&markdown),
+        markdown: markdown_for_result.as_deref(),
         raw: raw_for_output.as_deref(),
-        log_path: None,
-        byte_cap: false,
+        log_path: log_path.as_deref(),
+        byte_cap: must_spill_source,
+        body_clipped,
         total_bytes: hit.body.len(),
     });
     WebFetchResult::Ok(WebFetchOk {
         output: out_text,
         meta,
-        body_markdown: Some(markdown),
+        body_markdown: markdown_for_result,
         body_raw: raw_for_output,
-        log_path: None,
-        byte_cap: false,
+        log_path,
+        byte_cap: must_spill_source,
     })
 }
 

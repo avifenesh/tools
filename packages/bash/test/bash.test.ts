@@ -294,6 +294,36 @@ describe("bash — output cap / stream-to-file", () => {
     expect(r.logPath).toBeTruthy();
     expect(r.output).toMatch(/Full log:/);
   });
+
+  it("returns head and tail preview with webfetch hint for capped curl output", async () => {
+    const dir = makeTempDir();
+    const command = [
+      "curl() {",
+      "printf 'HTML_HEAD\\n';",
+      "printf '%2048s' | tr ' ' m;",
+      "printf 'HTML_MIDDLE_MARKER';",
+      "printf '%2048s' | tr ' ' t;",
+      "printf '\\nHTML_TAIL\\n';",
+      "};",
+      "curl https://github.com/agent-sh/tools",
+    ].join(" ");
+    const r = await bash(
+      { command },
+      makeSession(dir, {
+        maxOutputBytesInline: 1024,
+        maxOutputBytesFile: 10 * 1024 * 1024,
+      }),
+    );
+    assertKind(r, "ok");
+    expect(r.byteCap).toBe(true);
+    expect(r.logPath).toBeTruthy();
+    expect(r.stdout).toContain("HTML_HEAD");
+    expect(r.stdout).toContain("HTML_TAIL");
+    expect(r.stdout).not.toContain("HTML_MIDDLE_MARKER");
+    expect(r.stdout.length).toBeLessThan(1400);
+    expect(r.output).toMatch(/head\+tail preview/);
+    expect(r.output).toMatch(/use webfetch/i);
+  });
 });
 
 describe("bash — abort signal", () => {

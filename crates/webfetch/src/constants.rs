@@ -8,8 +8,8 @@ pub const MAX_MAX_REDIRECTS: u32 = 10;
 pub const INLINE_MARKDOWN_CAP: usize = 200 * 1024; // 200 KB
 pub const INLINE_RAW_CAP: usize = 2 * 1024 * 1024; // 2 MB
 pub const SPILL_HARD_CAP: usize = 10 * 1024 * 1024; // 10 MB
-pub const SPILL_HEAD_BYTES: usize = 100 * 1024;
-pub const SPILL_TAIL_BYTES: usize = 100 * 1024;
+pub const SPILL_HEAD_BYTES: usize = 32 * 1024;
+pub const SPILL_TAIL_BYTES: usize = 32 * 1024;
 
 pub const CACHE_TTL_MS: u64 = 5 * 60 * 1000;
 pub const MAX_URL_LENGTH: usize = 2 * 1024;
