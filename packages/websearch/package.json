@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@agent-sh/harness-core": "workspace:*",
-    "undici": "^7.0.0",
+    "undici": "^7.28.0",
     "valibot": "^1.2.0"
   },
   "devDependencies": {
