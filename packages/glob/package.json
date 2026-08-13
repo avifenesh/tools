@@ -54,13 +54,13 @@
   },
   "dependencies": {
     "@agent-sh/harness-core": "workspace:*",
-    "picomatch": "^4.0.2",
+    "picomatch": "^4.0.5",
     "ripgrep": "^0.3.1",
     "valibot": "^1.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
-    "@types/picomatch": "^3.0.1",
+    "@types/picomatch": "^4.0.3",
     "tsup": "^8.3.5",
     "typescript": "^5.6.3",
     "vitest": "^3.2.6"
