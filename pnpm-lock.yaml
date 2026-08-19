@@ -209,8 +209,8 @@ importers:
         specifier: ^1.2.0
         version: 1.4.2(typescript@5.9.3)
       vscode-jsonrpc:
-        specifier: ^8.2.1
-        version: 8.2.1
+        specifier: ^9.0.1
+        version: 9.0.1
       vscode-languageserver-protocol:
         specifier: ^3.17.5
         version: 3.18.2
@@ -2657,10 +2657,6 @@ packages:
     resolution: {integrity: sha512-JvONPptw3GAQGXlVV2utDcHx0BiY34FupW/kI6mZ5x06ER5DdPG/tXWMVHjTNULF5uKPOUUD0SaXg5QaubJL0A==}
     engines: {node: '>=8.0.0 || >=10.0.0'}
 
-  vscode-jsonrpc@8.2.1:
-    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
-    engines: {node: '>=14.0.0'}
-
   vscode-jsonrpc@9.0.1:
     resolution: {integrity: sha512-rfuA6T75H6m5EkbhtEPzre9pT0HPcDI2MMy4+nPFIBks5J8JBAUHD4tRYSgaBOijIEC7SRkC1kKyXTLqbmh9jw==}
     engines: {node: '>=14.0.0'}
@@ -4952,8 +4948,6 @@ snapshots:
       - msw
 
   vscode-jsonrpc@5.0.1: {}
-
-  vscode-jsonrpc@8.2.1: {}
 
   vscode-jsonrpc@9.0.1: {}
 
