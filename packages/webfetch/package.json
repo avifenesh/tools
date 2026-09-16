@@ -60,7 +60,7 @@
     "jsdom": "^25.0.1",
     "turndown": "^7.2.0",
     "undici": "^7.29.1",
-    "valibot": "^1.2.0"
+    "valibot": "^1.5.0"
   },
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
