@@ -66,6 +66,8 @@ The response stops with `stop_reason: "tool_use"`. Your code runs the tool, then
 
 **`tool_choice` options**: `auto` (default), `any` (must call some tool), `tool` (must call *this* tool), `none` (block all tool calls). `any` and `tool` prefill the assistant turn to force a tool block, so the model emits no natural-language preface. Extended thinking is only compatible with `auto` and `none`.
 
+> **Current models (2026-09-23):** on Claude Opus 5.5 (`claude-opus-5-5`, Bedrock `anthropic.claude-opus-5-5`) and Claude Fable 5.1 (`claude-fable-5-1`), `tool_choice` `any` and `tool` return a 400. Use `auto` with `strict: true` on the tool, name the tool in the prompt, and retry once if no tool call came back. Thinking is always on for both.
+
 **Tool system prompt overhead**: Defining tools silently adds 313-346 tokens of system prompt on Claude 4.x models, regardless of how many tools you define (assuming at least one). This is fixed overhead on top of the serialized schemas.
 
 ### 3. OpenAI Function Calling: `tools` / `tool_calls`
@@ -307,6 +309,8 @@ Before strict/structured modes, the state of the art was:
 
 ### Basic Anthropic Tool Use (strict, with enum)
 
+The examples below were written against `claude-opus-4-7`. For current code use `claude-opus-5-5` (or `claude-fable-5-1` for escalation); the request shape is the same, and `tool_choice` stays `auto`.
+
 ```python
 import anthropic
 client = anthropic.Anthropic()
@@ -437,6 +441,8 @@ tools = [
 
 ### Fine-Grained Tool Streaming + Accumulation
 
+Same model note as above: swap `claude-opus-4-7` for `claude-opus-5-5`. Opus 5.5 and Fable 5.1 allow 128K output tokens.
+
 ```python
 with client.messages.stream(
     model="claude-opus-4-7", max_tokens=65536,
@@ -503,7 +509,7 @@ The key detail: `apply_chat_template` will auto-convert Python functions to JSON
 | Strict mode rejects your schema | Uses unsupported JSON Schema features (oneOf, $ref with cycles, format validation gaps) | Check vendor's supported subset; flatten schemas; replace unsupported features |
 | Tools return bloated responses | Dumping raw API output into tool_result | Filter to high-signal fields; use semantic IDs (slugs) not UUIDs; paginate |
 | PHI leaked in schema | Putting patient identifiers in enums/property names/descriptions | Keep PHI only in message content; schemas are cached separately without HIPAA retention |
-| `tool_choice: any` disables thinking | Forced tool choice prefills the turn, bypassing extended thinking | Use `tool_choice: auto` with explicit prompting when you need thinking + tools |
+| `tool_choice: any` disables thinking | Forced tool choice prefills the turn, bypassing extended thinking. On Claude Opus 5.5 and Fable 5.1 `any` and `tool` return a 400 | Use `tool_choice: auto` + `strict: true` + a prompt line naming the tool, and retry once if no call came back |
 | Claude Code / IDE blows up at 100+ MCP tools | All MCP server tool definitions loaded eagerly | Use `mcp_toolset` with `defer_loading: true`; filter by server; disable unused servers |
 | Forgot `JSON.parse` on OpenAI `function.arguments` | OpenAI returns arguments as a JSON *string*, not an object | Always `json.loads(call.function.arguments)` before passing to your tool |
 | Model calls tools when it shouldn't | `tool_choice: auto` with weak prompt; user message is conversational | Use `tool_choice: none` for pure-chat turns; prompt "answer from memory when possible" |
@@ -533,7 +539,7 @@ Synthesized from 20 sources:
 
 10. **Use `input_examples` for complex schemas.** Nested objects, format-sensitive strings, or tools with multiple valid input patterns benefit from 2-3 concrete examples — which are validated against your schema so they can't drift. (Source: Anthropic define-tools)
 
-11. **Pick `tool_choice` deliberately.** `auto` for agentic flows, `any` or `required` for guaranteed tool invocation (note: loses the preface text and extended thinking), `none` for pure-chat turns. (Source: Anthropic define-tools, OpenAI function calling)
+11. **Pick `tool_choice` deliberately.** `auto` for agentic flows, `any` or `required` for guaranteed tool invocation (note: loses the preface text and extended thinking), `none` for pure-chat turns. On Claude Opus 5.5 and Fable 5.1, `any` and `tool` return a 400: use `auto` + `strict: true` + a prompt instruction naming the tool, and check that the call happened. OpenAI `required` is unaffected. (Source: Anthropic define-tools, OpenAI function calling, Claude Opus 5.5 / Fable 5.1 migration notes)
 
 12. **Instrument for parallel tool usage.** Track `avg_tools_per_message` > 1.0 as a canary; regressions mean either prompt drift or mis-formatted tool results. (Source: Anthropic parallel-tool-use)
 
