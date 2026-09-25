@@ -9,6 +9,7 @@ use harness_core::PermissionPolicy;
 use harness_websearch::{
     websearch, BraveEngine, EngineBaseUrls, EngineClass, MarginaliaEngine, MojeekEngine,
     SearchError, SearchErrorCode, TavilyEngine, WebSearchEngine, WebSearchEngineInput,
+    ExaEngine, ParallelEngine, resolve_engine,
     WebSearchEngineResult, WebSearchPermissionPolicy, WebSearchResult, WebSearchResultItem,
     WebSearchSessionConfig, WebSearchTimeRange, WikipediaEngine,
 };
@@ -573,6 +574,9 @@ async fn fallback_merges_and_dedupes_across_two_fixture_engines() {
     let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
     let mut s = WebSearchSessionConfig::auto(ws_perms);
     s.allow_loopback = true;
+    // Mojeek-first mechanics: keep the run hermetic (no live Exa/Parallel).
+    s.disable_exa = true;
+    s.disable_parallel = true;
     s.engine_base_urls = Some(EngineBaseUrls {
         mojeek: Some(format!("http://{}", maddr)),
         marginalia: Some(format!("http://{}", gaddr)),
@@ -623,6 +627,9 @@ async fn zero_config_uses_keyless_and_reports_provenance() {
     let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
     let mut s = WebSearchSessionConfig::auto(ws_perms);
     s.allow_loopback = true;
+    // Mojeek-first mechanics: keep the run hermetic (no live Exa/Parallel).
+    s.disable_exa = true;
+    s.disable_parallel = true;
     s.engine_base_urls = Some(EngineBaseUrls {
         mojeek: Some(format!("http://{}", addr)),
         ..Default::default()
@@ -687,6 +694,9 @@ async fn honest_recency_note_when_engine_ignores_time_range() {
     let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
     let mut s = WebSearchSessionConfig::auto(ws_perms);
     s.allow_loopback = true;
+    // Mojeek-first mechanics: keep the run hermetic (no live Exa/Parallel).
+    s.disable_exa = true;
+    s.disable_parallel = true;
     s.engine_base_urls = Some(EngineBaseUrls {
         mojeek: Some(format!("http://{}", addr)),
         ..Default::default()
@@ -699,4 +709,253 @@ async fn honest_recency_note_when_engine_ignores_time_range() {
         }
         other => panic!("expected ok, got {:?}", other),
     }
+}
+
+// ---- Exa + Parallel (keyless MCP engines) ----
+
+fn sse_resp(body: impl Into<Bytes>) -> Resp {
+    Resp {
+        status: StatusCode::OK,
+        content_type: "text/event-stream",
+        body: body.into(),
+    }
+}
+
+fn rpc_result_text(text: &str) -> String {
+    json!({"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":text}]}}).to_string()
+}
+
+#[tokio::test]
+async fn exa_parses_real_sse_fixture() {
+    let body = Bytes::from(fixture("exa.sse"));
+    let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+    let seen2 = seen.clone();
+    let handler: H = Arc::new(move |req| {
+        seen2.lock().unwrap().push(format!(
+            "{} {} key={}",
+            req.method(),
+            req.uri().path(),
+            req.headers().get("x-api-key").map(|v| v.to_str().unwrap().to_string()).unwrap_or_default()
+        ));
+        sse_resp(body.clone())
+    });
+    let (addr, _jh) = serve(handler).await;
+    let engine = ExaEngine::new()
+        .with_api_key("k-exa")
+        .with_base_url(format!("http://{}", addr));
+    let r = engine.search(engine_input()).await.unwrap();
+    assert_eq!(seen.lock().unwrap()[0], "POST /mcp key=k-exa");
+    assert_eq!(r.results.len(), 3);
+    assert_eq!(r.engine.as_deref(), Some("exa"));
+    assert!(r.results[0].url.contains("async-book"));
+    // "Published: 2026-07-22T16:46:14.000Z" → date; "N/A" → none.
+    assert_eq!(r.results[0].age, None);
+    assert_eq!(r.results[1].age.as_deref(), Some("2026-07-22"));
+    // The repeated title highlight is chrome, not the snippet.
+    assert!(!r.results[1].snippet.starts_with("Tokio - An asynchronous Rust runtime"));
+    assert!(r.results[1].snippet.contains("runtime"));
+    assert!(r.results.iter().all(|x| x.snippet.chars().count() <= 600));
+}
+
+#[tokio::test]
+async fn exa_reports_time_range_not_applied() {
+    let body = Bytes::from(fixture("exa.sse"));
+    let handler: H = Arc::new(move |_req| sse_resp(body.clone()));
+    let (addr, _jh) = serve(handler).await;
+    let mut input = engine_input();
+    input.time_range = WebSearchTimeRange::Week;
+    let r = ExaEngine::new()
+        .with_base_url(format!("http://{}", addr))
+        .search(input)
+        .await
+        .unwrap();
+    assert_eq!(r.time_range_applied, Some(false));
+}
+
+#[tokio::test]
+async fn parallel_parses_real_fixture_and_skips_page_chrome() {
+    let body = Bytes::from(fixture("parallel.json"));
+    let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+    let seen2 = seen.clone();
+    let handler: H = Arc::new(move |req| {
+        seen2.lock().unwrap().push(
+            req.headers().get("authorization").map(|v| v.to_str().unwrap().to_string()).unwrap_or_default(),
+        );
+        json_resp(body.clone())
+    });
+    let (addr, _jh) = serve(handler).await;
+    let mut input = engine_input();
+    input.count = 3;
+    let r = ParallelEngine::new()
+        .with_api_key("k-par")
+        .with_base_url(format!("http://{}", addr))
+        .search(input)
+        .await
+        .unwrap();
+    assert_eq!(seen.lock().unwrap()[0], "Bearer k-par");
+    // No count input on the MCP tool: the engine truncates.
+    assert_eq!(r.results.len(), 3);
+    assert!(r.results[0].url.starts_with("https://doc.rust-lang.org/"));
+    for x in &r.results {
+        assert!(!x.snippet.starts_with("Keyboard shortcuts"), "{}", x.snippet);
+        assert!(!x.snippet.starts_with("Skip to main content"), "{}", x.snippet);
+    }
+}
+
+#[tokio::test]
+async fn mcp_engines_map_every_failure_to_server_not_available() {
+    // HTTP 400 (not the model's fault), HTTP 429, a JSON-RPC error, and a
+    // tool-level isError all mean "this engine is out", never INVALID_PARAM.
+    let cases: Vec<Resp> = vec![
+        Resp { status: StatusCode::BAD_REQUEST, content_type: "application/json", body: Bytes::from_static(b"{}") },
+        Resp { status: StatusCode::TOO_MANY_REQUESTS, content_type: "application/json", body: Bytes::from_static(b"{}") },
+        json_resp(json!({"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"rate limit exceeded"}}).to_string()),
+        json_resp(json!({"jsonrpc":"2.0","id":1,"result":{"isError":true,"content":[{"type":"text","text":"Free tier limit reached"}]}}).to_string()),
+    ];
+    for case in cases {
+        let status = case.status;
+        let ct = case.content_type;
+        let b = case.body.clone();
+        let handler: H = Arc::new(move |_req| Resp { status, content_type: ct, body: b.clone() });
+        let (addr, _jh) = serve(handler).await;
+        let e = expect_err(
+            ExaEngine::new()
+                .with_base_url(format!("http://{}", addr))
+                .search(engine_input())
+                .await,
+        );
+        assert_eq!(e.code, SearchErrorCode::ServerNotAvailable, "{}", e.message);
+    }
+}
+
+#[tokio::test]
+async fn exa_unparseable_records_are_io_error_not_empty() {
+    let body = rpc_result_text("Title: only a title line and nothing else");
+    let handler: H = Arc::new(move |_req| json_resp(body.clone()));
+    let (addr, _jh) = serve(handler).await;
+    let e = expect_err(
+        ExaEngine::new()
+            .with_base_url(format!("http://{}", addr))
+            .search(engine_input())
+            .await,
+    );
+    assert_eq!(e.code, SearchErrorCode::IoError);
+}
+
+fn auto_session() -> WebSearchSessionConfig {
+    let perms = PermissionPolicy::new(Vec::<String>::new());
+    WebSearchSessionConfig::auto(WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true))
+}
+
+#[test]
+fn zero_config_chain_leads_with_exa_and_parallel() {
+    let s = auto_session();
+    assert_eq!(
+        resolve_engine(&s).chain,
+        vec!["exa", "parallel", "mojeek", "marginalia", "wikipedia"]
+    );
+    let mut s = auto_session();
+    s.disable_exa = true;
+    s.disable_parallel = true;
+    assert_eq!(resolve_engine(&s).chain, vec!["mojeek", "marginalia", "wikipedia"]);
+    // Explicit backends stay exclusive; the keyless tail (now led by Exa) is
+    // appended only with fallback_to_keyless.
+    let mut s = auto_session();
+    s.searxng_url = Some("http://127.0.0.1:8888".to_string());
+    assert_eq!(resolve_engine(&s).chain, vec!["searxng"]);
+    s.fallback_to_keyless = true;
+    assert_eq!(
+        resolve_engine(&s).chain,
+        vec!["searxng", "exa", "parallel", "mojeek", "marginalia", "wikipedia"]
+    );
+}
+
+#[test]
+fn engine_order_replaces_the_resolver_order() {
+    let mut s = auto_session();
+    s.searxng_url = Some("http://127.0.0.1:8888".to_string());
+    s.disable_exa = true; // ignored under engine_order
+    s.engine_order = Some(vec!["exa".into(), "parallel".into(), "searxng".into(), "wikipedia".into()]);
+    let r = resolve_engine(&s);
+    assert_eq!(r.chain, vec!["exa", "parallel", "searxng", "wikipedia"]);
+    assert!(!r.keyless_default);
+}
+
+#[tokio::test]
+async fn invalid_engine_order_is_a_config_error_the_model_cannot_fix() {
+    for (order, needle) in [
+        (vec!["exa", "bing"], "unknown engine 'bing'"),
+        (vec!["exa", "exa"], "lists 'exa' twice"),
+        (vec!["searxng"], "session.searxng_url is not set"),
+        (vec!["brave"], "session.brave_api_key is not set"),
+        (vec![], "is empty"),
+    ] {
+        let mut s = auto_session();
+        s.engine_order = Some(order.iter().map(|x| x.to_string()).collect());
+        match websearch(json!({"query": "x"}), &s).await {
+            WebSearchResult::Error(e) => {
+                assert_eq!(e.error.code, harness_core::ToolErrorCode::InvalidParam);
+                assert!(e.error.message.contains(needle), "{}", e.error.message);
+                assert!(e.error.message.contains("not a tool parameter"));
+            }
+            other => panic!("expected error, got {:?}", other),
+        }
+    }
+}
+
+#[tokio::test]
+async fn engine_order_falls_through_a_rate_limited_exa_to_parallel() {
+    let exa_h: H = Arc::new(|_req| Resp {
+        status: StatusCode::TOO_MANY_REQUESTS,
+        content_type: "application/json",
+        body: Bytes::from_static(b"{}"),
+    });
+    let (eaddr, _ej) = serve(exa_h).await;
+    let pbody = Bytes::from(fixture("parallel.json"));
+    let par_h: H = Arc::new(move |_req| json_resp(pbody.clone()));
+    let (paddr, _pj) = serve(par_h).await;
+
+    let mut s = auto_session();
+    s.allow_loopback = true;
+    s.engine_order = Some(vec!["exa".into(), "parallel".into()]);
+    s.engine_base_urls = Some(EngineBaseUrls {
+        exa: Some(format!("http://{}", eaddr)),
+        parallel: Some(format!("http://{}", paddr)),
+        ..Default::default()
+    });
+    match websearch(json!({"query": "rust async runtime", "count": 3}), &s).await {
+        WebSearchResult::Ok(ok) => {
+            assert_eq!(ok.results.len(), 3);
+            assert!(ok.output.contains("parallel (general web)"), "{}", ok.output);
+        }
+        other => panic!("expected ok, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn passage_picker_matches_the_ts_twin_on_real_fixtures() {
+    // passage.expected.json is shared with packages/websearch/test/fixtures;
+    // both suites assert the same snippet so the pickers cannot drift.
+    let expected: serde_json::Value =
+        serde_json::from_str(&fixture("passage.expected.json")).unwrap();
+
+    let ebody = Bytes::from(fixture("exa.sse"));
+    let eh: H = Arc::new(move |_req| sse_resp(ebody.clone()));
+    let (eaddr, _ej) = serve(eh).await;
+    let exa = ExaEngine::new()
+        .with_base_url(format!("http://{}", eaddr))
+        .search(engine_input())
+        .await
+        .unwrap();
+    assert_eq!(exa.results[1].snippet, expected["exa1"].as_str().unwrap());
+
+    let pbody = Bytes::from(fixture("parallel.json"));
+    let ph: H = Arc::new(move |_req| json_resp(pbody.clone()));
+    let (paddr, _pj) = serve(ph).await;
+    let par = ParallelEngine::new()
+        .with_base_url(format!("http://{}", paddr))
+        .search(engine_input())
+        .await
+        .unwrap();
+    assert_eq!(par.results[1].snippet, expected["par1"].as_str().unwrap());
 }

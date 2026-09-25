@@ -232,6 +232,9 @@ describe("websearch — parameter / alias validation", () => {
       { query: "x" },
       makeSession({
         searxngUrl: undefined,
+        // Hermetic: skip the live Exa/Parallel heads of the keyless chain.
+        disableExa: true,
+        disableParallel: true,
         engineBaseUrls: { mojeek: server.url },
       }),
     );

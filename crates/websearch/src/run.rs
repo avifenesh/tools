@@ -10,7 +10,7 @@ use crate::constants::{
     MAX_COUNT, MIN_COUNT, MIN_TIMEOUT_MS, SESSION_BACKSTOP_MS,
 };
 use crate::engine::{SearchError, SearchErrorCode, WebSearchEngineInput};
-use crate::engines::resolve_engine;
+use crate::engines::{resolve_engine, validate_engine_order};
 use crate::fence::{ask_permission, permission_denied_error, AskArgs, PermissionOutcome};
 use crate::format::{format_empty_text, format_ok_text, FormatOkArgs};
 use crate::schema::safe_parse_websearch_params;
@@ -55,16 +55,33 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
         Err(e) => return err(ToolError::new(ToolErrorCode::InvalidParam, e.to_string())),
     };
 
+    // A harness-chosen engine_order is session config the model cannot fix;
+    // say so, so the model reports it instead of rewording the query.
+    if let Err(msg) = validate_engine_order(session) {
+        return err(ToolError::new(
+            ToolErrorCode::InvalidParam,
+            format!(
+                "{}\nHint: this is the harness's session configuration, not a tool parameter; retrying will not help. Report it to the operator.",
+                msg
+            ),
+        ));
+    }
+
     // Resolve the engine chain. With no key and no searxng_url this yields the
-    // bundled keyless default (Mojeek → Marginalia → Wikipedia), so search
-    // works with zero config — there is no longer a hard "no backend" error.
+    // bundled keyless default (Exa → Parallel → Mojeek → Marginalia →
+    // Wikipedia), so search works with zero config. There is no longer a hard
+    // "no backend" error.
     let resolved = resolve_engine(session);
 
-    // When an explicit SearXNG backend is configured, validate its URL/scheme
-    // and SSRF up front so the model gets the SearXNG-specific hint. The
-    // keyless/keyed engines self-check their (public) hosts per call.
+    // When SearXNG is part of the chain, validate its URL/scheme and SSRF up
+    // front so the model gets the SearXNG-specific hint. The keyless/keyed
+    // engines self-check their (public) hosts per call.
+    let uses_searxng = session
+        .engine_order
+        .as_ref()
+        .map_or(true, |o| o.iter().any(|n| n == "searxng"));
     if let Some(searxng_url) = session.searxng_url.as_deref() {
-        if !searxng_url.is_empty() {
+        if !searxng_url.is_empty() && uses_searxng {
             if let Some(e) = validate_searxng_backend(searxng_url, session).await {
                 return err(e);
             }
@@ -92,16 +109,22 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
     let headers = normalize_headers(session);
 
     let permission_host = permission_backend_host(session);
-    let backend_label = session
-        .searxng_url
-        .clone()
-        .unwrap_or_else(|| format!("keyless ({})", resolved.chain.join(" → ")));
+    let (backend_label, backend_url_for_hook) = if session.engine_order.is_some() {
+        (
+            format!("chain ({})", resolved.chain.join(" → ")),
+            format!("chain:{}", resolved.chain.join("+")),
+        )
+    } else {
+        match session.searxng_url.clone().filter(|u| !u.is_empty()) {
+            Some(u) => (u.clone(), u),
+            None => (
+                format!("keyless ({})", resolved.chain.join(" → ")),
+                format!("keyless:{}", resolved.chain.join("+")),
+            ),
+        }
+    };
 
     // Permission hook (autonomous — allow or deny).
-    let backend_url_for_hook = session
-        .searxng_url
-        .clone()
-        .unwrap_or_else(|| format!("keyless:{}", resolved.chain.join("+")));
     let ask_args = AskArgs {
         query: &params.query,
         backend_url: &backend_url_for_hook,
@@ -220,6 +243,9 @@ pub async fn websearch_run(input: Value, session: &WebSearchSessionConfig) -> We
 
 /// Host label used for the permission pattern + audit metadata.
 fn permission_backend_host(session: &WebSearchSessionConfig) -> String {
+    if session.engine_order.is_some() {
+        return "chain".to_string();
+    }
     if let Some(u) = session.searxng_url.as_deref() {
         if !u.is_empty() {
             return Url::parse(u)
@@ -283,7 +309,7 @@ struct TranslateCtx<'a> {
     backend_label: &'a str,
 }
 
-const KEYLESS_HINT: &str = "All search backends are rate-limited or returned nothing. For reliable results, set a free Brave Search API key (api-dashboard.search.brave.com) via session.brave_api_key, add a Tavily key, or run a local SearXNG and set session.searxng_url.";
+const KEYLESS_HINT: &str = "All search backends are rate-limited or returned nothing. Exa and Parallel keys (session.exa_api_key / session.parallel_api_key) raise their free limits; for a keyed backend set session.brave_api_key or session.tavily_api_key, or run a local SearXNG and set session.searxng_url.";
 
 fn translate_search_error(e: SearchError, query: &str, ctx: &TranslateCtx<'_>) -> ToolError {
     let echo = format!("\nQuery: \"{}\"\nBackend: {}", query, ctx.backend_label);

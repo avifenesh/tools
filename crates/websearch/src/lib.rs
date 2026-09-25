@@ -23,8 +23,9 @@ pub use engine::{
     WebSearchEngineInput, WebSearchEngineResult,
 };
 pub use engines::{
-    resolve_engine, BraveEngine, EngineBaseUrls, FallbackEngine, MarginaliaEngine, MojeekEngine,
-    ResolvedEngine, TavilyEngine, WikipediaEngine,
+    resolve_engine, validate_engine_order, BraveEngine, EngineBaseUrls, ExaEngine, FallbackEngine,
+    MarginaliaEngine, MojeekEngine, ParallelEngine, ResolvedEngine, TavilyEngine, WikipediaEngine,
+    ENGINE_NAMES,
 };
 pub use format::{format_empty_text, format_ok_text, render_search_block};
 pub use schema::{

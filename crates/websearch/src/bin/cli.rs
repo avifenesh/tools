@@ -56,7 +56,17 @@ struct SessionSpec {
     #[serde(default)]
     tavily_api_key: Option<String>,
     #[serde(default)]
+    exa_api_key: Option<String>,
+    #[serde(default)]
+    parallel_api_key: Option<String>,
+    #[serde(default)]
+    disable_exa: bool,
+    #[serde(default)]
+    disable_parallel: bool,
+    #[serde(default)]
     disable_mojeek: bool,
+    #[serde(default)]
+    engine_order: Option<Vec<String>>,
     #[serde(default)]
     snippet_cap: Option<usize>,
     #[serde(default)]
@@ -84,6 +94,10 @@ struct SessionSpec {
 #[derive(Debug, Deserialize, Default)]
 struct EngineBaseUrlsSpec {
     #[serde(default)]
+    exa: Option<String>,
+    #[serde(default)]
+    parallel: Option<String>,
+    #[serde(default)]
     mojeek: Option<String>,
     #[serde(default)]
     marginalia: Option<String>,
@@ -98,6 +112,8 @@ struct EngineBaseUrlsSpec {
 impl From<EngineBaseUrlsSpec> for EngineBaseUrls {
     fn from(s: EngineBaseUrlsSpec) -> Self {
         EngineBaseUrls {
+            exa: s.exa,
+            parallel: s.parallel,
             mojeek: s.mojeek,
             marginalia: s.marginalia,
             wikipedia: s.wikipedia,
@@ -120,7 +136,12 @@ impl SessionSpec {
         cfg.searxng_url = self.searxng_url;
         cfg.brave_api_key = self.brave_api_key;
         cfg.tavily_api_key = self.tavily_api_key;
+        cfg.exa_api_key = self.exa_api_key;
+        cfg.parallel_api_key = self.parallel_api_key;
+        cfg.disable_exa = self.disable_exa;
+        cfg.disable_parallel = self.disable_parallel;
         cfg.disable_mojeek = self.disable_mojeek;
+        cfg.engine_order = self.engine_order;
         cfg.snippet_cap = self.snippet_cap;
         cfg.fallback_to_keyless = self.fallback_to_keyless;
         cfg.engine_base_urls = self.engine_base_urls.map(Into::into);
