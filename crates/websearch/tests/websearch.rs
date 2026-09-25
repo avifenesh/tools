@@ -120,6 +120,9 @@ async fn no_backend_falls_back_to_keyless_chain() {
     let ws_perms = WebSearchPermissionPolicy::new(perms).with_unsafe_bypass(true);
     let mut s = WebSearchSessionConfig::auto(ws_perms);
     s.allow_loopback = true;
+    // Hermetic: skip the live Exa/Parallel heads of the keyless chain.
+    s.disable_exa = true;
+    s.disable_parallel = true;
     s.engine_base_urls = Some(EngineBaseUrls {
         mojeek: Some(format!("http://{}", addr)),
         ..Default::default()

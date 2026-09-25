@@ -364,15 +364,41 @@ describe("FallbackEngine — empty vs error semantics", () => {
 describe("resolveEngine — chain construction", () => {
   const perms = { roots: [], sensitivePatterns: [], unsafeAllowSearchWithoutHook: true };
 
-  it("zero-config → keyless chain mojeek→marginalia→wikipedia", () => {
+  it("zero-config → keyless chain exa→parallel→mojeek→marginalia→wikipedia", () => {
     const r = resolveEngine({ permissions: perms });
-    expect(r.chain).toEqual(["mojeek", "marginalia", "wikipedia"]);
+    expect(r.chain).toEqual([
+      "exa",
+      "parallel",
+      "mojeek",
+      "marginalia",
+      "wikipedia",
+    ]);
     expect(r.keylessDefault).toBe(true);
   });
 
   it("disableMojeek drops mojeek", () => {
     const r = resolveEngine({ permissions: perms, disableMojeek: true });
-    expect(r.chain).toEqual(["marginalia", "wikipedia"]);
+    expect(r.chain).toEqual(["exa", "parallel", "marginalia", "wikipedia"]);
+  });
+
+  it("disableExa / disableParallel drop the hosted AI indexes", () => {
+    const r = resolveEngine({
+      permissions: perms,
+      disableExa: true,
+      disableParallel: true,
+    });
+    expect(r.chain).toEqual(["mojeek", "marginalia", "wikipedia"]);
+  });
+
+  it("engineOrder replaces the resolver order and ignores disable flags", () => {
+    const r = resolveEngine({
+      permissions: perms,
+      searxngUrl: "http://127.0.0.1:8888",
+      disableExa: true,
+      engineOrder: ["exa", "parallel", "searxng", "wikipedia"],
+    });
+    expect(r.chain).toEqual(["exa", "parallel", "searxng", "wikipedia"]);
+    expect(r.keylessDefault).toBe(false);
   });
 
   it("braveApiKey → brave exclusively (no keyless leak by default)", () => {
@@ -387,7 +413,14 @@ describe("resolveEngine — chain construction", () => {
       braveApiKey: "k",
       fallbackToKeyless: true,
     });
-    expect(r.chain).toEqual(["brave", "mojeek", "marginalia", "wikipedia"]);
+    expect(r.chain).toEqual([
+      "brave",
+      "exa",
+      "parallel",
+      "mojeek",
+      "marginalia",
+      "wikipedia",
+    ]);
   });
 
   it("searxngUrl → searxng exclusively", () => {

@@ -105,11 +105,13 @@ function setHandler(h: Handler): void {
 }
 
 /**
- * Keyless-chain fixtures. The zero-config default queries Mojeek (HTML SERP),
- * Marginalia (JSON), then Wikipedia (JSON). For hermetic e2e we run one local
- * server that answers ALL THREE shapes by path, and point the session's
- * `engineBaseUrls` at it — so the keyless default is exercised without the
- * live internet. Each test installs the per-engine payloads it wants.
+ * Keyless-chain fixtures. The zero-config default queries Exa (MCP), Parallel
+ * (MCP), Mojeek (HTML SERP), Marginalia (JSON), then Wikipedia (JSON). For
+ * hermetic e2e we run one local server that answers every shape, and point the
+ * session's `engineBaseUrls` at it, so the keyless default is exercised
+ * without the live internet. Each test installs the per-engine payloads it
+ * wants. Exa and Parallel answer 503 unless a test gives them a payload, so
+ * the Mojeek-first cases keep their meaning.
  */
 interface KeylessResult {
   title: string;
@@ -117,12 +119,60 @@ interface KeylessResult {
   snippet: string;
 }
 
+type KeylessEngineName = "exa" | "parallel" | "mojeek" | "marginalia" | "wikipedia";
+
 interface KeylessPayloads {
+  /** Exa records; `snippet` becomes the record's Highlights block verbatim. */
+  exa?: KeylessResult[];
+  /** Parallel results; `snippet` becomes the single excerpt verbatim. */
+  parallel?: KeylessResult[];
   mojeek?: KeylessResult[];
   marginalia?: KeylessResult[];
   wikipedia?: KeylessResult[];
   /** Force a non-200 for an engine (path key) to simulate an outage. */
-  status?: Partial<Record<"mojeek" | "marginalia" | "wikipedia", number>>;
+  status?: Partial<Record<KeylessEngineName, number>>;
+}
+
+/** Exa MCP text records (see packages/websearch/src/engines/exa.ts). */
+function exaMcpBody(results: KeylessResult[]): string {
+  const text = results
+    .map(
+      (r) =>
+        `Title: ${r.title}\nURL: ${r.url}\nPublished: N/A\nAuthor: N/A\nHighlights:\n${r.snippet}`,
+    )
+    .join("\n\n---\n\n");
+  const rpc = { jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text }] } };
+  return `event: message\ndata: ${JSON.stringify(rpc)}\n\n`;
+}
+
+/** Parallel MCP structuredContent (see packages/websearch/src/engines/parallel.ts). */
+function parallelMcpBody(results: KeylessResult[]): string {
+  const structured = {
+    search_id: "search_e2e",
+    results: results.map((r) => ({
+      url: r.url,
+      title: r.title,
+      publish_date: null,
+      excerpts: [r.snippet],
+    })),
+  };
+  return JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    result: {
+      structuredContent: structured,
+      content: [{ type: "text", text: JSON.stringify(structured) }],
+      isError: false,
+    },
+  });
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c) => chunks.push(c as Buffer));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+  });
 }
 
 function mojeekHtml(results: KeylessResult[]): string {
@@ -164,18 +214,46 @@ function wikipediaJson(results: KeylessResult[]): string {
 }
 
 /**
- * Build a handler that serves all three keyless engine shapes by path:
+ * Build a handler that serves every keyless engine shape:
+ *   POST /mcp         → Exa or Parallel MCP (told apart by the tool name)
  *   /search           → Mojeek HTML
  *   /public/search/*  → Marginalia JSON
  *   /w/api.php        → Wikipedia JSON
  */
 function keylessHandler(p: KeylessPayloads): Handler {
-  return (req, res) => {
+  return async (req, res) => {
     const url = new URL(req.url ?? "/", sharedServer!.url);
     const pathname = url.pathname;
-    const want = (
-      engine: "mojeek" | "marginalia" | "wikipedia",
-    ): number | undefined => p.status?.[engine];
+    const want = (engine: KeylessEngineName): number | undefined =>
+      p.status?.[engine];
+
+    if (pathname.endsWith("/mcp")) {
+      const rpc = JSON.parse(await readBody(req)) as {
+        params?: { name?: string; arguments?: Record<string, unknown> };
+      };
+      const engine: KeylessEngineName =
+        rpc.params?.name === "web_search_exa" ? "exa" : "parallel";
+      const payload = engine === "exa" ? p.exa : p.parallel;
+      const s = want(engine) ?? (payload === undefined ? 503 : undefined);
+      if (s) {
+        res.statusCode = s;
+        res.end(`${engine} down`);
+        return;
+      }
+      const q =
+        engine === "exa"
+          ? rpc.params?.arguments?.["query"]
+          : rpc.params?.arguments?.["objective"];
+      res.setHeader("x-received-query", typeof q === "string" ? q : "");
+      if (engine === "exa") {
+        res.setHeader("content-type", "text/event-stream");
+        res.end(exaMcpBody(payload ?? []));
+      } else {
+        res.setHeader("content-type", "application/json");
+        res.end(parallelMcpBody(payload ?? []));
+      }
+      return;
+    }
 
     if (pathname.endsWith("/w/api.php")) {
       const s = want("wikipedia");
@@ -232,6 +310,8 @@ function makeKeylessSession(
     // keyless engine at the local fixture so the run is hermetic.
     allowLoopback: true,
     engineBaseUrls: {
+      exa: base,
+      parallel: base,
       mojeek: base,
       marginalia: base,
       wikipedia: base,
@@ -896,6 +976,108 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
       const surface = combinedSurface(trace, res.finalContent);
       // The paper came from the SECOND engine (Marginalia) via the merge.
       expect(surface).toMatch(/raft\.github\.io\/raft\.pdf|raft\.pdf/i);
+    },
+    300_000,
+  );
+  // WS11: Exa (the new keyless head) serves a result whose highlight opens
+  // with page chrome; the fact the user asked for is further in. The passage
+  // picker must surface it in the snippet so the model can answer without
+  // fetching the page.
+  it.runIf(() => available)(
+    "WS11 exa: a highlight's page chrome is skipped and the fact reaches the model",
+    async () => {
+      setHandler(
+        keylessHandler({
+          exa: [
+            {
+              title: "Kestrel 4.2 release notes",
+              url: "https://kestrel-lang.org/releases/4.2",
+              snippet: [
+                "Skip to main content",
+                "Toggle navigation menu",
+                "Kestrel 4.2 release notes",
+                "...",
+                "Kestrel 4.2 ships a new default garbage collector named Lark, replacing the older Heron collector.",
+              ].join("\n"),
+            },
+          ],
+        }),
+      );
+      const session = makeKeylessSession();
+      const tools = [pickWebSearchExecutor(session)];
+      const { trace, onTrace } = collectTrace();
+      const res = await runE2E(
+        runOpts(
+          SYSTEM_PROMPT,
+          "Search the web: what is the name of the new default garbage collector in Kestrel 4.2?",
+          tools,
+          6,
+          onTrace,
+        ),
+      );
+      const toolOutputs = trace.events
+        .filter(
+          (e): e is AgentTraceEvent & { kind: "tool_result"; content: string } =>
+            e.kind === "tool_result" && typeof (e as { content?: unknown }).content === "string",
+        )
+        .map((e) => e.content);
+      console.log(
+        `[WS11 ${LABEL}]`,
+        JSON.stringify({
+          turns: trace.turns,
+          tools: trace.toolsByName,
+          searchArgs: searchArgs(trace),
+          final: res.finalContent.slice(0, 200),
+        }),
+      );
+      expect(trace.toolsByName.websearch ?? 0).toBeGreaterThanOrEqual(1);
+      // Tool contract: served by exa, and the snippet starts at the fact.
+      expect(toolOutputs.some((o) => /exa \(general web\)/.test(o))).toBe(true);
+      expect(toolOutputs.some((o) => /Skip to main content/.test(o))).toBe(false);
+      expect(res.finalContent).toMatch(/Lark/);
+    },
+    300_000,
+  );
+
+  // WS12: Exa is rate-limited; Parallel, next in the chain, serves the answer.
+  it.runIf(() => available)(
+    "WS12 exa rate-limited: parallel serves the result",
+    async () => {
+      setHandler(
+        keylessHandler({
+          status: { exa: 429 },
+          parallel: [
+            {
+              title: "Heronbase 3 changelog",
+              url: "https://docs.heronbase.io/changelog/3",
+              snippet:
+                "Heronbase 3 raises the default connection pool size from 16 to 64 connections.",
+            },
+          ],
+        }),
+      );
+      const session = makeKeylessSession();
+      const tools = [pickWebSearchExecutor(session)];
+      const { trace, onTrace } = collectTrace();
+      const res = await runE2E(
+        runOpts(
+          SYSTEM_PROMPT,
+          "Search the web: what is the default connection pool size in Heronbase 3?",
+          tools,
+          6,
+          onTrace,
+        ),
+      );
+      console.log(
+        `[WS12 ${LABEL}]`,
+        JSON.stringify({
+          turns: trace.turns,
+          tools: trace.toolsByName,
+          final: res.finalContent.slice(0, 200),
+        }),
+      );
+      expect(trace.toolsByName.websearch ?? 0).toBeGreaterThanOrEqual(1);
+      expect(res.finalContent).toMatch(/64/);
     },
     300_000,
   );

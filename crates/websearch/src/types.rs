@@ -101,8 +101,25 @@ pub struct WebSearchSessionConfig {
     pub brave_api_key: Option<String>,
     /// Tavily API key — when set, Tavily joins the head of the chain.
     pub tavily_api_key: Option<String>,
+    /// Exa API key (sent as `x-api-key`). Optional: Exa runs keyless on a
+    /// rate-limited free tier; a key only raises the limit.
+    pub exa_api_key: Option<String>,
+    /// Parallel API key (bearer). Optional: Parallel's Search MCP runs keyless
+    /// for light use; a key only raises the limit.
+    pub parallel_api_key: Option<String>,
+    /// Drop Exa from the keyless chain (the query is sent to Exa).
+    pub disable_exa: bool,
+    /// Drop Parallel from the keyless chain (the query is sent to Parallel).
+    pub disable_parallel: bool,
     /// Drop the Mojeek scrape engine from the keyless chain (ToS gray area).
     pub disable_mojeek: bool,
+    /// Harness-chosen engine chain, best-first, e.g.
+    /// `["exa", "parallel", "searxng", "mojeek"]`. When set it replaces the
+    /// resolver's ordering (and ignores the disable_* flags and
+    /// fallback_to_keyless). Names: brave, tavily, searxng, exa, parallel,
+    /// mojeek, marginalia, wikipedia. A keyed engine needs its key and searxng
+    /// needs searxng_url, else the call fails with INVALID_PARAM.
+    pub engine_order: Option<Vec<String>>,
     /// Per-result snippet character cap (default 240; clamped 80–600).
     pub snippet_cap: Option<usize>,
     /// When an explicit backend is configured, also fall back to the keyless
@@ -124,7 +141,8 @@ pub struct WebSearchSessionConfig {
 
 impl WebSearchSessionConfig {
     /// Zero-config constructor: no explicit engine, no backend — the resolver
-    /// will use the bundled keyless chain (Mojeek → Marginalia → Wikipedia).
+    /// will use the bundled keyless chain
+    /// (Exa → Parallel → Mojeek → Marginalia → Wikipedia).
     pub fn auto(permissions: WebSearchPermissionPolicy) -> Self {
         Self {
             permissions,
@@ -132,7 +150,12 @@ impl WebSearchSessionConfig {
             searxng_url: None,
             brave_api_key: None,
             tavily_api_key: None,
+            exa_api_key: None,
+            parallel_api_key: None,
+            disable_exa: false,
+            disable_parallel: false,
             disable_mojeek: false,
+            engine_order: None,
             snippet_cap: None,
             fallback_to_keyless: false,
             engine_base_urls: None,

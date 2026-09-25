@@ -77,7 +77,8 @@ export interface WebSearchEngineResult {
   readonly engines?: readonly string[];
   /**
    * Whether the serving engine actually applied the requested time_range.
-   * Only searxng/brave/tavily honor it; mojeek/marginalia/wikipedia ignore it.
+   * Only searxng/brave/tavily honor it; exa/parallel/mojeek/marginalia/wikipedia
+   * ignore it.
    * The orchestrator uses this to tell the model the truth instead of
    * mislabeling all-time results as filtered. Undefined when time_range=all
    * (nothing to apply).
@@ -92,7 +93,8 @@ export interface WebSearchEngine {
 /**
  * Engine coverage class, used by the fallback chain to decide whether an
  * `empty` result is authoritative:
- * - "general": broad web index (Mojeek, Brave, Tavily, SearXNG). An empty
+ * - "general": broad web index (Exa, Parallel, Mojeek, Brave, Tavily,
+ *   SearXNG). An empty
  *   from one of these is a trustworthy "the web had nothing" signal.
  * - "niche": small/indie index (Marginalia) — an empty here says little.
  * - "vertical": single-domain index (Wikipedia) — empty says even less.
@@ -123,7 +125,8 @@ export interface WebSearchSessionConfig {
    * Base URL of a self-hosted SearXNG instance, e.g. http://127.0.0.1:8888.
    * Optional: when set, SearXNG is preferred at the head of the fallback
    * chain. When unset, the tool falls back to the bundled keyless engines
-   * (Mojeek → Marginalia → Wikipedia) so search works with no config.
+   * (Exa → Parallel → Mojeek → Marginalia → Wikipedia) so search works with
+   * no config.
    */
   readonly searxngUrl?: string;
   /**
@@ -135,11 +138,34 @@ export interface WebSearchSessionConfig {
   /** Tavily API key. When set, the Tavily engine joins the head of the chain. */
   readonly tavilyApiKey?: string;
   /**
+   * Exa API key (sent as `x-api-key`). Optional: Exa runs keyless on a
+   * rate-limited free tier; a key only raises the limit.
+   */
+  readonly exaApiKey?: string;
+  /**
+   * Parallel API key (bearer). Optional: Parallel's Search MCP runs keyless
+   * for light use; a key only raises the limit.
+   */
+  readonly parallelApiKey?: string;
+  /** Drop Exa from the keyless chain (the query is sent to Exa). */
+  readonly disableExa?: boolean;
+  /** Drop Parallel from the keyless chain (the query is sent to Parallel). */
+  readonly disableParallel?: boolean;
+  /**
    * Drop the Mojeek scrape engine from the default chain. Mojeek's robots.txt
    * disallows /search (ToS gray area); set true to use only the documented
    * APIs (Marginalia/Wikipedia + any keyed engine).
    */
   readonly disableMojeek?: boolean;
+  /**
+   * Harness-chosen engine chain, best-first, e.g.
+   * `["exa", "parallel", "searxng", "mojeek"]`. When set it replaces the
+   * resolver's ordering (and ignores the disable* flags and
+   * fallbackToKeyless). Names: brave, tavily, searxng, exa, parallel, mojeek,
+   * marginalia, wikipedia. A keyed engine needs its key and searxng needs
+   * searxngUrl, else the call fails with INVALID_PARAM.
+   */
+  readonly engineOrder?: readonly string[];
   /**
    * Per-result snippet character cap (default 240; was 300 in v1). Lower it to
    * save tokens, raise it for richer snippets. Clamped to a sane floor/ceiling.
@@ -163,6 +189,8 @@ export interface WebSearchSessionConfig {
    * servers). Production leaves these unset and uses the real public hosts.
    */
   readonly engineBaseUrls?: {
+    readonly exa?: string;
+    readonly parallel?: string;
     readonly mojeek?: string;
     readonly marginalia?: string;
     readonly wikipedia?: string;

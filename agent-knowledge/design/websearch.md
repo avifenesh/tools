@@ -1,7 +1,7 @@
 # WebSearch Tool — Cross-Language Design Spec
 
-**Status**: v2 — 2026-06-14 (self-contained keyless default). v1 was SearXNG-only.
-**Implementations**: TypeScript (`@agent-sh/harness-websearch` 0.4.0), Rust (`harness-websearch`)
+**Status**: v3, 2026-09-26 (hosted AI-index engines Exa and Parallel lead the keyless chain; harness `engineOrder`). v2 (2026-06-14) made the keyless default self-contained; v1 was SearXNG-only.
+**Implementations**: TypeScript (`@agent-sh/harness-websearch` 0.8.0), Rust (`harness-websearch`)
 **Scope**: Language-neutral contract. Implementation files (`packages/websearch/` for TS, `crates/websearch/` for Rust) must conform.
 
 This spec is the source of truth. Implementation-specific ergonomics are allowed; public semantics are not.
@@ -329,6 +329,8 @@ interface WebSearchEngine {
 
 | Engine | Kind | Key? | Notes |
 |---|---|---|---|
+| **Exa** | hosted MCP (`web_search_exa`) | optional | Own neural web index. Keyless free tier, rate-limited; `exaApiKey` (`x-api-key`) raises the limit. Opt-out via `disableExa`. See §17. |
+| **Parallel** | hosted MCP (`web_search`) | optional | Own web index built for agents. Keyless "for light use"; `parallelApiKey` (bearer) raises the limit. Opt-out via `disableParallel`. See §17. |
 | **Mojeek** | HTML SERP scrape | no | Independent full-web crawl; mainstream coverage. ToS-gray (robots disallows `/search`) → **opt-out** via `disableMojeek`. |
 | **Marginalia** | public JSON API | no | `api.marginalia.nu/public/search/{q}?count=`. Niche "small web" index; ToS-clean; CC-BY-NC-SA results. |
 | **Wikipedia** | MediaWiki JSON | no | Encyclopedic backstop; effectively never fails with a descriptive UA. |
@@ -341,9 +343,10 @@ interface WebSearchEngine {
 `resolveEngine(session)` builds an ordered chain, best-first:
 
 1. Explicit `session.engine` override (verbatim — advanced/tests).
-2. Brave / Tavily (if their key is set).
-3. SearXNG (if `searxngUrl` is set).
-4. **Keyless tail**: Mojeek (unless `disableMojeek`) → Marginalia → Wikipedia.
+2. Harness `session.engineOrder` (v3): exactly the listed engines, in order (§17).
+3. Brave / Tavily (if their key is set).
+4. SearXNG (if `searxngUrl` is set).
+5. **Keyless tail**: Exa (unless `disableExa`) → Parallel (unless `disableParallel`) → Mojeek (unless `disableMojeek`) → Marginalia → Wikipedia.
 
 An **explicit backend (key or SearXNG) is exclusive by default** — a configured
 SearXNG hiccup must not silently leak the query to public scrape engines. Set
@@ -507,3 +510,49 @@ The **one breaking change**: the `no search backend configured` `INVALID_PARAM` 
 **WS-D18** (gather + merge, not first-non-empty): the FallbackEngine accumulates and de-duplicates results across engines until `count` is met, rather than returning the first engine that has *any* result (the reviewer's "first-non-empty is too weak" point — a 1-hit leader for a 5-result request was a bad answer). A sufficient first engine still short-circuits (fast path, no mixing). Dedup is on a normalized URL (www/port/fragment/trailing-slash/tracking-param-insensitive, but preserving meaningful query params) so the same page from two backends collapses to one; the original URL is kept. Merged results expose contributors in the header and a per-row `source`.
 
 **WS-D19** (RRF + engine weights for merge ranking; A/B-validated): when the chain merges, results are ordered by Reciprocal Rank Fusion with engine weights, not chain concatenation. The engines' native scores are not comparable (Marginalia `quality` ~0–4.5, Tavily 0–1 `score`, Mojeek bare rank), so fusion is on **rank**: `fused(d)=Σ weight(e)/(K+rank_e(d))`, K=10, weights general 1.0 / niche 0.8 / vertical 0.6 / keyed 1.2. A URL multiple engines return sums its terms (consensus boost); weights demote a backstop below broad web. An **A/B** (`packages/websearch/scripts/ab-rank*.mjs`) drove the decision and set honest expectations: in the zero-config keyless case the fast path usually skips merging and the keyless backends rarely overlap, so day-to-day reordering is small — the real value is **robust weighting now** + **consensus ranking for keyed/multi-engine setups**. Score normalization and home-grown lexical/BM25 rescoring were rejected (incomparable scales; would re-do the engines' job worse); **semantic/LLM rerank stays a deferred opt-in hook**, not a core default.
+
+---
+
+## 17. v3: hosted AI-index engines (2026-09-26)
+
+v2's keyless chain was self-contained but weak at the top: Mojeek scrapes an HTML SERP that bot-blocks datacenter and busy residential IPs, and every scrape engine returns a short generic description rather than the passage that answers the query. Two companies now run their own web indexes for agents and expose them keylessly through official MCP endpoints: Exa (`https://mcp.exa.ai/mcp`, tool `web_search_exa`) and Parallel (`https://search.parallel.ai/mcp`, tool `web_search`). v3 adds both as engines at the head of the keyless chain.
+
+An independent benchmark (openbenchmarks.com, measured 2026-09-12 and 2026-09-15) scored both well above plain SERP APIs on agent tasks, and in a live probe from the rig on 2026-09-26 both returned the primary source for a factual question in about 1 second while the rig's SearXNG could only reach Yandex.
+
+### 17.1 Wire
+
+- One stateless JSON-RPC `tools/call` POST per search, with `Accept: application/json, text/event-stream`. Both servers answer without the `initialize` handshake (verified live), which saves two round trips.
+- The reply is plain JSON (Parallel) or a `text/event-stream` whose `data:` line carries the JSON-RPC response (Exa). The parser takes the first event with a `result` or `error`, so interleaved notifications are skipped.
+- Exa: `{ query, numResults: count }`. The tool returns one text block of records (`Title:` / `URL:` / `Published:` / `Author:` / `Highlights:` then passages separated by `...`), records separated by a `---` line. `Published` becomes `age` when it is a real date.
+- Parallel: `{ objective: query, search_queries: [query] }`. The tool returns `structuredContent.results[]` with `url`, `title`, `publish_date`, `excerpts[]`. It has no count input and returns about 10 results, so the engine truncates to `count`.
+- Neither tool takes a freshness filter, so a requested `time_range` is reported as NOT applied (WS-D17).
+
+### 17.2 Passage selection
+
+Both engines return long excerpts that often open with page chrome ("Keyboard shortcuts", "Skip to main content", the page title again). The formatter trims snippets from the start, so the engines first pick a passage:
+
+1. Split the excerpt into lines; drop lines under 20 code points, `...` separators, and lines equal to the result title.
+2. Query terms: lowercase alphanumeric tokens of 2+ code points, minus a small stopword list, de-duplicated.
+3. Rank lines by (distinct query terms contained, line is 40+ code points); the earliest line wins a full tie. With no term hit anywhere, this picks the first substantial line.
+4. Emit the chosen line plus the following lines, whitespace-collapsed, up to 600 code points (`MAX_SNIPPET_CAP`). The session `snippetCap` then applies as usual.
+
+TS (`engines/passage.ts`) and Rust (`engines/passage.rs`) implement the same algorithm. `passage.expected.json` in both fixture directories pins the exact snippet for two real fixture records, and both suites assert it.
+
+### 17.3 `engineOrder`
+
+`session.engineOrder` (Rust `engine_order`) is an ordered list of engine names: `brave`, `tavily`, `searxng`, `exa`, `parallel`, `mojeek`, `marginalia`, `wikipedia`. When set, the chain is exactly that list; the `disable*` flags and `fallbackToKeyless` are ignored. It is validated before anything else runs: an empty list, an unknown or repeated name, `brave`/`tavily` without its key, or `searxng` without `searxngUrl` returns `INVALID_PARAM` with a hint that this is harness configuration the model cannot fix. With `engineOrder` set, the error echo reads `Backend: chain (a → b)`, the permission hook sees `chain:a+b`, and the permission host is `chain`.
+
+### Decision log (v3)
+
+**WS-D20** (hosted AI indexes lead the keyless chain): the zero-config chain is Exa → Parallel → Mojeek → Marginalia → Wikipedia. Both are documented, ToS-clean keyless endpoints, which also answers WS-D10's concern about leading with a robots-disallowed scrape. The cost is that a zero-config query now goes to two AI companies first; `disableExa` / `disableParallel` opt out, the same pattern as `disableMojeek`.
+
+**WS-D21** (keys raise limits, not priority): `exaApiKey` / `parallelApiKey` only raise rate limits. They do not make Exa or Parallel explicit backends, so the WS-D9 exclusivity rules for Brave/Tavily/SearXNG are unchanged.
+
+**WS-D22** (MCP failures never blame the query): an HTTP 4xx/5xx, a JSON-RPC `error`, and a tool result with `isError: true` all map to `SERVER_NOT_AVAILABLE` (a per-engine failure the chain skips), including HTTP 400. An MCP-level rejection says nothing about whether the model's query was malformed (WS-D14). A response that carries records but none parse is `IO_ERROR`, not `empty`, so a format change on Exa's side cannot pass as "the web had nothing".
+
+**WS-D23** (`engineOrder` is harness-only): some harnesses want the AI indexes ahead of a self-hosted SearXNG, which the default precedence cannot express. A single ordered list is the smallest knob that covers every ordering. It is session config, never a model parameter, and it fails loudly on names it cannot build instead of silently dropping them.
+
+**WS-D24** (passage selection, not reranking): choosing which lines of one result become its snippet is extraction, not relevance ranking, so it does not reopen WS-D19. Result order still comes from the engine (and RRF when merged). Engine weights stay at the general-class 1.0; no A/B has measured a premium for Exa or Parallel yet.
+
+**WS-D25** (timeouts): the per-engine slice (WS-D11) now divides the budget across up to five keyless engines, 3 s each at the 15 s default. Exa's cold first call has taken up to 3.9 s in live probes, so a harness that leads with both AI indexes plus SearXNG should raise `searchTimeoutMs` (about 24 s gives each of six engines 4 s). The default is unchanged because a sufficient first engine short-circuits the chain.
+

@@ -7,7 +7,11 @@ export {
   safeParseWebSearchParams,
 } from "./schema.js";
 export { createDefaultEngine, SearchError } from "./engine.js";
-export { resolveEngine } from "./engines/resolve.js";
+export {
+  resolveEngine,
+  validateEngineOrder,
+  ENGINE_NAMES,
+} from "./engines/resolve.js";
 export type { ResolvedEngine } from "./engines/resolve.js";
 export { createFallbackEngine } from "./engines/fallback.js";
 export type {
@@ -20,6 +24,12 @@ export { createMarginaliaEngine } from "./engines/marginalia.js";
 export { createWikipediaEngine } from "./engines/wikipedia.js";
 export { createBraveEngine } from "./engines/brave.js";
 export { createTavilyEngine } from "./engines/tavily.js";
+export { createExaEngine, parseExaText } from "./engines/exa.js";
+export {
+  createParallelEngine,
+  mapParallelResults,
+} from "./engines/parallel.js";
+export { selectPassage, queryTerms } from "./engines/passage.js";
 export { stripTags, decodeEntities } from "./engines/html.js";
 export { normalizeUrlForDedup } from "./engines/dedupe.js";
 export {

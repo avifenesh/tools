@@ -16,7 +16,7 @@ import {
   SESSION_BACKSTOP_MS,
   SNIPPET_CAP,
 } from "./constants.js";
-import { resolveEngine } from "./engines/resolve.js";
+import { resolveEngine, validateEngineOrder } from "./engines/resolve.js";
 import { SearchError } from "./engines/searchError.js";
 import { askPermission, permissionDeniedError } from "./fence.js";
 import { formatEmptyText, formatOkText } from "./format.js";
@@ -69,15 +69,34 @@ export async function websearch(
   }
   const params = parsed.value;
 
+  // A harness-chosen engineOrder is session config the model cannot fix;
+  // say so, so the model reports it instead of rewording the query.
+  const orderProblem = validateEngineOrder(session);
+  if (orderProblem !== undefined) {
+    return err(
+      toolError(
+        "INVALID_PARAM",
+        `${orderProblem}\nHint: this is the harness's session configuration, not a tool parameter; retrying will not help. Report it to the operator.`,
+      ),
+    );
+  }
+
   // Resolve the engine chain. With no key and no searxngUrl this yields the
-  // bundled keyless default (Mojeek → Marginalia → Wikipedia), so search
-  // works with zero config — there is no longer a hard "no backend" error.
+  // bundled keyless default (Exa → Parallel → Mojeek → Marginalia →
+  // Wikipedia), so search works with zero config. There is no longer a hard
+  // "no backend" error.
   const resolved = resolveEngine(session);
 
-  // When an explicit SearXNG backend is configured, validate its URL/scheme
-  // and run the SSRF check up front so the model gets the SearXNG-specific
-  // hint. The keyless/keyed engines self-check their (public) hosts per call.
-  if (session.searxngUrl !== undefined && session.searxngUrl.length > 0) {
+  // When SearXNG is part of the chain, validate its URL/scheme and run the
+  // SSRF check up front so the model gets the SearXNG-specific hint. The
+  // keyless/keyed engines self-check their (public) hosts per call.
+  const usesSearxng =
+    session.engineOrder === undefined || session.engineOrder.includes("searxng");
+  if (
+    session.searxngUrl !== undefined &&
+    session.searxngUrl.length > 0 &&
+    usesSearxng
+  ) {
     const pre = await validateSearxngBackend(session);
     if (pre) return err(pre);
   }
@@ -101,11 +120,12 @@ export async function websearch(
   const headers = normalizeHeaders(session);
 
   const permissionHost = permissionBackendHost(session);
+  const { backendLabel, hookBackendUrl } = backendLabels(session, resolved.chain);
 
   // Permission hook (autonomous — allow or deny).
   const decision = await askPermission(session, {
     query: params.query,
-    backendUrl: session.searxngUrl ?? `keyless:${resolved.chain.join("+")}`,
+    backendUrl: hookBackendUrl,
     backendHost: permissionHost,
     chain: resolved.chain,
     count,
@@ -158,7 +178,7 @@ export async function websearch(
       translateSearchError(e, params.query, {
         keylessDefault: resolved.keylessDefault,
         chain: resolved.chain,
-        backendLabel: session.searxngUrl ?? `keyless (${resolved.chain.join(" → ")})`,
+        backendLabel,
       }),
     );
   }
@@ -210,8 +230,29 @@ function clampSnippetCap(n: number | undefined): number {
   return Math.trunc(n);
 }
 
+/** Error-echo label and permission-hook backend URL for this chain. */
+function backendLabels(
+  session: WebSearchSessionConfig,
+  chain: readonly string[],
+): { backendLabel: string; hookBackendUrl: string } {
+  if (session.engineOrder !== undefined) {
+    return {
+      backendLabel: `chain (${chain.join(" → ")})`,
+      hookBackendUrl: `chain:${chain.join("+")}`,
+    };
+  }
+  if (session.searxngUrl !== undefined && session.searxngUrl.length > 0) {
+    return { backendLabel: session.searxngUrl, hookBackendUrl: session.searxngUrl };
+  }
+  return {
+    backendLabel: `keyless (${chain.join(" → ")})`,
+    hookBackendUrl: `keyless:${chain.join("+")}`,
+  };
+}
+
 /** Pick the host label used for the permission pattern + audit metadata. */
 function permissionBackendHost(session: WebSearchSessionConfig): string {
+  if (session.engineOrder !== undefined) return "chain";
   if (session.searxngUrl !== undefined && session.searxngUrl.length > 0) {
     try {
       return new URL(session.searxngUrl).hostname;
@@ -271,7 +312,7 @@ function translateSearchError(
   const echo = `\nQuery: "${query}"\nBackend: ${ctx.backendLabel}`;
   // The keyless default nudge mirrors the existing error wording style.
   const keylessHint =
-    "All search backends are rate-limited or returned nothing. For reliable results, set a free Brave Search API key (api-dashboard.search.brave.com) via session.braveApiKey, add a Tavily key, or run a local SearXNG and set session.searxngUrl.";
+    "All search backends are rate-limited or returned nothing. Exa and Parallel keys (session.exaApiKey / session.parallelApiKey) raise their free limits; for a keyed backend set session.braveApiKey or session.tavilyApiKey, or run a local SearXNG and set session.searxngUrl.";
 
   if (e instanceof SearchError) {
     const meta = { query, backend: ctx.backendLabel, ...(e.meta ?? {}) };
