@@ -389,7 +389,7 @@ Full test catalogue lives in `agent-knowledge/design/grep.tests.md` (to be draft
 20. `type: "ts"` restricts to `.ts` (rg `--type ts`).
 21. `glob: "*.{ts,tsx}"` restricts equivalently; `glob` + `type` together narrow (AND).
 
-### 13.2 LLM e2e (model-contract validation, see CLAUDE.md §"What counts as a test")
+### 13.2 LLM e2e (model-contract validation, see AGENTS.md §"What counts as a test")
 
 E2E suites live in `packages/harness-e2e/test/grep.e2e*.ts` and exercise real models. Minimum categories:
 

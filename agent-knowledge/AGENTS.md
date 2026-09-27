@@ -491,7 +491,7 @@ Use this knowledge when the user asks about any of the following. Match liberall
 - "Skill vs MCP — when to use which?"
 - "Skill vs subagent — when to use which?"
 - "Skill vs hook — when to use which?"
-- "Skill vs system prompt vs AGENTS.md — progressive disclosure argument"
+- "Skill vs system prompt vs CLAUDE.md — progressive disclosure argument"
 - "Why does OpenCode ship a `skill` tool?" / "what does skill.ts return?"
 - "Why does Gemini CLI ship `activate-skill` but not other harnesses?"
 - "Why does Continue ship `readSkill`?"
@@ -718,7 +718,7 @@ Use this knowledge when the user asks about any of the following. Match liberall
 | hooks (PreToolUse/PostToolUse/Stop/SessionStart) | ai-agent-harness-tooling.md, agent-write-edit-tools.md, exec-tool-design-across-harnesses.md, lsp-tool-design-across-harnesses.md, skill-tool-design-across-harnesses.md |
 | subagent, sub-agent, handoff, Agent tool | ai-agent-harness-tooling.md, harness-tool-surface-audit.md, skill-tool-design-across-harnesses.md, skill-tool-in-autonomous-agents.md |
 | context compaction, /clear, /compact, /rewind | ai-agent-harness-tooling.md, skill-tool-design-across-harnesses.md, skill-tool-in-autonomous-agents.md |
-| AGENTS.md, AGENTS.md as memory files | ai-agent-harness-tooling.md, skill-tool-design-across-harnesses.md, skill-tool-in-autonomous-agents.md |
+| CLAUDE.md, AGENTS.md as memory files | ai-agent-harness-tooling.md, skill-tool-design-across-harnesses.md, skill-tool-in-autonomous-agents.md |
 | server-executed tools (web_search, code_execution) | ai-agent-harness-tooling.md, webfetch-tool-design-across-harnesses.md |
 | pause_turn, MaxTurnsExceeded | ai-agent-harness-tooling.md, webfetch-tool-design-across-harnesses.md |
 | reasoning preservation (Responses API) | ai-agent-harness-tooling.md |
@@ -1159,4 +1159,4 @@ Use this knowledge when the user asks about any of the following. Match liberall
 
 - Guides are created via `/learn <topic>`
 - Each guide has a companion `resources/<slug>-sources.json` with full source metadata + quality scores (1-10 on authority/recency/depth/examples/uniqueness)
-- This file (`AGENTS.md`) is mirrored to `AGENTS.md` for OpenCode/Codex compatibility
+- This file (`AGENTS.md`) is the canonical instruction index for this scope
