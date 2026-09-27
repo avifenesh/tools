@@ -4,7 +4,7 @@ TypeScript-first agent tools, designed for real LLMs.
 
 Each tool in this repo (`read`, `write`, `grep`, `glob`, `bash`, `webfetch`, `websearch`, `lsp`, `skill`) ships as its own `@agent-sh/harness-*` npm package, plus an umbrella `@agent-sh/harness-tools` that re-exports them. Matching Rust ports live under `crates/` and maintain TS parity.
 
-The tools are meant to be consumed by autonomous agents (Claude, GPT, Qwen, Gemini, ...), not by deterministic callers. That framing shapes every design call — see [`CLAUDE.md`](./CLAUDE.md) and the per-tool specs under [`agent-knowledge/design/`](./agent-knowledge/design/).
+The tools are meant to be consumed by autonomous agents (Claude, GPT, Qwen, Gemini, ...), not by deterministic callers. That framing shapes every design call — see [`AGENTS.md`](./AGENTS.md) and the per-tool specs under [`agent-knowledge/design/`](./agent-knowledge/design/).
 
 ## Packages
 
@@ -62,7 +62,7 @@ LLMs are probabilistic, and the textual surface of a tool (name, description, sc
 - **Fuzzy recovery hints.** `NOT_FOUND` with candidate siblings. `OLD_STRING_NOT_UNIQUE` with all match locations. The model is expected to correct and retry.
 - **Cross-language parity.** Every tool has a Rust port (`crates/<tool>/`) and a parity baseline proving they behave identically to real LLMs across four Ollama models.
 
-More in [`CLAUDE.md`](./CLAUDE.md).
+More in [`AGENTS.md`](./AGENTS.md).
 
 ## Repository layout
 
@@ -116,7 +116,7 @@ Required repo secret: `NPM_TOKEN` (an automation token for the `@agent-sh` scope
 
 ## Contributing
 
-The design docs at [`agent-knowledge/design/`](./agent-knowledge/design/) are the canonical specs for each tool. Implementation changes must be reflected in the spec, and vice versa. See [`CLAUDE.md`](./CLAUDE.md) for the contributor agreement.
+The design docs at [`agent-knowledge/design/`](./agent-knowledge/design/) are the canonical specs for each tool. Implementation changes must be reflected in the spec, and vice versa. See [`AGENTS.md`](./AGENTS.md) for the contributor agreement.
 
 ## License
 

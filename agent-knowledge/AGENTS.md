@@ -1159,4 +1159,4 @@ Use this knowledge when the user asks about any of the following. Match liberall
 
 - Guides are created via `/learn <topic>`
 - Each guide has a companion `resources/<slug>-sources.json` with full source metadata + quality scores (1-10 on authority/recency/depth/examples/uniqueness)
-- This file (`CLAUDE.md`) is mirrored to `AGENTS.md` for OpenCode/Codex compatibility
+- This file (`AGENTS.md`) is the canonical instruction index for this scope
