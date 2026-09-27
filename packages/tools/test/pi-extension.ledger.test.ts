@@ -91,7 +91,7 @@ describe("pi-extension shared ledger — read composes with edit", () => {
 
   it("edit on a never-read file FAILS OPEN: proceeds with a warning (D11), not a hard deny", async () => {
     // The read-before-edit gate fails OPEN when no permission hook is wired
-    // (Read spec D11 / CLAUDE.md #6 tool-as-friction): a model with no prior
+    // (Read spec D11 / AGENTS.md #6 tool-as-friction): a model with no prior
     // Read must not be hard-blocked into shelling out to Bash. It overwrites
     // with a warning instead. (A wired deny-hook is the way to actually block —
     // see the deny-hook unit tests in packages/write.)

@@ -2,7 +2,7 @@
  * Peer runner: dispatches W1–W8 style prompts against an external agent CLI
  * (today: opencode) and returns a trace shape compatible with our e2e asserts.
  *
- * Why: CLAUDE.md's thesis is "the description is the API." To validate that
+ * Why: AGENTS.md's thesis is "the description is the API." To validate that
  * our tool descriptions/error messages actually deliver, we run the same
  * fixture + prompt against a peer harness that has its own read/edit/write
  * descriptions, and compare behavior. We are NOT testing our executors here;

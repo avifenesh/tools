@@ -1,6 +1,6 @@
 # AGENTS.md — `@agent-sh/harness-*` monorepo
 
-Guidance for Codex working on this repo. The repo builds LLM-facing agent
+Guidance for AI agents working on this repo. The repo builds LLM-facing agent
 tools (Read, Write, Grep, Glob, ...) as a TypeScript-first npm library, with
 Rust ports coming later. The tools are consumed by real language models inside
 agent harnesses — **not** by deterministic callers.
@@ -14,7 +14,7 @@ so the contract is not "given these args, produce this output." The contract is:
 
 > Given only the tool's *textual surface* (name, description, schema field
 > names, error messages, output shape, pagination hints), does a real model,
-> across many families (Qwen, Llama, GPT, Codex, DeepSeek), pick this tool,
+> across many families (Qwen, Llama, GPT, Claude, Codex, DeepSeek), pick this tool,
 > call it correctly, interpret the result, and make good next moves —
 > without giving up and falling back to Bash?
 
@@ -54,9 +54,9 @@ be for deterministic code, not less. Cover every edge case, every
   calling the tool through the same JSON-schema surface a production
   harness would use.
 - **Multi-model coverage** is required before a tool ships. The same
-  description lands differently on Qwen vs Llama vs GPT vs Codex. At
+  description lands differently on Qwen vs Llama vs GPT vs Claude or Codex. At
   minimum: one thinking-capable open model (Qwen3.5 family) plus one
-  closed model (Codex or GPT) via their respective APIs.
+  closed model (Claude or GPT, including a Codex workflow) via its API.
 - **Multi-prompt coverage** per tool. At minimum include:
   - Golden path (obvious correct invocation)
   - Ambiguous phrasing ("take a look at X" vs "read X")
@@ -117,3 +117,14 @@ be for deterministic code, not less. Cover every edge case, every
 - Don't implement ahead of the user's explicit go-ahead on design.
 - Keep the project spec (`agent-knowledge/design/*.md`) and the code in
   sync — if one changes, change the other in the same change.
+
+## Worktree and tmp hygiene (owner, 2026-08-17)
+
+- When work in a git worktree is finished — merged, banked, or abandoned — clean it up
+  as part of finishing: `git worktree remove <path>` AND delete its branch
+  (`git branch -d`; `-D` only once the owner's merge/abandon decision is recorded).
+  A closed lane leaves no `wt-*` directory and no stale branch behind.
+- Every use of /tmp (or any scratch space) is cleaned by the task that created it:
+  delete scratch files and dirs when the task closes, not when disk pressure finds
+  them. Motivating incident 2026-08-17: 7 GB of dead lane dirs in /tmp plus an
+  unthrottled upload storm flooded 25 GB of swap and stalled the rig.
