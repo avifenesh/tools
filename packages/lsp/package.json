@@ -56,7 +56,7 @@
     "@agent-sh/harness-core": "workspace:*",
     "valibot": "^1.5.0",
     "vscode-jsonrpc": "^8.2.1",
-    "vscode-languageserver-protocol": "^3.18.3"
+    "vscode-languageserver-protocol": "^3.18.4"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
