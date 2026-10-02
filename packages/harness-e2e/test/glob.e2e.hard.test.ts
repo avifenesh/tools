@@ -237,9 +237,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   });
 
   // G1: Golden — find a specific file with a clear pattern.
-  it.runIf(() => available)(
+  it(
     "G1 golden: locates a uniquely named file via recursive pattern",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "src/UserService.ts", "export class UserService {}\n");
       writeFile(root, "src/AuthService.ts", "export class AuthService {}\n");
@@ -275,9 +276,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   );
 
   // G2: Refine — a too-broad pattern truncates, model narrows.
-  it.runIf(() => available)(
+  it(
     "G2 refine: narrows after a truncated result set",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       for (let i = 0; i < 400; i++) {
         writeFile(root, `pkg/f${i}.ts`, `export const x${i} = ${i};\n`);
@@ -318,9 +320,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   );
 
   // G3: Forgotten **. Stochastic — wrapped in pass@k.
-  it.runIf(() => available)(
+  it(
     "G3 forgot-**: recovers from bare '*.ts' via the zero-match hint",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -373,9 +376,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   );
 
   // G4: Bash-decoy — shell available, glob is the right tool.
-  it.runIf(() => available)(
+  it(
     "G4 bash-decoy: prefers glob over shell for filename search",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "src/UniqueWidget.tsx", "x");
       writeFile(root, "src/other.ts", "x");
@@ -414,9 +418,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   );
 
   // G5: gitignore respect — node_modules has matches but must not appear in output.
-  it.runIf(() => available)(
+  it(
     "G5 gitignore: returns only source hits, not node_modules",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, ".gitignore", "node_modules\n");
       writeFile(root, "src/app.ts", "x");
@@ -468,9 +473,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   // G6: Brace expansion — multi-extension pattern.
   // Stochastic: some weak models write '*.ts,*.tsx' which we now reject
   // with a schema hint; the model should pivot to '*.{ts,tsx}'.
-  it.runIf(() => available)(
+  it(
     "G6 brace-expansion: handles multi-extension filter",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -519,9 +525,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   );
 
   // G7: Pagination — 600 matching files; model must page or narrow.
-  it.runIf(() => available)(
+  it(
     "G7 pagination: covers large result set via pagination or narrowing",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       for (let i = 0; i < 600; i++) {
         writeFile(root, `pkg/f${i}.ts`, `x`);
@@ -563,9 +570,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   );
 
   // G8: Typo recovery — NOT_FOUND with sibling suggestions.
-  it.runIf(() => available)(
+  it(
     "G8 typo-recovery: uses NOT_FOUND sibling suggestion to find typo'd path",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "components/Button.tsx", "x");
       writeFile(root, "components/Input.tsx", "x");
@@ -601,9 +609,10 @@ describe(`glob e2e hard [${LABEL}]`, () => {
   // model toward narrowing (directory scope or specific extension),
   // not blindly paginating through 600 files. Stochastic on weak models
   // so wrapped in pass@k.
-  it.runIf(() => available)(
+  it(
     "G9 oversize-steer: narrows instead of paging through a broad truncated result",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,

@@ -134,9 +134,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   // 67% in one go, the model just needs one follow-up at offset=2001 to finish.
   // This is the realistic pagination validation; deep-file search belongs on
   // grep once that tool lands.
-  it.runIf(() => available)(
+  it(
     "H1 pagination-one-hop: find marker at line 2734 of 3000",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const lines = Array.from({ length: 3000 }, (_, i) => `L${i + 1}`);
       lines[2733] = "NEEDLE-8f2c";
@@ -171,9 +172,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   );
 
   // H2: Empty file — the tool returns "(File exists but is empty)".
-  it.runIf(() => available)(
+  it(
     "H2 empty-file: reports emptiness faithfully",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const p = writeFile(root, "blank.txt", "");
       const exec = pickReadExecutor(session(root));
@@ -208,9 +210,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   );
 
   // H3: Binary refusal + recovery via sibling text file.
-  it.runIf(() => available)(
+  it(
     "H3 binary-refusal: recovers by reading sibling text file",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeBinaryFile(
         root,
@@ -254,9 +257,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   );
 
   // H4: SENSITIVE with no hook — tool returns SENSITIVE error.
-  it.runIf(() => available)(
+  it(
     "H4 sensitive-no-hook: does not hallucinate .env contents",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const p = writeFile(
         root,
@@ -294,9 +298,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   );
 
   // H5: Attachment path — image file.
-  it.runIf(() => available)(
+  it(
     "H5 attachment-image: reports attachment metadata, does not hallucinate pixels",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const p = writeBinaryFile(root, "pixel.png", TINY_PNG);
       const exec = pickReadExecutor(session(root));
@@ -330,9 +335,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   );
 
   // H6: Directory — spec says `read` also handles dirs.
-  it.runIf(() => available)(
+  it(
     "H6 directory: lists entries via read (does not reach for ls)",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "alpha.md", "");
       writeFile(root, "beta.md", "");
@@ -369,9 +375,10 @@ describe(`e2e hard [${MODEL}]: real LLM calls \`read\` under stress`, () => {
   );
 
   // H7: Bash-decoy — both `read` and `shell` are available.
-  it.runIf(() => available)(
+  it(
     "H7 bash-decoy: observe whether model prefers read over shell",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const p = writeFile(
         root,

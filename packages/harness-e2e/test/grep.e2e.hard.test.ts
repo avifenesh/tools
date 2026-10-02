@@ -229,9 +229,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   });
 
   // G1: Golden — find where a symbol is defined.
-  it.runIf(() => available)(
+  it(
     "G1 golden: locates a symbol definition with files_with_matches first",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "src/server.ts", "export function handleRequest(req) {\n  return null;\n}\n");
       writeFile(root, "src/util.ts", "export function helper() {}\n");
@@ -278,9 +279,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   );
 
   // G2: Refine — a too-broad pattern produces truncated results, model narrows.
-  it.runIf(() => available)(
+  it(
     "G2 refine: narrows after a truncated result set",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       // 400 files each containing the word "log" — blows past head_limit=250.
       for (let i = 0; i < 400; i++) {
@@ -324,9 +326,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
 
   // G3: Escape — regex metacharacters. Model should escape OR recover after INVALID_REGEX.
   // Stochastic across small models, so wrapped in pass@k.
-  it.runIf(() => available)(
+  it(
     "G3 escape: finds 'interface{}' via escaped pattern or post-error recovery",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -374,9 +377,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   // G3b: fixed_strings — exact literal with parens. Model should set
   // fixed_strings: true OR escape the parens (accept either, like G3 accepts
   // escape-or-recover). Stochastic across small models, so wrapped in pass@k.
-  it.runIf(() => available)(
+  it(
     "G3b fixed-strings: finds literal 'format(msg)' via fixed_strings or escaped parens",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -436,9 +440,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   );
 
   // G4: Bash-decoy — shell is available but grep is the correct tool.
-  it.runIf(() => available)(
+  it(
     "G4 bash-decoy: prefers grep over shell for content search",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "src/a.ts", "const TODO_MARK = 'needleX42';\n");
       writeFile(root, "src/b.ts", "const OTHER = 'hay';\n");
@@ -477,9 +482,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   );
 
   // G5: gitignore respect — node_modules has matches but must not appear in output.
-  it.runIf(() => available)(
+  it(
     "G5 gitignore: returns only source hits, not node_modules",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, ".gitignore", "node_modules\n");
       writeFile(root, "src/app.ts", "export const VERSION = '1.2.3';\n");
@@ -515,9 +521,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
 
   // G6: Mode selection — summary question should pick a cheap mode.
   // Accept files_with_matches OR count; reject content for a pure "are there any?" question.
-  it.runIf(() => available)(
+  it(
     "G6 mode-selection: cheap mode for 'are there any' style question",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "src/a.ts", "// TODO: refactor\nconst x = 1;\n");
       writeFile(root, "src/b.ts", "const y = 2; // TODO later\n");
@@ -567,9 +574,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   // G7: Context-aware — "show me the body" should use content mode with context.
   // Stochastic: gemma4:e2b sometimes picks content without context and still returns the right lines;
   // that's a weaker-but-acceptable outcome. pass@k with k=2/3 protects against jitter.
-  it.runIf(() => available)(
+  it(
     "G7 context-aware: uses content mode (ideally with context) to show a function body",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -634,9 +642,10 @@ describe(`grep e2e hard [${LABEL}]`, () => {
   );
 
   // G8: Pagination — 600 matching files; model must page or narrow, not give up.
-  it.runIf(() => available)(
+  it(
     "G8 pagination: covers a large result set via pagination or narrowing",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       for (let i = 0; i < 600; i++) {
         writeFile(root, `pkg/f${i}.ts`, `export const MARK = ${i};\n`);

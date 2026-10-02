@@ -329,9 +329,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   });
 
   // LSP1: Golden \u2014 definition lookup.
-  it.runIf(() => available)(
+  it(
     "LSP1 golden: finds the definition of UserService",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = makeTsFixture();
       const session = makeSession(root);
       await warmupLsp(session, [
@@ -369,9 +370,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP2: References.
-  it.runIf(() => available)(
+  it(
     "LSP2 references: lists references to UserService across files",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = makeTsFixture();
       const session = makeSession(root);
       await warmupLsp(session, [
@@ -399,9 +401,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP3: Hover.
-  it.runIf(() => available)(
+  it(
     "LSP3 hover: returns type info for a symbol",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = makeTsFixture();
       const session = makeSession(root);
       const tools = [pickLspExecutor(session)];
@@ -425,9 +428,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP4: documentSymbol.
-  it.runIf(() => available)(
+  it(
     "LSP4 documentSymbol: lists symbols in a file",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = makeTsFixture();
       const session = makeSession(root);
       const tools = [pickLspExecutor(session)];
@@ -451,9 +455,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP5: workspaceSymbol. Stochastic.
-  it.runIf(() => available)(
+  it(
     "LSP5 workspaceSymbol: finds symbols by query across the workspace",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -495,9 +500,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP6: SERVER_NOT_AVAILABLE for unknown extension.
-  it.runIf(() => available)(
+  it(
     "LSP6 server_not_available: reports when no server is configured for a language",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = makeTsFixture();
       writeFile(root, "src/main.rs", "fn main() { println!(\"hi\"); }\n");
       const session = makeSession(root);
@@ -522,9 +528,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP7: 1-indexed position handling.
-  it.runIf(() => available)(
+  it(
     "LSP7 position-1-indexed: uses 1-indexed lines and characters",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = makeTsFixture();
       const session = makeSession(root);
       await warmupLsp(session, [path.join(root, "src/UserService.ts")]);
@@ -555,9 +562,10 @@ describe(`lsp e2e hard [${LABEL}]`, () => {
   );
 
   // LSP8: basic lsp usage (replaces generic alias pushback \u2014 hard to force naturally).
-  it.runIf(() => available)(
+  it(
     "LSP8 hover-on-method: returns type for a method",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,

@@ -269,9 +269,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   });
 
   // W1: Golden edit — read, then edit a single unique occurrence.
-  it.runIf(() => available)(
+  it(
     "W1 golden-edit: reads then edits a unique line",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeFile(
         root,
@@ -313,9 +314,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   );
 
   // W2: Read-before-edit gate — if model skips read, Edit fails; model must recover.
-  it.runIf(() => available)(
+  it(
     "W2 read-gate: edit without read gets NOT_READ_THIS_SESSION, model recovers",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeFile(root, "a.txt", "hello world\n");
       const session = makeSession(root);
@@ -355,9 +357,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   // old_string with context, or switches to replace_all. Either is acceptable.
   // Wrapped in passAtK because small models (gemma4:e2b) and baseline qwen3:8b
   // are stochastic on this recovery path. We tolerate 1 miss in 3.
-  it.runIf(() => available)(
+  it(
     "W3 not-unique: recovers from OLD_STRING_NOT_UNIQUE",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const summary = await passAtK({
         n: 3,
         k: 2,
@@ -427,9 +430,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
 
   // W4: NOT_FOUND with candidates — model mistypes a name; fuzzy candidates
   // should let it self-correct.
-  it.runIf(() => available)(
+  it(
     "W4 not-found-fuzzy: recovers via returned candidates",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeFile(
         root,
@@ -473,9 +477,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   );
 
   // W5: MultiEdit atomicity — ask for a rename + body change in one multiedit.
-  it.runIf(() => available)(
+  it(
     "W5 multiedit: applies coordinated rename + signature change in one call",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeFile(
         root,
@@ -526,9 +531,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   );
 
   // W6: Write overwrite — existing file, model must read first.
-  it.runIf(() => available)(
+  it(
     "W6 write-overwrite: reads then overwrites an existing file",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeFile(root, "notes.md", "old notes\n");
       const before = sha(target);
@@ -566,9 +572,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   );
 
   // W7: Write create — path doesn't exist yet; no read required.
-  it.runIf(() => available)(
+  it(
     "W7 write-create: creates a new file without reading first",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = path.join(root, "hello.txt");
       const session = makeSession(root);
@@ -608,9 +615,10 @@ describe(`write e2e hard [${LABEL}]`, () => {
   // edit/write for file mutations. If it routes around, that's a description
   // problem we want to see surfaced in logs. Wrapped in passAtK because tool
   // routing is probabilistic at the small-model end of the matrix.
-  it.runIf(() => available)(
+  it(
     "W8 bash-decoy-write: model prefers edit over shell sed",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const summary = await passAtK({
         n: 3,
         k: 2,

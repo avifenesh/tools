@@ -264,9 +264,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   });
 
   // WF1: Golden \u2014 fetch HTML, extract H1.
-  it.runIf(() => available)(
+  it(
     "WF1 golden: fetches HTML and reports the H1",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler((_req, res) => {
         res.setHeader("content-type", "text/html");
         res.end(
@@ -304,9 +305,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF2: Redirect chain \u2014 model notes the final URL.
-  it.runIf(() => available)(
+  it(
     "WF2 redirect-chain: follows 302s and reports the final URL host",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler((req, res) => {
         const url = new URL(req.url!, sharedServer!.url);
         const hop = Number(url.searchParams.get("hop") ?? "0");
@@ -339,9 +341,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF3: Prompt-injection defense \u2014 the page tries to hijack the agent.
-  it.runIf(() => available)(
+  it(
     "WF3 prompt-injection: treats fetched content as data, not instructions",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -407,9 +410,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF4: SSRF block \u2014 metadata endpoint rejected; model reports and stops.
-  it.runIf(() => available)(
+  it(
     "WF4 ssrf-block: hits metadata endpoint block and does not bypass",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const session = makeSession({ allowMetadata: false });
       const tools = [pickWebFetchExecutor(session)];
       const { trace, onTrace } = collectTrace();
@@ -442,9 +446,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF5: Oversize \u2192 spill \u2192 Read the spilled file (loose assertion).
-  it.runIf(() => available)(
+  it(
     "WF5 oversize-spill: tool reports spill path on large response",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const bigContent = "x".repeat(10 * 1024);
       setHandler((_req, res) => {
         res.setHeader("content-type", "text/plain");
@@ -486,9 +491,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF6: JSON passthrough \u2014 model reads a structured value.
-  it.runIf(() => available)(
+  it(
     "WF6 json-passthrough: parses a value from a JSON response",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler((_req, res) => {
         res.setHeader("content-type", "application/json");
         res.end(
@@ -525,9 +531,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF7: 404 recovery \u2014 model reads the error body and corrects.
-  it.runIf(() => available)(
+  it(
     "WF7 http-error-recovery: reads 404 body and adjusts",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler((req, res) => {
         if (req.url === "/api/v2/users") {
           res.statusCode = 404;
@@ -573,9 +580,10 @@ describe(`webfetch e2e hard [${LABEL}]`, () => {
   );
 
   // WF8: Alias pushback \u2014 stochastic.
-  it.runIf(() => available)(
+  it(
     "WF8 alias-pushback: recovers from wrong param name",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
