@@ -19,9 +19,10 @@ describe("bedrock smoke", () => {
     }
   });
 
-  it.runIf(() => shouldRun)(
+  it(
     "reaches Converse with a trivial turn",
-    async () => {
+    async (ctx) => {
+      if (!shouldRun) ctx.skip();
       const res = await bedrockConverse({
         modelId: MODEL_ID,
         system: "Reply with a single word.",

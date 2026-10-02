@@ -75,9 +75,10 @@ describe(`CRLF e2e [${LABEL}]`, () => {
   //   2. The edit applied correctly at the targeted line.
   //   3. Post-edit the file still uses CRLF (CR bytes preserved). If the
   //      engine ever regresses and flattens to LF, this test catches it.
-  it.runIf(() => available)(
+  it(
     "edits a CRLF file; content is correct and CRLF endings are preserved",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = path.join(root, "win.txt");
       // Explicit CRLF — note raw \r\n in the on-disk bytes.

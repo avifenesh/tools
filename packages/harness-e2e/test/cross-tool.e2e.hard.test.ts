@@ -341,9 +341,10 @@ describe(`cross-tool e2e hard [${LABEL}]`, () => {
   });
 
   // CT1: Glob → Read. The model must hand off an absolute path cleanly.
-  it.runIf(() => available)(
+  it(
     "CT1 glob->read: finds a file and reads its content",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(
         root,
@@ -407,9 +408,10 @@ describe(`cross-tool e2e hard [${LABEL}]`, () => {
   // actually want. CT2 now tests "model respects the src/-only scope AND
   // doesn't leak vendor results", which is the real contract.
   // Stochastic — wrapped in pass@k.
-  it.runIf(() => available)(
+  it(
     "CT2 scoped-search: respects directory scope via grep path or glob+grep chain",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -482,9 +484,10 @@ describe(`cross-tool e2e hard [${LABEL}]`, () => {
 
   // CT3: Read → Edit with the read-before-edit gate exercised via the
   // shared ledger. Glob+Read+Edit are all available; model must pick Read.
-  it.runIf(() => available)(
+  it(
     "CT3 read->edit: read-before-edit gate holds when tools share a ledger",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = writeFile(
         root,
@@ -534,9 +537,10 @@ describe(`cross-tool e2e hard [${LABEL}]`, () => {
   );
 
   // CT4: Grep → Read → Edit. Multi-step refactor. Stochastic, wrapped in pass@k.
-  it.runIf(() => available)(
+  it(
     "CT4 grep->read->edit: three-step rename via content search",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,

@@ -99,9 +99,10 @@ describe(`distractor e2e [${LABEL}]`, () => {
   // Pass@k: we expect `read` to win more often than the distractor, but
   // not every single time. A 3/5 threshold lets us detect routing
   // degradation while tolerating routine variance.
-  it.runIf(() => available)(
+  it(
     "model prefers the well-described `read` over a vague `read_file` distractor (pass@3/5)",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const target = path.join(root, "manifest.json");
       writeFileSync(target, '{"name": "sample", "version": "1.0.0"}\n');

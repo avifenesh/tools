@@ -506,9 +506,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   });
 
   // WS1: Golden — issue a search, surface a result title.
-  it.runIf(() => available)(
+  it(
     "WS1 golden: searches the web and reports a result",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         searxResultsHandler([
           {
@@ -560,9 +561,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   );
 
   // WS2: Sensible query — model derives a query that mentions the topic.
-  it.runIf(() => available)(
+  it(
     "WS2 query-quality: derives a query containing the topic keywords",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -612,9 +614,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   );
 
   // WS3: Empty results — model handles a no-result search gracefully.
-  it.runIf(() => available)(
+  it(
     "WS3 empty-results: handles a search that returns nothing",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(searxResultsHandler([]));
       const session = makeSession();
       const tools = [pickWebSearchExecutor(session)];
@@ -645,9 +648,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   );
 
   // WS4: Prompt-injection defense — a result snippet tries to hijack.
-  it.runIf(() => available)(
+  it(
     "WS4 prompt-injection: treats result snippets as data, not instructions",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -699,9 +703,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   );
 
   // WS5: Result selection — model picks the relevant hit among several.
-  it.runIf(() => available)(
+  it(
     "WS5 relevance: surfaces the on-topic result among distractors",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         searxResultsHandler([
           {
@@ -749,9 +754,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   );
 
   // WS6: Backend error — SearXNG returns 5xx; model reports the failure.
-  it.runIf(() => available)(
+  it(
     "WS6 backend-error: surfaces a search backend failure without inventing results",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler((_req, res) => {
         res.statusCode = 502;
         res.setHeader("content-type", "text/plain");
@@ -789,9 +795,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
 
   // WS7: Zero-config keyless default — no searxngUrl/key; the bundled keyless
   // chain (Mojeek→Marginalia→Wikipedia) serves results out of the box.
-  it.runIf(() => available)(
+  it(
     "WS7 zero-config: keyless chain serves results with no backend configured",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         keylessHandler({
           mojeek: [
@@ -835,9 +842,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
 
   // WS8: Empty keyless — a general engine (Mojeek) returns a real zero-results
   // SERP; the model must not fabricate a result.
-  it.runIf(() => available)(
+  it(
     "WS8 keyless-empty: handles a genuinely empty keyless search",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         keylessHandler({
           mojeek: [], // real no-hits SERP (scaffold present)
@@ -874,9 +882,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   // WS9: Honest recency — the keyless engines ignore time_range. When the
   // model asks for recent results, the tool output says the filter was NOT
   // applied; the model should not claim the results are time-filtered.
-  it.runIf(() => available)(
+  it(
     "WS9 honest-recency: surfaces that the keyless engine ignored time_range",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         keylessHandler({
           mojeek: [
@@ -927,9 +936,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
 
   // WS10: Cross-engine merge — Mojeek returns too few; the chain merges
   // Marginalia to fill the count, and the on-topic hit reaches the model.
-  it.runIf(() => available)(
+  it(
     "WS10 merge: tops up a short leader with the next engine",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         keylessHandler({
           mojeek: [
@@ -983,9 +993,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   // with page chrome; the fact the user asked for is further in. The passage
   // picker must surface it in the snippet so the model can answer without
   // fetching the page.
-  it.runIf(() => available)(
+  it(
     "WS11 exa: a highlight's page chrome is skipped and the fact reaches the model",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         keylessHandler({
           exa: [
@@ -1040,9 +1051,10 @@ describe(`websearch e2e hard [${LABEL}]`, () => {
   );
 
   // WS12: Exa is rate-limited; Parallel, next in the chain, serves the answer.
-  it.runIf(() => available)(
+  it(
     "WS12 exa rate-limited: parallel serves the result",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       setHandler(
         keylessHandler({
           status: { exa: 429 },

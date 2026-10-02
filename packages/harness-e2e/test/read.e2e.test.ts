@@ -51,9 +51,10 @@ describe("e2e: real LLM calls `read`", () => {
     }
   });
 
-  it.runIf(() => available)(
+  it(
     "reads a file and answers a question about its content",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const p = writeFile(
         root,
@@ -75,9 +76,10 @@ describe("e2e: real LLM calls `read`", () => {
     180_000,
   );
 
-  it.runIf(() => available)(
+  it(
     "paginates when the file exceeds the default window",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const lines = Array.from({ length: 2500 }, (_, i) => `L${i + 1}`);
       lines[2400] = "SECRETMARKER-A8B3F";
@@ -106,9 +108,10 @@ describe("e2e: real LLM calls `read`", () => {
     240_000,
   );
 
-  it.runIf(() => available)(
+  it(
     "handles a not-found error gracefully and retries a corrected path",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeFile(root, "README.md", "# Project Alpha\n\nThe version is 1.2.3.\n");
       const typo = path.join(root, "readm.md");

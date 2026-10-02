@@ -213,9 +213,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
   });
 
   // SK1: Golden — description triggers activation; model follows body.
-  it.runIf(() => available)(
+  it(
     "SK1 golden: activates a skill when the prompt matches its description",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeSkill(
         root,
@@ -255,9 +256,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
   );
 
   // SK2: NOT_FOUND with siblings → model picks from the list.
-  it.runIf(() => available)(
+  it(
     "SK2 not-found-siblings: recovers via fuzzy siblings",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeSkill(
         root,
@@ -299,9 +301,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
   );
 
   // SK3: Idempotence — already_loaded on second call.
-  it.runIf(() => available)(
+  it(
     "SK3 already-loaded: dedupes repeat activations",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeSkill(
         root,
@@ -349,9 +352,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
   // SK4: allowed-tools advisory — model sees declaration but still goes
   // through hook. Here we just check the advisory declaration appears
   // in the returned body.
-  it.runIf(() => available)(
+  it(
     "SK4 allowed-tools-visible: declaration appears in output",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeSkill(
         root,
@@ -386,9 +390,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
   );
 
   // SK5: disable-model-invocation triggers DISABLED; model must not loop.
-  it.runIf(() => available)(
+  it(
     "SK5 disabled: respects disable-model-invocation",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeSkill(
         root,
@@ -427,9 +432,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
 
   // SK6: Resource reference — skill body mentions scripts/; model sees
   // the resource path.
-  it.runIf(() => available)(
+  it(
     "SK6 resources: body enumerates bundled scripts/references",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const dir = writeSkill(
         root,
@@ -470,9 +476,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
   );
 
   // SK7: Argument passing (string form).
-  it.runIf(() => available)(
+  it(
     "SK7 argument-passing: passes a string argument to the skill",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       writeSkill(
         root,
@@ -508,9 +515,10 @@ describe(`skill e2e hard [${LABEL}]`, () => {
 
   // SK8: Trust gate — hook denies the activation; model reports it.
   // Stochastic — wrap in passAtK so we get a fair signal.
-  it.runIf(() => available)(
+  it(
     "SK8 trust-gate: reports permission denial gracefully",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const result = await passAtK({
         n: 3,
         k: 2,

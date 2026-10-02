@@ -236,9 +236,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
   });
 
   // BASH1: Golden — simple command with clean output.
-  it.runIf(() => available)(
+  it(
     "BASH1 golden: answers a shell question with one bash call",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const session = makeSession(root);
       const tools = [pickBashExecutors(session).bash];
@@ -273,9 +274,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
   );
 
   // BASH2: Python one-liner. Tests that models hit language via the command.
-  it.runIf(() => available)(
+  it(
     "BASH2 python-one-liner: computes via `python -c`",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const session = makeSession(root);
       const tools = [pickBashExecutors(session).bash];
@@ -310,9 +312,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
 
   // BASH3: Nonzero exit recovery. Model runs failing cmd then corrects.
   // Stochastic — wrap in pass@k.
-  it.runIf(() => available)(
+  it(
     "BASH3 nonzero-exit-recovery: corrects after `ls` on missing path",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -360,9 +363,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
   );
 
   // BASH4: Output cap. Model runs a high-output command, must cope with cap.
-  it.runIf(() => available)(
+  it(
     "BASH4 output-cap: handles capped output via head+tail or log-path",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const session = makeSession(root, {
         maxOutputBytesInline: 1024,
@@ -398,9 +402,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
   );
 
   // BASH5: Nonsensitive env rejection. Model tries AWS_*, gets rejected, recovers.
-  it.runIf(() => available)(
+  it(
     "BASH5 sensitive-env-rejection: recovers from AWS_ env rejection",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const session = makeSession(root);
       const tools = [pickBashExecutors(session).bash];
@@ -432,9 +437,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
   );
 
   // BASH6: Interactive-rejection. Stochastic — wrap in pass@k.
-  it.runIf(() => available)(
+  it(
     "BASH6 interactive: avoids or recovers from an interactive-style command",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -476,9 +482,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
 
   // BASH7: Alias pushback — model passes 'cmd' instead of 'command'.
   // This tests that the alias hint routes the model back. Stochastic.
-  it.runIf(() => available)(
+  it(
     "BASH7 alias-pushback: recovers from wrong param name",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const r = await passAtK({
         n: 3,
         k: 2,
@@ -517,9 +524,10 @@ describe(`bash e2e hard [${LABEL}]`, () => {
   );
 
   // BASH8: Background jobs. Model starts a background command, polls, kills.
-  it.runIf(() => available)(
+  it(
     "BASH8 background: starts background job, polls bash_output, kills",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const session = makeSession(root);
       const picked = pickBashExecutors(session);

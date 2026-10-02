@@ -85,9 +85,10 @@ describe(`symlink e2e [${LABEL}]`, () => {
     }
   });
 
-  it.runIf(() => available)(
+  it(
     "read via symlink, edit via symlink — ledger identifies them as the same file",
-    async () => {
+    async (ctx) => {
+      if (!available) ctx.skip();
       const root = mkRoot();
       const realDir = path.join(root, "real");
       const linkDir = path.join(root, "link");
