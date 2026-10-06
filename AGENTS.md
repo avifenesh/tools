@@ -1,26 +1,26 @@
-# AGENTS.md — `@agent-sh/harness-*` monorepo
+# AGENTS.md: `@agent-sh/harness-*` monorepo
 
 Guidance for AI agents working on this repo. The repo builds LLM-facing agent
 tools (Read, Write, Grep, Glob, ...) as a TypeScript-first npm library, with
 Rust ports coming later. The tools are consumed by real language models inside
-agent harnesses — **not** by deterministic callers.
+agent harnesses, **not** by deterministic callers.
 
 ## The prime directive: treat LLM tools as a chaotic distributed system, not as kernel code
 
 The user is a systems software engineer (Valkey, CRIU, ElastiCache). These
-tools look like regular functions — typed inputs, typed outputs, clean error
-enums — but that framing is a trap. The consumer is a probabilistic model,
+tools look like regular functions (typed inputs, typed outputs, clean error
+enums), but that framing is a trap. The consumer is a probabilistic model,
 so the contract is not "given these args, produce this output." The contract is:
 
 > Given only the tool's *textual surface* (name, description, schema field
 > names, error messages, output shape, pagination hints), does a real model,
 > across many families (Qwen, Llama, GPT, Claude, Codex, DeepSeek), pick this tool,
-> call it correctly, interpret the result, and make good next moves —
+> call it correctly, interpret the result, and make good next moves
 > without giving up and falling back to Bash?
 
 That is the spec. Everything else is implementation detail.
 
-### Why this matters — the failure modes that unit tests never catch
+### Why this matters: the failure modes that unit tests never catch
 
 1. **Description-driven misuse.** An ambiguous parameter name (`path` vs
    `file_path`, `limit` vs `max_lines`) causes the model to pass the wrong
@@ -38,7 +38,7 @@ That is the spec. Everything else is implementation detail.
 6. **Tool-as-friction.** A well-intentioned safety rail (sensitive-path
    deny, forced pagination, mandatory ledger confirmation) makes the tool
    annoying enough that the model routes around it. The user has shipped
-   many tools and watched exactly this happen — "too many to count."
+   many tools and watched exactly this happen: "too many to count."
 
 Summary: LLMs are statistics. "Return 0 or 1" doesn't mean you get 0 or 1.
 Precisely because of that, you must be **more** systematic than you would
@@ -76,16 +76,19 @@ be for deterministic code, not less. Cover every edge case, every
 
 ## Operational rules for this repo
 
-- **Qwen models stay in thinking mode.** Never set `think: false` or use
-  `/no_think`. See `feedback_qwen_thinking.md` in auto-memory. This is
-  about tool-call quality, not latency.
+- **Keep Qwen models in thinking mode for e2e runs.** Do not pass
+  `think: false` or `/no_think` to a run that exercises a tool: thinking
+  off lowers tool-call quality, which is what the suites measure, so
+  latency is not a reason to turn it off. `think` defaults to `true` in
+  `packages/harness-e2e`; only the one-word warmup in
+  `packages/harness-e2e/src/warmup.ts` turns it off.
 - **E2E harness is `packages/harness-e2e`.** It is the canonical place to
   prove a tool works. New tools must land with a corresponding e2e suite
   that covers the categories above.
-- **Design before code.** The user reviews each design decision via
-  AskUserQuestion before implementation starts. The canonical spec lives
-  in `agent-knowledge/design/<tool>.md` and is the cross-language source
-  of truth for TS and future Rust ports.
+- **Spec and code move together.** Each tool's spec lives in
+  `agent-knowledge/design/` (for example `agent-knowledge/design/read.md`)
+  and is the cross-language source of truth for TS and future Rust ports.
+  When one changes, change the other in the same change.
 - **Safety rails must fail open to the hook, not hard-deny.** If a rail
   is annoying enough for the model to route around, it fails its purpose.
   Current pattern: sensitive-path and out-of-workspace requests go
@@ -111,20 +114,19 @@ be for deterministic code, not less. Cover every edge case, every
 - Published surface: umbrella `@agent-sh/harness-tools` plus per-tool
   packages (`@agent-sh/harness-read`, `-write`, `-grep`, `-glob`, ...).
 
-## Working-agreement reminders
+## Working agreement
 
-- Use AskUserQuestion for all decision prompts, not prose.
-- Don't implement ahead of the user's explicit go-ahead on design.
-- Keep the project spec (`agent-knowledge/design/*.md`) and the code in
-  sync — if one changes, change the other in the same change.
+- Once a task is authorized, design and implement it without asking at
+  each step. Ask only for a real safety boundary or a material change of
+  scope.
 
-## Worktree and tmp hygiene (owner, 2026-08-17)
+<!-- BEGIN:turborepo-agent-rules -->
 
-- When work in a git worktree is finished — merged, banked, or abandoned — clean it up
-  as part of finishing: `git worktree remove <path>` AND delete its branch
-  (`git branch -d`; `-D` only once the owner's merge/abandon decision is recorded).
-  A closed lane leaves no `wt-*` directory and no stale branch behind.
-- Every use of /tmp (or any scratch space) is cleaned by the task that created it:
-  delete scratch files and dirs when the task closes, not when disk pressure finds
-  them. Motivating incident 2026-08-17: 7 GB of dead lane dirs in /tmp plus an
-  unthrottled upload storm flooded 25 GB of swap and stalled the rig.
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->
